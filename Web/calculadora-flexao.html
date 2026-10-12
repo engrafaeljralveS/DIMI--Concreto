@@ -1,0 +1,546 @@
+<title>Calculadora de Flexão</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&display=swap">
+<style>
+/* Layout: coluna de dados à esquerda, resultados e seção transversal à direita; empilha no celular. */
+:root{
+  --bg:#e8eaeb;
+  --panel:#f4f5f5;
+  --ink:#171f25;
+  --muted:#5b6770;
+  --line:#c3c9cd;
+  --accent:#1f5c8b;
+  --accent-ink:#ffffff;
+  --rebar:#b4452a;
+  --ok:#2a7a4b;
+  --warn:#a8650b;
+  --bad:#b3261e;
+  --conc:#d5d9dc;
+  --conc-hi:#9fb9cf;
+  --f-display:'Barlow Condensed','Arial Narrow',sans-serif;
+  --f-body:'Source Sans 3',system-ui,sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12181d;--panel:#1a2229;--ink:#e6eaed;--muted:#93a0a9;--line:#2f3a43;
+    --accent:#6fb0e0;--accent-ink:#0c1419;--rebar:#e47a5e;--ok:#5cc58a;--warn:#e0a14a;--bad:#f0877f;
+    --conc:#2a343c;--conc-hi:#3f6485;color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12181d;--panel:#1a2229;--ink:#e6eaed;--muted:#93a0a9;--line:#2f3a43;
+  --accent:#6fb0e0;--accent-ink:#0c1419;--rebar:#e47a5e;--ok:#5cc58a;--warn:#e0a14a;--bad:#f0877f;
+  --conc:#2a343c;--conc-hi:#3f6485;color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;padding-inline:16px;padding-block:24px 48px}
+.wrap{max-width:1080px;margin-inline:auto}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 24px;border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:20px}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(30px,6vw,44px);line-height:1;margin:0;letter-spacing:.01em;text-transform:uppercase;text-wrap:balance}
+.sub{font-family:var(--f-mono);font-size:12px;color:var(--muted);letter-spacing:.04em}
+.grid{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);padding:16px}
+h2{font-family:var(--f-display);font-weight:600;font-size:20px;letter-spacing:.06em;text-transform:uppercase;margin:0 0 12px;color:var(--ink)}
+fieldset{border:0;padding:0;margin:0 0 18px}
+legend{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:0;margin-bottom:8px;border-bottom:1px solid var(--line);width:100%;padding-bottom:4px}
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+label{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--muted);min-width:0}
+label span.u{font-family:var(--f-mono);font-size:11px}
+input,select{font-family:var(--f-mono);font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);padding:7px 8px;width:100%;min-width:0;border-radius:2px}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.full{grid-column:1/-1}
+button{font-family:var(--f-display);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:16px;background:var(--accent);color:var(--accent-ink);border:0;padding:9px 14px;cursor:pointer;border-radius:2px}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.seg{display:grid;grid-template-columns:1fr 1fr;margin-bottom:16px;border:1px solid var(--ink);border-radius:2px;overflow:hidden}
+.seg button{background:transparent;color:var(--ink);border-radius:0;padding:9px 6px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.bar-row{border-top:1px solid var(--line);padding:12px 0}
+.bar-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;margin-bottom:8px}
+.bar-head strong{font-family:var(--f-display);font-weight:600;font-size:17px;letter-spacing:.05em;text-transform:uppercase}
+.need{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.bar-ctl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:10px;align-items:end;max-width:420px}
+.bar-ctl button{padding:8px 12px}
+.bar-res{margin-top:10px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+.bar-sum{font-family:var(--f-mono);font-size:13px;margin-right:6px}
+.hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+.k{border-top:3px solid var(--ink);padding-top:6px}
+.k .l{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.k .v{font-family:var(--f-display);font-weight:600;font-size:38px;line-height:1.05;font-variant-numeric:tabular-nums}
+.k .v small{font-family:var(--f-mono);font-size:12px;font-weight:400;color:var(--muted);margin-left:4px}
+.k.main{border-top-color:var(--rebar)}
+.pill{display:inline-block;font-family:var(--f-mono);font-size:12px;padding:2px 8px;border:1px solid currentColor;border-radius:2px;margin:0 6px 6px 0}
+.pill.ok{color:var(--ok)}.pill.warn{color:var(--warn)}.pill.bad{color:var(--bad)}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+@media (max-width:640px){.two{grid-template-columns:minmax(0,1fr)}}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:right;padding:5px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+th{font-family:var(--f-mono);font-weight:500;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+td{font-family:var(--f-mono)}
+th:first-child,td:first-child{text-align:left}
+tr.best td{color:var(--accent);font-weight:600}
+dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px}
+dt{color:var(--muted)}
+dd{margin:0;font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+svg{display:block;width:100%;height:auto;max-height:340px}
+.s-conc{fill:var(--conc);stroke:var(--ink);stroke-width:1.5}
+.s-comp{fill:var(--conc-hi);opacity:.85}
+.s-na{stroke:var(--accent);stroke-width:1.5;stroke-dasharray:6 4}
+.s-bar{fill:var(--rebar)}
+.s-dim{stroke:var(--muted);stroke-width:1;fill:none}
+.s-txt{fill:var(--muted);font-family:var(--f-mono);font-size:11px}
+.s-txt-i{fill:var(--ink);font-family:var(--f-mono);font-size:11px}
+.msg{font-size:13px;color:var(--muted);margin:10px 0 0}
+.err{color:var(--bad);font-family:var(--f-mono);font-size:13px;margin:0 0 12px}
+footer{margin-top:18px;font-size:12px;color:var(--muted);max-width:75ch}
+@media (prefers-reduced-motion:no-preference){.k .v{transition:color .2s}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Calculadora de Flexão</h1>
+    <div class="sub" id="sub">NBR 6118 · SEÇÃO RETANGULAR · FLEXÃO SIMPLES · ATÉ C90</div>
+  </header>
+
+  <div class="grid">
+    <form class="panel" id="form" autocomplete="off">
+      <h2>Dados de entrada</h2>
+      <div class="seg" role="group" aria-label="Tipo de solicitação">
+        <button type="button" id="m-flex" aria-pressed="true">Flexão simples</button>
+        <button type="button" id="m-ft" aria-pressed="false">Flexo-tração</button>
+      </div>
+      <fieldset>
+        <legend>Materiais</legend>
+        <div class="fields">
+          <label>fck <span class="u">MPa</span>
+            <select id="fck">
+              <option>20</option><option>25</option><option selected>30</option><option>35</option><option>40</option><option>45</option><option>50</option><option>55</option><option>60</option><option>65</option><option>70</option><option>75</option><option>80</option><option>85</option><option>90</option>
+            </select></label>
+          <label>Aço
+            <select id="fyk"><option value="500" selected>CA-50 (500 MPa)</option><option value="600">CA-60 (600 MPa)</option><option value="250">CA-25 (250 MPa)</option></select></label>
+          <label>γc<input id="gc" type="number" step="0.05" value="1.4" min="1"></label>
+          <label>γs<input id="gs" type="number" step="0.05" value="1.15" min="1"></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Geometria</legend>
+        <div class="fields">
+          <label>b <span class="u">cm</span><input id="b" type="number" step="1" value="20" min="1"></label>
+          <label>h <span class="u">cm</span><input id="h" type="number" step="1" value="50" min="1"></label>
+          <label title="Distância do CG da armadura à borda (face superior ou inferior)">d' <span class="u">cm</span><input id="dl" type="number" step="0.1" value="4" min="0.5"></label>
+          <label title="Distância do centro da barra de canto à face lateral (cobrimento + estribo + ø/2)">c lateral <span class="u">cm</span><input id="cl" type="number" step="0.1" value="4" min="0.5"></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Solicitação</legend>
+        <div class="fields">
+          <label>Mk <span class="u">kN·m</span><input id="mk" type="number" step="1" value="120"></label>
+          <label>γf<input id="gf" type="number" step="0.05" value="1.4" min="1"></label>
+          <label id="nk-wrap" class="full" hidden>Nk (tração) <span class="u">kN</span><input id="nk" type="number" step="1" value="150" min="0"></label>
+          <label title="Momento na combinação frequente de ações (verificação de fissuração)">Mser <span class="u">kN·m</span><input id="ms" type="number" step="1" value="85"></label>
+          <label id="ns-wrap" title="Esforço normal de tração na combinação frequente" hidden>Nser <span class="u">kN</span><input id="ns" type="number" step="1" value="105" min="0"></label>
+          <label class="full">Classe de agressividade (wk,lim)<select id="caa"><option value="0.4">CAA I · 0,4 mm</option><option value="0.3">CAA II · 0,3 mm</option><option value="0.3">CAA III · 0,3 mm</option><option value="0.2">CAA IV · 0,2 mm</option></select></label>
+        </div>
+      </fieldset>
+      <div class="row">
+        <button type="button" id="reset" class="ghost">Valores de exemplo</button>
+      </div>
+      <p class="msg">Os valores iniciais são um exemplo (viga 20×50 cm, C30, CA-50, Mk = 120 kN·m; na flexo-tração, Nk = 150 kN). O cálculo atualiza a cada alteração.</p>
+    </form>
+
+    <div class="panel">
+      <div id="out"></div>
+      <section id="armaduras" hidden>
+        <h2 style="margin-top:20px">Escolha das barras</h2>
+        <div class="bar-row" id="row-inf">
+          <div class="bar-head"><strong id="lbl-inf">Armadura inferior (As)</strong><span class="need" id="need-inf"></span></div>
+          <div class="bar-ctl">
+            <label>ø (mm)<select id="phi-inf"><option value="6.3">6,3</option><option value="8">8</option><option value="10">10</option><option value="12.5">12,5</option><option value="16">16</option><option value="20">20</option><option value="25">25</option><option value="32">32</option></select></label>
+            <label>Espaçamento s (cm)<input id="s-inf" type="number" step="0.1" min="0.5"></label>
+            <button type="button" class="ghost" id="sg-inf">Sugerir</button>
+          </div>
+          <div class="bar-res" id="res-inf"></div>
+        </div>
+        <div class="bar-row" id="row-sup" hidden>
+          <div class="bar-head"><strong id="lbl-sup">Armadura superior (As')</strong><span class="need" id="need-sup"></span></div>
+          <div class="bar-ctl">
+            <label>ø (mm)<select id="phi-sup"><option value="6.3">6,3</option><option value="8">8</option><option value="10">10</option><option value="12.5">12,5</option><option value="16">16</option><option value="20">20</option><option value="25">25</option><option value="32">32</option></select></label>
+            <label>Espaçamento s (cm)<input id="s-sup" type="number" step="0.1" min="0.5"></label>
+            <button type="button" class="ghost" id="sg-sup">Sugerir</button>
+          </div>
+          <div class="bar-res" id="res-sup"></div>
+        </div>
+        <div id="fissura"></div>
+      </section>    </div>
+  </div>
+
+  <footer>Cálculo com diagrama retangular de tensões no concreto (λ e αc conforme NBR 6118:2014, item 17.2.2) e limite de posição da linha neutra x/d de 0,45 (fck ≤ 50 MPa) ou 0,35 (fck &gt; 50 MPa). Resultado preliminar: confira e detalhe o dimensionamento conforme a norma e o projeto.</footer>
+</div>
+
+<script>
+(function(){
+  var $ = function(id){return document.getElementById(id)};
+  var defaults = {fck:'30',fyk:'500',gc:'1.4',gs:'1.15',b:'20',h:'50',dl:'4',cl:'4',mk:'120',gf:'1.4',nk:'150',ms:'85',ns:'105',caa:'0.3'};
+  var ids = Object.keys(defaults);
+  var mode = 'flex';
+
+  function fmt(v,n){ if(!isFinite(v)) return '–'; return v.toLocaleString('pt-BR',{minimumFractionDigits:n,maximumFractionDigits:n}); }
+
+  function params(fck){
+    var lam = fck<=50 ? 0.8 : 0.8-(fck-50)/400;
+    var ac  = fck<=50 ? 0.85 : 0.85*(1-(fck-50)/200);
+    var ecu = fck<=50 ? 3.5 : 2.6+35*Math.pow((90-fck)/100,4);
+    var xlim = fck<=50 ? 0.45 : 0.35;
+    var fctm = fck<=50 ? 0.3*Math.pow(fck,2/3) : 2.12*Math.log(1+0.11*fck);
+    return {lam:lam,ac:ac,ecu:ecu,xlim:xlim,fctm:fctm,fctksup:1.3*fctm};
+  }
+
+  // unidades: kN e cm. Flexão simples (armadura simples ou dupla).
+  function design(Md,P,b,d,dl,fcd,fyd,Es){
+    var A = P.ac*fcd*b*d*d;
+    var ratio = Md/A;
+    var disc = 1-2*ratio;
+    var xi = disc>=0 ? (1-Math.sqrt(disc))/P.lam : Infinity;
+    if(xi<=P.xlim){
+      var x = xi*d;
+      var z = d-P.lam*x/2;
+      return {dupla:false,x:x,xi:xi,As:Md/(fyd*z),Asc:0,sigc:0,epsc:0,z:z};
+    }
+    var xl = P.xlim*d;
+    var M1 = P.ac*fcd*b*P.lam*xl*(d-P.lam*xl/2);
+    var dM = Md-M1;
+    var epsc = (P.ecu/1000)*(xl-dl)/xl;
+    if(epsc<=0) return {erro:'d\' é maior que a profundidade da linha neutra limite. A armadura comprimida não trabalha: aumente a altura da seção.'};
+    var sig = Math.min(fyd,Es*epsc);
+    var Asc = dM/(sig*(d-dl));
+    var As = M1/(fyd*(d-P.lam*xl/2)) + Asc*sig/fyd;
+    return {dupla:true,x:xl,xi:P.xlim,As:As,Asc:Asc,sigc:sig,epsc:epsc,z:d-P.lam*xl/2};
+  }
+
+  var last = null, shown = {inf:false,sup:false};
+
+  function barArea(phi){ return Math.PI*Math.pow(phi/10,2)/4; }
+  // espaçamento livre mínimo (cm): máx(2 cm, ø, 1,2 · dmáx com brita 1 = 19 mm)
+  function ahMin(phi){ return Math.max(2,phi/10,1.2*1.9); }
+  function nBars(b,cl,s){ return Math.max(0,Math.floor((b-2*cl)/s+1e-9))+1; }
+
+  // primeira bitola que cabe em uma camada com o espaçamento livre mínimo
+  function suggest(req,b,cl){
+    var w = b-2*cl, pick = null;
+    [10,12.5,16,20,25,32].some(function(phi){
+      var n = Math.max(2,Math.ceil(req/barArea(phi)-1e-9));
+      var s = w/(n-1);
+      if(w>0 && s-phi/10 >= ahMin(phi)-1e-9){ pick = {phi:phi,s:s}; return true; }
+      return false;
+    });
+    if(!pick) pick = {phi:25,s:ahMin(25)+2.5};
+    pick.s = Math.floor(pick.s*10)/10;
+    return pick;
+  }
+
+  function renderBar(k,req,o){
+    var res = $('res-'+k);
+    var phi = parseFloat($('phi-'+k).value), s = parseFloat($('s-'+k).value);
+    if(!isFinite(phi)||!isFinite(s)||s<=0){ res.innerHTML = '<span class="pill warn">Informe o espaçamento</span>'; return; }
+    var n = nBars(o.b,o.cl,s), as = n*barArea(phi);
+    var ok = as>=req-1e-9;
+    var h = '<span class="bar-sum">'+n+' ø '+String(phi).replace('.',',')+' c/ '+fmt(s,1)+' cm · As,ef = '+fmt(as,2)+' cm²</span>';
+    h += ok ? '<span class="pill ok">Suficiente · folga '+fmt((as/req-1)*100,1)+' %</span>'
+            : '<span class="pill bad">Insuficiente · faltam '+fmt(req-as,2)+' cm²</span>';
+    var clear = s-phi/10, need = ahMin(phi);
+    if(n>=2 && clear<need-1e-9) h += '<span class="pill warn">Espaço livre '+fmt(clear,1)+' cm, mínimo '+fmt(need,1)+' cm</span>';
+    if(n<2) h += '<span class="pill warn">Menos de 2 barras na largura</span>';
+    res.innerHTML = h;
+  }
+
+  function updateBars(sug,o){
+    $('armaduras').hidden = false;
+    var rows = [
+      {k:'inf',req:o.inf,lbl:'Armadura inferior (As)'},
+      {k:'sup',req:o.sup,lbl:(o.kind==='pequena'?'Armadura superior (As\', tracionada)':'Armadura superior (As\', compressão)')}
+    ];
+    rows.forEach(function(r){
+      var vis = r.k==='inf' || r.req>1e-9;
+      $('row-'+r.k).hidden = !vis;
+      if(!vis){ shown[r.k] = false; return; }
+      if(sug || !shown[r.k]){
+        var p = suggest(r.req,o.b,o.cl);
+        $('phi-'+r.k).value = String(p.phi);
+        $('s-'+r.k).value = String(p.s);
+      }
+      shown[r.k] = true;
+      $('lbl-'+r.k).textContent = r.lbl;
+      $('need-'+r.k).textContent = 'Necessária: '+fmt(r.req,2)+' cm²';
+      renderBar(r.k,r.req,o);
+    });
+    renderFissura(o);
+  }
+
+  // Verificação de fissuração (NBR 6118, 17.3.3.2): combinação frequente, estádio II
+  function renderFissura(o){
+    var box = $('fissura'), v = o.v, P = params(v.fck);
+    var phi = parseFloat($('phi-inf').value), s = parseFloat($('s-inf').value);
+    if(!isFinite(phi)||!isFinite(s)||s<=0){ box.innerHTML = ''; return; }
+    var n = nBars(o.b,o.cl,s), As = n*barArea(phi);
+    var Asc = 0;
+    if(!$('row-sup').hidden){
+      var ps = parseFloat($('phi-sup').value), ss = parseFloat($('s-sup').value);
+      if(isFinite(ps)&&isFinite(ss)&&ss>0) Asc = nBars(o.b,o.cl,ss)*barArea(ps);
+    }
+    var wlim = v.caa;
+    var eta1 = v.fyk>=600 ? 1.4 : (v.fyk<=250 ? 1.0 : 2.25);
+    var Eci = v.fck<=50 ? 5600*Math.sqrt(v.fck) : 21500*Math.pow(v.fck/10+1.25,1/3);
+    var Ecs = Math.min(1,0.8+0.2*v.fck/80)*Eci;   // MPa
+    var Es = 210000, ae = Es/Ecs;
+    var d = v.h-v.dl;
+    var Mser = Math.abs(v.ms)*100;                 // kN·cm
+    var Nser = o.ft ? Math.abs(v.ns) : 0;          // kN
+    var title = '<h2 style="margin-top:20px">Verificação de fissuração</h2>';
+    if(Mser<=0 && Nser<=0){ box.innerHTML = title+'<p class="msg">Informe Mser'+(o.ft?' e Nser':'')+' para verificar.</p>'; return; }
+
+    var x = NaN, sig = NaN, tipo = 'Estádio II';
+    var e0s = Nser>0 ? Mser/Nser : Infinity;
+    if(Nser>0 && e0s <= v.h/2-v.dl){
+      tipo = 'Seção inteira tracionada';
+      sig = Nser*(v.h/2+e0s-v.dl)/((d-v.dl)*As);
+    } else {
+      var Ms = Mser - Nser*(v.h/2-v.dl);
+      var calc = function(xx){
+        var r = xx/(ae*(d-xx));
+        var Cc = v.b*xx*r/2;
+        var Cs = (Asc>0 && xx>v.dl) ? Asc*ae*r*(xx-v.dl)/xx : 0;
+        return {g:As-Cc-Cs, f:Cc*(d-xx/3)+Cs*(d-v.dl)};
+      };
+      var hf = function(xx){ var q = calc(xx); return Ms*q.g - Nser*q.f; };
+      var lo = d*0.0005, hi = d*0.9995, steps = 2000;
+      var a = lo, ha = hf(a), b2 = a, found = false;
+      for(var i=1;i<=steps;i++){
+        b2 = lo+(hi-lo)*i/steps;
+        var hb = hf(b2);
+        if(ha*hb<0){ found = true; break; }
+        a = b2; ha = hb;
+      }
+      if(found){
+        for(var k=0;k<60;k++){
+          var m = (a+b2)/2, hm = hf(m);
+          if(ha*hm<=0){ b2 = m; } else { a = m; ha = hm; }
+        }
+        x = (a+b2)/2;
+        sig = Ms/calc(x).f;
+      }
+    }
+    if(!isFinite(sig) || sig<=0){
+      box.innerHTML = title+'<p class="err">Não foi possível determinar a tensão na armadura no estádio II com os dados informados.</p>';
+      return;
+    }
+    var phic = phi/10, sigM = sig*10;              // MPa
+    var hA = Math.min(v.dl,7.5*phic) + Math.min(7.5*phic, isNaN(x) ? (v.h-v.dl) : Math.max(0,d-x));
+    var wA = 2*Math.min(o.cl,7.5*phic) + Math.max(0,n-1)*Math.min(s,15*phic);
+    var Acri = hA*wA, rho = As/Acri;
+    var kk = phi/(12.5*eta1)*sigM/Es;
+    var w1 = kk*3*sigM/P.fctm, w2 = kk*(4/rho+45);
+    var wk = Math.min(w1,w2);
+    var ok = wk<=wlim+1e-9;
+    box.innerHTML = title +
+      '<div class="bar-res" style="margin:0 0 10px"><span class="bar-sum">wk = '+fmt(wk,3)+' mm · limite '+fmt(wlim,1)+' mm</span>'+
+      (ok ? '<span class="pill ok">Atende</span>' : '<span class="pill bad">Não atende</span>')+'</div>'+
+      '<dl>'+
+        '<dt>Barras adotadas (inferior)</dt><dd>'+n+' ø '+String(phi).replace('.',',')+' c/ '+fmt(s,1)+' cm</dd>'+
+        '<dt>Situação da seção</dt><dd>'+tipo+'</dd>'+
+        (isNaN(x) ? '' : '<dt>x (estádio II)</dt><dd>'+fmt(x,2)+' cm</dd>')+
+        '<dt>Ecs · αe = Es/Ecs</dt><dd>'+fmt(Ecs/1000,1)+' GPa · '+fmt(ae,2)+'</dd>'+
+        '<dt>σs (combinação frequente)</dt><dd>'+fmt(sigM,1)+' MPa</dd>'+
+        '<dt>η1 · fctm</dt><dd>'+fmt(eta1,2)+' · '+fmt(P.fctm,2)+' MPa</dd>'+
+        '<dt>Acri · ρri</dt><dd>'+fmt(Acri,1)+' cm² · '+fmt(rho*100,2)+' %</dd>'+
+        '<dt>w1 (3σs/fctm)</dt><dd>'+fmt(w1,3)+' mm</dd>'+
+        '<dt>w2 (4/ρri + 45)</dt><dd>'+fmt(w2,3)+' mm</dd>'+
+      '</dl>';
+  }
+
+  function refresh(){ if(last) updateBars(false,last); }
+
+  function setMode(m){
+    mode = m;
+    $('m-flex').setAttribute('aria-pressed', m==='flex'?'true':'false');
+    $('m-ft').setAttribute('aria-pressed', m==='ft'?'true':'false');
+    $('nk-wrap').hidden = (m!=='ft');
+    $('ns-wrap').hidden = (m!=='ft');
+    $('sub').textContent = 'NBR 6118 · SEÇÃO RETANGULAR · '+(m==='ft'?'FLEXO-TRAÇÃO':'FLEXÃO SIMPLES')+' · ATÉ C90';
+    compute(true);
+  }
+
+  function compute(sug){
+    $('armaduras').hidden = true;
+    var v = {};
+    ids.forEach(function(i){ v[i] = parseFloat($(i).value.replace(',','.')); });
+    var out = $('out');
+    var bad = ids.some(function(i){return !isFinite(v[i])});
+    if(bad){ out.innerHTML='<h2>Resultados</h2><p class="err">Preencha todos os campos com números.</p>'; return; }
+    var P = params(v.fck);
+    var d = v.h-v.dl;
+    if(d<=0||v.b<=0||v.dl<=0||v.h-2*v.dl<=0){ out.innerHTML='<h2>Resultados</h2><p class="err">Confira a geometria: h deve ser maior que 2·d\'.</p>'; return; }
+    var fcd = v.fck/v.gc/10;      // kN/cm²
+    var fyd = v.fyk/v.gs/10;      // kN/cm²
+    var Es = 21000;               // kN/cm²
+    var eyd = fyd/Es*1000;        // ‰
+    var Md = Math.abs(v.mk)*v.gf*100; // kN·cm
+    var Nd = (mode==='ft') ? Math.abs(v.nk)*v.gf : 0; // kN (tração)
+    var ft = mode==='ft' && Nd>0;
+
+    var kind, r, As, Asc, e0=0, Ms=0, lim=0;
+    if(!ft){
+      kind = 'flex';
+      r = design(Md,P,v.b,d,v.dl,fcd,fyd,Es);
+      if(r.erro){ out.innerHTML='<h2>Resultados</h2><p class="err">'+r.erro+'</p>'; return; }
+      As = r.As; Asc = r.Asc;
+    } else {
+      e0 = Md/Nd;
+      lim = v.h/2 - v.dl;
+      if(e0<=lim){
+        kind = 'pequena';
+        r = {dupla:false};
+        As  = Nd*(v.h/2+e0-v.dl)/((d-v.dl)*fyd);
+        Asc = Nd*(v.h/2-e0-v.dl)/((d-v.dl)*fyd);
+      } else {
+        kind = 'grande';
+        Ms = Md - Nd*(v.h/2-v.dl);
+        r = design(Ms,P,v.b,d,v.dl,fcd,fyd,Es);
+        if(r.erro){ out.innerHTML='<h2>Resultados</h2><p class="err">'+r.erro+'</p>'; return; }
+        As = r.As + Nd/fyd; Asc = r.Asc;
+      }
+    }
+
+    // armadura mínima de flexão: Md,min = 0,8 W0 fctk,sup (referência)
+    var W0 = v.b*v.h*v.h/6;
+    var Mdmin = 0.8*W0*(P.fctksup/10);
+    var rm = design(Mdmin,P,v.b,d,v.dl,fcd,fyd,Es);
+    var Asmin = rm.erro ? NaN : rm.As;
+    var rhomin = Asmin/(v.b*v.h)*100;
+    var Asmax = 0.04*v.b*v.h;
+
+    var Asef, epss=NaN, dom='';
+    if(kind==='pequena'){
+      Asef = As;
+    } else {
+      Asef = (kind==='flex') ? Math.max(As,Asmin) : As;
+      epss = P.ecu*(d-r.x)/r.x;
+      dom = epss>=10 ? '2' : (epss>=eyd ? '3' : '4');
+    }
+
+    var pills = '';
+    if(kind==='pequena'){
+      pills += '<span class="pill warn">Pequena excentricidade</span><span class="pill ok">Seção inteira tracionada</span>';
+      if(As+Asc<Asmin) pills += '<span class="pill warn">As+As\' abaixo do As,mín de flexão</span>';
+    } else {
+      if(kind==='grande') pills += '<span class="pill warn">Grande excentricidade</span>';
+      pills += r.dupla ? '<span class="pill warn">Armadura dupla</span>' : '<span class="pill ok">Armadura simples</span>';
+      pills += '<span class="pill '+(dom==='4'?'bad':'ok')+'">Domínio '+dom+'</span>';
+      if(kind==='flex') pills += As<Asmin ? '<span class="pill warn">Governa As,mín</span>' : '<span class="pill ok">Governa o cálculo</span>';
+      if(kind==='grande' && As<Asmin) pills += '<span class="pill warn">As abaixo do As,mín de flexão</span>';
+    }
+    if(Asef+Asc>Asmax) pills += '<span class="pill bad">As+As\' acima de 4% Ac</span>';
+
+    var third = (kind==='pequena')
+      ? '<div class="k"><div class="l">e0 = Md / Nd</div><div class="v">'+fmt(e0,1)+'<small>lim. '+fmt(lim,1)+' cm</small></div></div>'
+      : '<div class="k"><div class="l">x / d</div><div class="v">'+fmt(r.xi,3)+'<small>lim. '+fmt(P.xlim,2)+'</small></div></div>';
+
+    var dlist = '<dt>Md = γf · Mk</dt><dd>'+fmt(Md/100,1)+' kN·m</dd>';
+    if(ft){
+      dlist += '<dt>Nd = γf · Nk</dt><dd>'+fmt(Nd,1)+' kN</dd>'+
+               '<dt>e0 = Md / Nd</dt><dd>'+fmt(e0,1)+' cm</dd>'+
+               '<dt>h/2 − d\'</dt><dd>'+fmt(lim,1)+' cm</dd>';
+      if(kind==='grande') dlist += '<dt>Ms = Md − Nd·(h/2 − d\')</dt><dd>'+fmt(Ms/100,1)+' kN·m</dd>';
+    }
+    dlist += '<dt>d = h − d\'</dt><dd>'+fmt(d,1)+' cm</dd>'+
+             '<dt>fcd</dt><dd>'+fmt(fcd*10,2)+' MPa</dd>'+
+             '<dt>fyd</dt><dd>'+fmt(fyd*10,1)+' MPa</dd>';
+    if(kind!=='pequena'){
+      dlist += '<dt>λ · αc</dt><dd>'+fmt(P.lam,3)+' · '+fmt(P.ac,3)+'</dd>'+
+               '<dt>εcu</dt><dd>'+fmt(P.ecu,2)+' ‰</dd>'+
+               '<dt>x</dt><dd>'+fmt(r.x,2)+' cm</dd>'+
+               '<dt>εs (tração)</dt><dd>'+fmt(epss,2)+' ‰</dd>';
+    }
+    dlist += '<dt>As calculada</dt><dd>'+fmt(As,2)+' cm²</dd>'+
+             '<dt>As,mín (ρmín = '+fmt(rhomin,3)+' %)</dt><dd>'+fmt(Asmin,2)+' cm²</dd>'+
+             '<dt>As,máx (4 % Ac)</dt><dd>'+fmt(Asmax,2)+' cm²</dd>';
+    if(r.dupla) dlist += '<dt>σs\' (compressão)</dt><dd>'+fmt(r.sigc*10,1)+' MPa</dd>';
+
+    var lblTop = (kind==='pequena') ? 'As\' (face superior)' : 'As\' (compressão)';
+
+    out.innerHTML =
+      '<h2>Resultados</h2>'+
+      '<div class="hero">'+
+        '<div class="k main"><div class="l">As (inferior)</div><div class="v">'+fmt(Asef,2)+'<small>cm²</small></div></div>'+
+        '<div class="k"><div class="l">'+lblTop+'</div><div class="v">'+fmt(Asc,2)+'<small>cm²</small></div></div>'+
+        third+
+      '</div>'+
+      '<div>'+pills+'</div>'+
+      '<div class="two" style="margin-top:14px">'+
+        '<div>'+svg(v,d,r,P,kind)+'</div>'+
+        '<div><dl>'+dlist+'</dl></div>'+
+      '</div>'+
+      '';
+    last = {inf:Asef,sup:Asc,kind:kind,b:v.b,cl:v.cl,v:v,ft:ft};
+    updateBars(sug,last);
+  }
+
+  function svg(v,d,r,P,kind){
+    var W=300,H=280,pad=34;
+    var sc = Math.min((W-2*pad-20)/v.b,(H-2*pad)/v.h);
+    var bw=v.b*sc, hh=v.h*sc;
+    var x0=(W-bw)/2+8, y0=(H-hh)/2;
+    var yAs = y0+hh-v.dl*sc;
+    var yAsc = y0+v.dl*sc;
+    var s = '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Seção transversal com armaduras">';
+    s += '<rect class="s-conc" x="'+x0+'" y="'+y0+'" width="'+bw+'" height="'+hh+'"/>';
+    if(kind!=='pequena'){
+      var xn = y0 + r.x*sc;
+      var comp = P.lam*r.x*sc;
+      s += '<rect class="s-comp" x="'+(x0+1)+'" y="'+(y0+1)+'" width="'+(bw-2)+'" height="'+Math.max(0,Math.min(comp,hh-2))+'"/>';
+      s += '<line class="s-na" x1="'+(x0-10)+'" x2="'+(x0+bw+10)+'" y1="'+xn+'" y2="'+xn+'"/>';
+      s += '<text class="s-txt-i" x="'+(x0+bw+12)+'" y="'+(xn+4)+'">LN</text>';
+    }
+    var nb = Math.max(2,Math.min(5,Math.round(bw/32)));
+    var rad = Math.max(3,Math.min(6,bw/(nb*5)));
+    var ins = rad+6;
+    for(var i=0;i<nb;i++){
+      var cx = x0+ins+(bw-2*ins)*(i/(nb-1));
+      s += '<circle class="s-bar" cx="'+cx+'" cy="'+yAs+'" r="'+rad+'"/>';
+    }
+    if(kind==='pequena' || r.dupla){
+      var rr = kind==='pequena' ? rad : rad*0.75;
+      var nt = kind==='pequena' ? nb : 2;
+      for(var j=0;j<nt;j++){
+        var cx2 = x0+ins+(bw-2*ins)*(j/(nt-1));
+        s += '<circle class="s-bar" cx="'+cx2+'" cy="'+yAsc+'" r="'+rr+'"/>';
+      }
+    }
+    s += '<line class="s-dim" x1="'+x0+'" x2="'+(x0+bw)+'" y1="'+(y0+hh+14)+'" y2="'+(y0+hh+14)+'"/>';
+    s += '<text class="s-txt" text-anchor="middle" x="'+(x0+bw/2)+'" y="'+(y0+hh+27)+'">b = '+fmt(v.b,0)+' cm</text>';
+    s += '<line class="s-dim" y1="'+y0+'" y2="'+(y0+hh)+'" x1="'+(x0-14)+'" x2="'+(x0-14)+'"/>';
+    s += '<text class="s-txt" text-anchor="middle" transform="translate('+(x0-20)+','+(y0+hh/2)+') rotate(-90)">h = '+fmt(v.h,0)+' cm</text>';
+    s += '</svg>';
+    return s;
+  }
+
+  ids.forEach(function(i){ $(i).addEventListener('input',function(){compute()}); $(i).addEventListener('change',function(){compute()}); });
+  ['inf','sup'].forEach(function(k){
+    $('phi-'+k).addEventListener('change',refresh);
+    $('s-'+k).addEventListener('input',refresh);
+    $('sg-'+k).addEventListener('click',function(){
+      if(!last) return;
+      var p = suggest(last[k],last.b,last.cl);
+      $('phi-'+k).value = String(p.phi);
+      $('s-'+k).value = String(p.s);
+      refresh();
+    });
+  });
+  $('form').addEventListener('submit',function(e){e.preventDefault()});
+  $('reset').addEventListener('click',function(){ ids.forEach(function(i){ $(i).value = defaults[i]; }); compute(true); });
+  $('m-flex').addEventListener('click',function(){setMode('flex')});
+  $('m-ft').addEventListener('click',function(){setMode('ft')});
+  compute(true);
+})();
+</script>
