@@ -1,6 +1,6 @@
 # Muro de vedação – v6
 
-Aplicativo em uma única página HTML para dimensionar muro de vedação de divisa. Para usar, abra `muro-vedacao-v6.html` no navegador.
+Aplicativo em uma única página HTML para dimensionar muro de vedação de divisa. Para usar: https://engrafaeljralves.github.io/DIMI--Concreto/muro-vedacao/ (GitHub Pages), ou abra `muro-vedacao-v6.html` no navegador.
 
 **Sistemas**
 - Pilares de concreto com alvenaria de vedação, baldrame, cinta superior e sapata isolada ou corrida, de divisa ou centrada.

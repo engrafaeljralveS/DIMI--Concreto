@@ -1487,6 +1487,14 @@ function docxParts(R,figs,state){
   };
 }
 // acesso ao download: confere a permissão e explica o que fazer quando não está disponível
+// Salva um arquivo: no claude.ai usa a capacidade de downloads; fora dele (GitHub Pages, arquivo local) usa o download do navegador.
+function browserSave(nm,blob){try{const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=nm;a.rel='noopener';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(url);a.remove()},2000);return true}catch(e){return false}}
+async function saveFile(nm,blob,say){
+  const C=window.claude;
+  if(C&&typeof C.use==='function'){let dl=null;try{dl=await C.use('downloads')}catch(e){}
+    if(dl){const d2=await getDownloads(say);if(!d2)return false;await d2.save({filename:nm,data:blob});return true}}
+  return browserSave(nm,blob);
+}
 async function getDownloads(say){
   const C=window.claude;
   if(!C||typeof C.use!=='function'){say('Esta visualização não permite salvar arquivos. Abra o aplicativo pelo link do artefato no claude.ai, ou use "Copiar dados" e cole no chat.');return null}
@@ -1523,10 +1531,8 @@ async function gerarMemorial(){
     if(typeof JSZip==='undefined'){say('Não foi possível carregar o gerador de Word. Verifique a conexão e tente de novo.');return}
     const zip=new JSZip();Object.entries(parts).forEach(([k,v])=>zip.file(k,v));figs.filter(Boolean).forEach(g=>zip.file('word/media/'+g.name,g.buf));
     const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
-    const dl=await getDownloads(say);
-    if(!dl)return;
     const d=new Date(),nm=`Memorial muro de vedacao ${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}.docx`;
-    await dl.save({filename:nm,data:blob});say('Memorial salvo.');
+    if(await saveFile(nm,blob,say))say('Memorial salvo.');
   }catch(e){const c=e&&e.code;say(c==='declined'?'Download cancelado.':c==='rate_limited'?'Já há um download aguardando confirmação.':'Não foi possível gerar o memorial. Tente de novo.')}
 }
 
@@ -1547,9 +1553,9 @@ async function exportarModelo(){
   const txt=modeloJSON(),d=new Date(),dt=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const base=(I.nomeModelo||'modelo').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\w\- ]+/g,' ').trim().replace(/\s+/g,' ').slice(0,60)||'modelo';
   const nm=`Muro - ${base} - ${dt}.json`;
-  try{const dl=await getDownloads(sayM);
-    if(!dl){$('modeloTxt').value=txt;$('modeloTxt').closest('details').open=true;sayM('Download indisponível aqui: o modelo foi colocado no campo de texto abaixo. Copie e salve num arquivo .json.');return}
-    await dl.save({filename:nm,data:new Blob([txt],{type:'application/json'})});sayM(`Modelo exportado: ${nm}`);
+  try{const ok=await saveFile(nm,new Blob([txt],{type:'application/json'}),sayM);
+    if(!ok){$('modeloTxt').value=txt;$('modeloTxt').closest('details').open=true;sayM('Download indisponível aqui: o modelo foi colocado no campo de texto abaixo. Copie e salve num arquivo .json.');return}
+    sayM(`Modelo exportado: ${nm}`);
   }catch(e){const c=e&&e.code;if(c==='declined'){sayM('Exportação cancelada.');return}
     $('modeloTxt').value=txt;$('modeloTxt').closest('details').open=true;sayM('Não foi possível salvar o arquivo: o modelo foi colocado no campo de texto abaixo para copiar.')}
 }
