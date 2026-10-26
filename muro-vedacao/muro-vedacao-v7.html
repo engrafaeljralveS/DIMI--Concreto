@@ -86,7 +86,10 @@ svg .t-muted{fill:var(--muted)} svg .t-title{font-family:var(--display);font-siz
 svg .t-wind{fill:var(--wind)} svg .t-soil{fill:var(--soil)} svg .t-v{fill:var(--vcol)} svg .t-m{fill:var(--accent)} svg .t-div{fill:var(--divisa);font-weight:500}
 svg .t-ok{fill:var(--ok)} svg .t-bad{fill:var(--bad)} svg .t-st{fill:var(--steel)}
 #corte{width:100%;height:auto;max-height:calc(100vh - 230px)}
-#diag{min-width:620px;width:100%;height:auto}
+#diag{min-width:440px;width:100%;height:auto}
+#vista{min-width:560px;width:100%;height:auto}
+.diagrow{display:grid;grid-template-columns:minmax(0,0.8fr) minmax(0,1.2fr);gap:20px;align-items:start}
+@media (max-width:980px){.diagrow{grid-template-columns:1fr}}
 .beam svg{width:100%;height:auto}
 .chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:10px}
 .chip{border:1px solid var(--line);border-left:4px solid var(--ok);border-radius:5px;padding:7px 10px;display:flex;flex-direction:column;min-width:0}
@@ -186,9 +189,15 @@ td.txt{font-family:var(--body);text-align:left;color:var(--muted);font-size:12.5
   <section class="screen" id="s2" hidden>
     <div class="lead"><div><h2>Esforços</h2><p id="s2lead"></p></div></div>
     <div class="strip" id="loads"></div>
-    <div class="panel">
-      <header><h3 id="diagTitle">Diagramas do pilar</h3><small id="diagSub"></small></header>
-      <div class="scroll"><svg id="diag" viewBox="0 0 760 560" role="img" aria-label="Diagramas de cortante e momento ao longo da altura"></svg></div>
+    <div class="diagrow">
+      <div class="panel">
+        <header><h3 id="diagTitle">Diagramas do pilar</h3><small id="diagSub"></small></header>
+        <div class="scroll"><svg id="diag" viewBox="0 0 760 560" role="img" aria-label="Diagramas de cortante e momento ao longo da altura"></svg></div>
+      </div>
+      <div class="panel">
+        <header><h3 id="vistaTitle">Seção típica: vista frontal e planta</h3><small id="vistaSub"></small></header>
+        <div class="scroll"><svg id="vista" viewBox="0 0 760 600" role="img" aria-label="Vista frontal e planta do trecho típico com o caminho das cargas horizontais"></svg></div>
+      </div>
     </div>
     <div class="panel">
       <header><h3>Esforços por seção</h3><small>Característicos (sem majoração)</small></header>
@@ -866,6 +875,75 @@ function drawDiag(R){
   $('diag').innerHTML=s;
   $('diagTitle').textContent=R.arm?'Diagramas do muro':'Diagramas do pilar';
   $('diagSub').textContent=R.arm?'Valores característicos por metro de muro':'Valores característicos · pilar = valor por metro × espaçamento';
+}
+// vista frontal + planta do trecho típico: apoio (pilar ou enrijecedor) no eixo, meio vão para cada lado e os panos vizinhos
+function drawVista(R){
+  const W=760;let s='';const sup=!R.arm||R.enr; // tem apoios discretos
+  const sp=!R.arm?R.s:R.enr?R.lenr:1.0, half=1.5*sp, tw=!R.arm?R.hp/100:R.enr?R.eenr/100:0; // largura do apoio ao longo do muro
+  const yTop=I.NTopo,yBot=I.Nf,sc=Math.min(640/(2*half),250/(yTop-yBot+0.3)),x0=W/2,X=m=>x0+m*sc,top=100,Y=e=>top+(yTop-e)*sc;
+  const rect=(a,b,e1,e2,fill,st,extra='')=>`<rect x="${X(Math.min(a,b))}" y="${Y(e1)}" width="${Math.abs(b-a)*sc}" height="${Math.max(0,Y(e2)-Y(e1))}" fill="${fill}" stroke="${st}" stroke-width="1"${extra}/>`;
+  const blk=R.Bl[0][0]==='k'?'var(--brick)':'var(--block)',blkL=R.Bl[0][0]==='k'?'var(--brickline)':'var(--blockline)';
+  const ar=(x1,y1,x2,y2,col,w=1.4)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${w}" marker-end="url(#va${col==='var(--wind)'?'W':col==='var(--accent)'?'A':'V'})"/>`;
+  s+=`<defs>${[['W','var(--wind)'],['A','var(--accent)'],['V','var(--vcol)']].map(([k,c])=>`<marker id="va${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="${c}"/></marker>`).join('')}</defs>`;
+  s+=`<text x="16" y="22" class="t-title">VISTA FRONTAL – TRECHO TÍPICO</text>`;
+  // solo
+  s+=`<rect x="${X(-half)-10}" y="${Y(R.Hg)}" width="${2*half*sc+20}" height="${Y(yBot)-Y(R.Hg)+8}" fill="var(--soilfill)"/><line x1="${X(-half)-10}" y1="${Y(R.Hg)}" x2="${X(half)+10}" y2="${Y(R.Hg)}" stroke="var(--soil)" stroke-width="1.4"/>`;
+  // fundação
+  if(R.arm||R.cor)s+=rect(-half,half,R.ytop,yBot,'var(--conc)','var(--concline)');
+  if(R.arm)s+=rect(-half,half,I.NA,R.ytop,'var(--conc)','var(--concline)');
+  // alvenaria e cintas
+  const hc=I.hcs/100;s+=rect(-half,half,yTop-hc,I.NA,blk,blkL);s+=rect(-half,half,yTop,yTop-hc,'var(--conc)','var(--concline)');
+  if(R.cInt)s+=rect(-half,half,I.NA+R.h1+R.hcan,I.NA+R.h1,'var(--conc)','var(--concline)');
+  if(!R.arm)s+=rect(-half,half,I.NA,I.NA-I.hci/100,'var(--conc)','var(--concline)');
+  if(R.arm&&R.canH)R.canH.forEach(z=>{s+=`<line x1="${X(-half)}" y1="${Y(I.NA+z)}" x2="${X(half)}" y2="${Y(I.NA+z)}" stroke="var(--accent)" stroke-width="1" stroke-dasharray="6 3"/>`});
+  const xs=sup?[-sp,0,sp]:[];
+  xs.forEach(xc=>{if(!R.arm){s+=rect(xc-tw/2,xc+tw/2,yTop,I.NA,'var(--conc)','var(--concline)');s+=rect(xc-R.hpe/200,xc+R.hpe/200,I.NA,R.ytop,'var(--conc)','var(--concline)');if(R.iso)s+=rect(xc-I.L/2,xc+I.L/2,R.ytop,yBot,'var(--conc)','var(--concline)')}
+    else{s+=rect(xc-tw/2,xc+tw/2,yTop,I.NA,'#c9c2b6',blkL);s+=rect(xc-tw/2,xc+tw/2,I.NA,R.ytop,'var(--conc)','var(--concline)')}});
+  // faixa de influência do apoio central
+  const fb=sup?sp:1.0,yMid=(Y(yTop)+Y(I.NA))/2;
+  s+=`<rect x="${X(-fb/2)}" y="${Y(yTop)-6}" width="${fb*sc}" height="${Y(R.ytop)-Y(yTop)+6}" fill="var(--accent)" fill-opacity=".08" stroke="var(--accent)" stroke-dasharray="6 4"/>`;
+  s+=`<line x1="${X(-fb/2)}" y1="${Y(yTop)-16}" x2="${X(fb/2)}" y2="${Y(yTop)-16}" stroke="var(--accent)"/><path d="M${X(-fb/2)} ${Y(yTop)-21}V${Y(yTop)-11}M${X(fb/2)} ${Y(yTop)-21}V${Y(yTop)-11}" stroke="var(--accent)"/>`;
+  s+=`<text x="${x0}" y="${Y(yTop)-26}" text-anchor="middle" class="t-m">${sup?`faixa do ${R.arm?'enrijecedor':'pilar'} típico: ${f(fb)} m (${f(fb/2)} m para cada lado)`:'faixa de cálculo: 1,00 m de muro'}</text>`;
+  if(sup){
+    const lp=!R.arm?R.lp:R.lpE,wd=R.wd||1.4*R.pv,Rh=(R.pv*lp/2);
+    // reação horizontal dos panos nos apoios, setas do meio dos panos para o apoio central
+    [[-1,'esq'],[1,'dir']].forEach(([sg])=>{const xm=X(sg*sp/2),xa=X(sg*tw/2)+sg*4;for(const fr of [0.3,0.55,0.8]){const y=Y(I.NA+fr*(yTop-hc-I.NA));s+=ar(xm,y,xa,y,'var(--accent)')}});
+    s+=`<text x="${X(sp/2)}" y="${Y(I.NA+0.92*(yTop-hc-I.NA))}" text-anchor="middle" class="t-m" font-size="10">reação do pano no apoio ≈ pv·ℓ/2</text><text x="${X(sp/2)}" y="${Y(I.NA+0.92*(yTop-hc-I.NA))+13}" text-anchor="middle" class="t-m" font-size="10">= ${f(Rh,2)} kN/m de altura (cada lado)</text>`;
+    // parcela vertical: para a cinta superior/baldrame (pilares) ou base (enrijecedores)
+    if(!R.arm){const xl=X(-0.72*sp);for(const fr of [0.15,0.85]){const y1=Y(I.NA+(0.5+(fr-0.5)*0.4)*(yTop-hc-I.NA)),y2=fr>0.5?Y(yTop-hc)+3:Y(I.NA)-3;s+=ar(xl,y1,xl,y2,'var(--vcol)')}
+      s+=`<text x="${xl}" y="${yMid+4}" text-anchor="middle" class="t-v" font-size="10">parcela vertical</text>`;
+      if(!R.topoLivre)s+=`<text x="16" y="${Y(yTop)-48}" class="t-v" font-size="10">cinta superior: qh = ${f(R.BS.q,2)} kN/m → ${f(R.BS.q*R.s,2)} kN no pilar</text>`;
+      if(R.CI)s+=`<text x="${X(half)+4}" y="${Y(I.NA+R.zCi)+4}" class="t-v" font-size="10" text-anchor="end">cinta intermediária: ${f(R.CI.q,2)} kN/m</text>`;}
+    // apoio central: esforços totais
+    const Vna=R.at(R.D.V,I.NA)*(R.arm?R.lenr:1)*(R.arm?1:R.s),Mna=R.at(R.D.M,I.NA)*(R.arm?R.lenr:1)*(R.arm?1:R.s);
+    s+=`<text x="${x0}" y="${Y(yBot)+22}" text-anchor="middle" class="t-title" font-size="12">${R.arm?'Enrijecedor':'Pilar'} típico no NA: V = ${f(Vna,2)} kN · M = ${f(Mna,2)} kN·m (característicos)</text>`;
+  }else{
+    for(const fr of [0.25,0.5,0.75]){const y=Y(I.NA+fr*(yTop-hc-I.NA));s+=ar(x0,y,x0,Y(I.NA)-3,'var(--vcol)')}
+    s+=`<text x="${x0}" y="${Y(yBot)+22}" text-anchor="middle" class="t-title" font-size="12">Muro contínuo: cada faixa de 1 m trabalha em balanço vertical · M(NA) = ${f(R.at(R.D.M,I.NA),2)} kN·m/m</text>`;
+  }
+  // planta
+  const py=Y(yBot)+92,pw=Math.max(8,R.t/100*sc*2.2),web=R.enr?Math.max(10,(R.tenr-R.t)/100*sc):(!R.arm?Math.max(0,R.bp/100*sc*2.2-pw):0),pb=py+pw+web;
+  s+=`<text x="16" y="${py-46}" class="t-title">PLANTA – FLEXÃO HORIZONTAL DO PANO (vento ${f(R.pv,2)} kN/m²)</text>`;
+  s+=`<text x="${X(-half)}" y="${py-24}" class="t-muted" font-size="10">vizinho (divisa)</text><text x="${X(half)}" y="${pb+70}" text-anchor="end" class="t-muted" font-size="10">lote (interno)</text>`;
+  for(let x=-half+0.15;x<half;x+=Math.max(0.25,half/12))s+=ar(X(x),py-20,X(x),py-3,'var(--wind)',1.2);
+  s+=`<rect x="${X(-half)}" y="${py}" width="${2*half*sc}" height="${pw}" fill="${blk}" stroke="${blkL}"/>`;
+  if(sup){
+    const lp=!R.arm?R.lp:R.lpE;
+    xs.forEach(xc=>{if(!R.arm)s+=`<rect x="${X(xc-tw/2)}" y="${py-2}" width="${tw*sc}" height="${Math.max(pw+4,R.bp/100*sc*2.2)}" fill="var(--conc)" stroke="var(--concline)"/>`;
+      else s+=`<rect x="${X(xc-tw/2)}" y="${py}" width="${tw*sc}" height="${pw+web}" fill="#c9c2b6" stroke="${blkL}"/>`;
+      s+=`<path d="M${X(xc)-7} ${pb+16}h14l-7 -10z" fill="none" stroke="var(--ink)"/>`});
+    // deformada dos panos (exagerada) e momento no meio do vão
+    for(const [a,b] of [[-half,-sp],[-sp,0],[0,sp],[sp,half]]){const pts=[];const aa=a+(a===-half?0:tw/2),bb=b-(b===half?0:tw/2);
+      for(let i=0;i<=20;i++){const x=aa+(bb-aa)*i/20,full=Math.abs((bb-aa)-(lp))<0.05;const k=full?Math.sin(Math.PI*i/20):(a===-half?Math.sin(Math.PI*(0.5+i/40)):Math.sin(Math.PI*(i/40)));pts.push(`${X(x)},${py+pw+4+Math.max(12,web*0.6)*k}`)}
+      s+=`<polyline points="${pts.join(' ')}" fill="none" stroke="var(--accent)" stroke-dasharray="4 3"/>`}
+    s+=`<text x="${x0}" y="${pb+34}" text-anchor="middle" class="t-m" font-size="10">vão livre ℓ = ${f(lp)} m · no meio do vão Md,paralelo = ${f(R.MdPar,3)} kN·m/m (Anexo E) · reação ≈ ${f(R.pv*lp/2,2)} kN/m em cada apoio</text>`;
+    s+=`<text x="${x0}" y="${pb+52}" text-anchor="middle" class="t-muted" font-size="10">tracejado: deformada exagerada do pano; os ${R.arm?'enrijecedores':'pilares'} recebem as reações horizontais e as levam à fundação</text>`;
+  }else s+=`<text x="${x0}" y="${py+pw+30}" text-anchor="middle" class="t-muted" font-size="10">sem apoios intermediários: não há flexão horizontal; a armadura vertical V1 resiste ao balanço</text>`;
+  $('vista').setAttribute('viewBox',`0 0 ${W} ${Math.ceil(pb+84)}`);
+  $('vista').innerHTML=s;
+  $('vistaTitle').textContent=sup?`Seção típica: ${R.arm?'enrijecedor':'pilar'} no eixo, ${f(sp/2)} m para cada lado`:'Seção típica do muro contínuo';
+  $('vistaSub').textContent='';
+  $('vistaSub').textContent=sup?`Panos vizinhos inteiros (${R.arm?'enrijecedores':'pilares'} a cada ${f(sp)} m) · caminho das cargas horizontais: pano → apoios → fundação`:'Por metro de muro';
 }
 function renderSec(R){
   const rows=[['Nível do terreno',R.Hg],['Assentamento (NA)',I.NA],['Topo da sapata',R.ytop],['Base da sapata',I.Nf]];
@@ -1657,7 +1735,7 @@ function update(){
   const R=calc();
   $('tAlv').value=`${f(R.t,R.t%1?1:0)} cm`;$('gaAlv').value=`${f(R.ga)} kN/m² · γ ≈ ${f(R.gEsp,1)} kN/m³`;$('EAlvOut').value=`${f(R.Ealv/1000,0)} MPa (${R.Ecoef}·fpk)`;$('fpkOut').value=`${f(R.fpk,1)} / ${f(R.fpkC,1)} MPa${R.cer?' (informado)':' (Tabela 3.2)'}`;$('ftkOut').value=`${f(R.ftkN,2)} / ${f(R.ftkP,2)} MPa`;$('modOut').value=`${f(R.mod,0)} cm`;if(R.enr)$('eenrOut').value=`${f(R.eenr,0)} cm · δ = ${f(R.dEnr,2)} · tef = ${f(R.tef,1)} cm`;$('CfOut').value=`${f(R.Cf,1)} (L/h = ${f(I.Lm/Math.max(R.Hv,0.1),1)})`;
   {const ol=$('refsAuto');if(ol)ol.innerHTML=refList(R,true).map(x=>`<li>${x.replace(/</g,'&lt;')}</li>`).join('');const ta=$('refsExtra');if(ta&&ta.value!==(I.refsExtra||''))ta.value=I.refsExtra||''}
-  drawCorte(R);renderChips(R);renderLoads(R);drawDiag(R);renderSec(R);renderChecks(R);renderDet(R);
+  drawCorte(R);renderChips(R);renderLoads(R);drawDiag(R);drawVista(R);renderSec(R);renderChecks(R);renderDet(R);
 }
 buildForm();update();
 try{const t=+localStorage.getItem(KEY+'-tab');if(t>=1&&t<=4)go(t)}catch(e){}
