@@ -286,7 +286,9 @@ const DEF=[
   ['NT','Terreno interno (lado do lote)','m',0],
   ['NT2','Terreno externo (vizinho, divisa)','m',0],
   ['NA',['Assentamento do muro (topo do baldrame)','Assentamento do muro (topo da parede de fundação)'],'m',-0.50],
-  ['Nf','Apoio da sapata (base)','m',-1.50]]],
+  ['Nf','Apoio da sapata (base)','m',-1.50],
+  ['qT2','Sobrecarga no terreno vizinho (NBR 6120)','kN/m²',0],
+  ['qT','Sobrecarga no terreno interno (NBR 6120)','kN/m²',0]]],
  ['Alvenaria',['Peso e módulo de elasticidade pela tabela do bloco. A tração entra na flexão do pano entre pilares.','Peso e módulo pela tabela do bloco. fbk e tração entram na flexão do muro armado.'],[
   ['bloco','Tipo de bloco (largura × altura × comprimento)','sel','c19_39',BLOCOS.map(b=>[b[0],b[1]])],
   ['reb','Reboco','sel','2',[['0','Sem reboco'],['1','Reboco 1 lado'],['2','Reboco 2 lados']]],
@@ -462,7 +464,8 @@ function calc(){
   const phi=I.phi*Math.PI/180;
   R.Ka=Math.tan(Math.PI/4-phi/2)**2; R.Kp=Math.tan(Math.PI/4+phi/2)**2;
   R.Hg=Math.max(I.NT,I.NT2); R.Lg=Math.min(I.NT,I.NT2); R.dh=R.Hg-R.Lg;
-  R.sE=I.NT2>I.NT?1:-1;
+  R.sE=1; // empuxo com sinal próprio: + empurra para o interior (vem do vizinho), − empurra para a divisa (vem do lote)
+  R.qE=Math.max(0,+I.qT2||0); R.qI=Math.max(0,+I.qT||0);
   R.Hv=Math.max(0,I.NTopo-R.Hg); R.He=Math.max(0,R.Lg-I.NA);
   // vento
   R.Cf=(I.borda==='borda'||I.Lm>60*Math.max(R.Hv,0.1))?1.2:1.5;
@@ -473,10 +476,13 @@ function calc(){
   const sKa=Math.sqrt(R.Ka),sKp=Math.sqrt(R.Kp),rep=I.kEmp==='repouso';
   R.K0=1-Math.sin(phi); R.Kemp=rep?R.K0:R.Ka; const cK=rep?0:2*I.c*sKa;
   const ea=d=>Math.max(0,R.Kemp*I.gam*d-cK);
+  // pressão de cada lado com a sobrecarga do terreno daquele lado (NBR 6120): σh = K·(γ·z + q) − 2c√K, só abaixo do terreno
+  const eaS=(d,q)=>d>0?Math.max(0,R.Kemp*(I.gam*d+q)-cK):0;
+  R.pE=y=>eaS(I.NT2-y,R.qE); R.pI=y=>eaS(I.NT-y,R.qI);
   R.Ea1=Math.max(0,0.5*R.Kemp*I.gam*R.He**2-cK*R.He);
   // empuxo de cada lado, do apoio da sapata (Nf) até o terreno daquele lado (alvenaria ou concreto preenchendo até a sapata)
-  const sideE=gl=>{const h=Math.max(0,gl-I.Nf),k=200;let E=0,M=0;for(let i=0;i<k;i++){const z=(i+.5)*h/k,pz=ea(z);E+=pz*h/k;M+=pz*h/k*(h-z)}return {h,E,y:E>0?M/E:0,pmax:ea(h)}};
-  R.EAe=sideE(I.NT2); R.EAi=sideE(I.NT); R.ea=ea; // por metro; y medido a partir do apoio
+  const sideE=(gl,q)=>{const h=Math.max(0,gl-I.Nf),k=200;let E=0,M=0;for(let i=0;i<k;i++){const z=(i+.5)*h/k,pz=eaS(z,q);E+=pz*h/k;M+=pz*h/k*(h-z)}return {h,E,y:E>0?M/E:0,pmax:eaS(h,q),ptop:eaS(1e-9,q),q}};
+  R.EAe=sideE(I.NT2,R.qE); R.EAi=sideE(I.NT,R.qI); R.ea=ea; // por metro; y medido a partir do apoio
   // cargas verticais (por metro)
   const hcs=I.hcs/100,hci=I.hci/100;
   R.Halv=Math.max(0,I.NTopo-I.NA-hcs);
@@ -508,16 +514,19 @@ function calc(){
   // solo sobre a sapata, por faixas: do lado externo da divisa usa o terreno externo
   {let W=0,Mx=0;const k=200,dx=I.B/k,P0=R.px0,P1=R.px0+bpe/100,lp=Math.min(L,hpe/100);
    for(let i=0;i<k;i++){const x=R.fx0+(i+.5)*dx,gl=x<0?I.NT2:I.NT,hh=Math.max(0,gl-R.ytop),len=(x>P0&&x<P1)?L-lp:L,w=I.gam*hh*len*dx;W+=w;Mx+=w*(x-fc)}
-   R.Psolo=W;R.xs=W>0?Mx/W:0;}
+   R.Psolo=W;R.xs=W>0?Mx/W:0;
+   // sobrecarga sobre a sapata (variável): entra só nas tensões no solo, não na estabilidade
+   let Wq=0,Mq=0;for(let i=0;i<k;i++){const x=R.fx0+(i+.5)*dx,q=x<0?R.qE:R.qI,len=(x>P0&&x<P1)?L-lp:L,w=q*len*dx;Wq+=w;Mq+=w*(x-fc)}
+   R.Pq=Wq;R.xq=Wq>0?Mq/Wq:0;}
   R.N=R.Nwall+R.Npes+R.Psap+R.Psolo;
   R.xw=R.cw-fc; R.xpe=R.px0+bpe/200-fc;
   R.Mv=R.Nwall*R.xw+R.Npes*R.xpe+R.Psolo*R.xs;
   // diagramas por metro
   const n=500,y0=I.NTopo,y1=I.Nf,dy=(y0-y1)/n;
   const Y=[],WW=[],WE=[],VW=[0],MW=[0],VE=[0],ME=[0];
-  for(let i=0;i<=n;i++){const y=y0-i*dy;Y.push(y);WW.push(y>=R.Hg?R.pv:0);WE.push(y<R.Hg&&R.dh>1e-6?ea(R.Hg-y)-(y<R.Lg?ea(R.Lg-y):0):0)}
+  for(let i=0;i<=n;i++){const y=y0-i*dy;Y.push(y);WW.push(y>=R.Hg?R.pv:0);WE.push(R.pE(y)-R.pI(y))}
   for(let i=1;i<=n;i++){VW[i]=VW[i-1]+(WW[i]+WW[i-1])/2*dy;MW[i]=MW[i-1]+(VW[i]+VW[i-1])/2*dy;VE[i]=VE[i-1]+(WE[i]+WE[i-1])/2*dy;ME[i]=ME[i-1]+(VE[i]+VE[i-1])/2*dy}
-  const V=VW.map((v,i)=>v+VE[i]),M=MW.map((v,i)=>v+ME[i]);
+  const V=VW.map((v,i)=>v+Math.abs(VE[i])),M=MW.map((v,i)=>v+Math.abs(ME[i])); // envoltória (vento no sentido do empuxo)
   R.D={Y,WW,WE,V,M,VW,MW,VE,ME,n,dy};
   R.at=(arr,y)=>{if(y>=y0)return arr[0];if(y<=y1)return arr[n];const tt=(y0-y)/dy,i=Math.floor(tt),r=tt-i;return arr[i]+(arr[Math.min(n,i+1)]-arr[i])*r};
   R.Eearth=R.at(VE,y1);
@@ -539,6 +548,7 @@ function calc(){
   R.delta=2/3*phi; R.ca=2/3*I.c; R.kern=I.B/6;
   const loads=[[R.Nwall,R.xw],[R.Npes,R.xpe],[R.Psap,0],[R.Psolo,R.xs]];
   const mk=(lab,d)=>{const Mh=d*R.Mw+R.sE*R.Me,Hh=d*R.Hw+R.sE*R.He_,Mt=R.Mv+Mh,e=Mt/R.N,P=press(R.N,e,I.B,L);
+    if(R.Pq>0){const Nq=R.N+R.Pq,Pq=press(Nq,(Mt+R.Pq*R.xq)/Nq,I.B,L);P.smaxQ=Pq.smax}
     let FSt=Infinity;
     const pp=Hh<0?R.pExt:R.pInt;
     if(Mh<-1e-9)FSt=(loads.reduce((q,[N,x])=>q+N*(x+I.B/2),0)+R.Wc_in*(I.B+R.Hs*R.tb/3)+R.Wc_lat*I.B/2+pp.E*pp.y)/(-Mh);
@@ -549,7 +559,7 @@ function calc(){
   R.cW=[mk('Vento para o interior',1),mk('Vento para a divisa',-1)];
   R.crit=Math.abs(R.cW[0].e)>Math.abs(R.cW[1].e)?R.cW[0]:R.cW[1];
   R.cW.forEach(c=>c.ok=I.crit==='23'?c.lc>=2*I.B/3-1e-9:c.comp); R.perm.ok=R.perm.comp;
-  R.sigPerm=R.perm.smax; R.sigW=Math.max(...R.cW.map(c=>c.smax)); R.sigMax=Math.max(R.sigPerm,R.sigW);
+  R.sigPerm=Math.max(R.perm.smax,R.perm.smaxQ||0); R.sigW=Math.max(...R.cW.map(c=>Math.max(c.smax,c.smaxQ||0))); R.sigMax=Math.max(R.sigPerm,R.sigW);
   R.sigOk=R.sigPerm<=I.sadm&&R.sigW<=1.3*I.sadm;
   R.FSt=Math.min(...R.cW.map(c=>c.FSt)); R.FSd=Math.min(...R.cW.map(c=>c.FSd));
   R.pl=Math.max(0,R.px0-R.fx0); R.pr=Math.min(I.B,R.pl+bpe/100); R.aMax=Math.max(R.pl,I.B-R.pr);
@@ -561,7 +571,7 @@ function calc(){
   const pil=(lab,y,bw,h,ecc,Nk,lfree,bar,wall)=>{const d=h-I.cob-(wall?0:I.pht/10)-bar/20;
     // NBR 6118, 13.2.3: pilar com menor dimensão entre 14 e 19 cm → γn = 1,95 − 0,05·b
     const bmin=Math.min(bw,h), gn=(!wall&&bmin<19)?Math.max(1,1.95-0.05*bmin):1;
-    const Mk=momW(y,ecc),Vk=(R.at(VW,y)+R.at(VE,y))*s; let Md=1.4*gn*Mk; const Vd=1.4*gn*Vk;
+    const Mk=momW(y,ecc),Vk=(Math.abs(R.at(VW,y))+Math.abs(R.at(VE,y)))*s; let Md=1.4*gn*Mk; const Vd=1.4*gn*Vk;
     // esbeltez (balanço, le = 2 l) e 2ª ordem pelo pilar-padrão com rigidez κ aproximada
     const le=2*lfree, lam=le*Math.sqrt(12)/(h/100), Nd=1.4*Nk, nu=Nd/(bw*h*fcd);
     let amp=1, lam1=90;
@@ -693,7 +703,7 @@ function calc(){
     {let yc=I.NA;const nn=200;for(let i=0;i<=nn;i++){const yy=I.NTopo-h*i/nn,zz=I.NTopo-yy,Mdy=1.4*momW(yy,0)*R.fV+R.Md2A*Math.pow(zz/Math.max(h,1e-6),2),Mry=R.W*R.ftdN+0.9*R.ga*zz*t/6;if(Mdy>Mry){yc=yy;break}}
      R.yCorte=yc; R.ateA=Math.min(h,Math.max(0,yc-I.NA)+(yc>I.NA?40*R.phiA/1000:0)); if(R.MdA<=R.MrA)R.ateA=0; R.zfree=h-R.ateA;}
     // cisalhamento na base (Parsekian e Medeiros, 2021, item 3.3): fvk = 0,35 + 17,5ρ ≤ 0,7 MPa
-    R.VdA=1.4*(R.at(VW,I.NA)+R.at(VE,I.NA))*R.fV; const rhoA=isFinite(R.AsA)&&R.espAd>0?(area(R.phiA)*100/R.espAd)/(100*R.dA):0;
+    R.VdA=1.4*(Math.abs(R.at(VW,I.NA))+Math.abs(R.at(VE,I.NA)))*R.fV; const rhoA=isFinite(R.AsA)&&R.espAd>0?(area(R.phiA)*100/R.espAd)/(100*R.dA):0;
     R.fvkA=Math.min(0.35+17.5*rhoA,0.7); R.VaA=R.fvkA*1000/I.gm*1*R.dA/100; R.vAok=R.VdA<=R.VaA;
     if(R.enr){const E={},lE=R.lenr,b=R.eenr,tf=R.t,Ht=R.tenr;R.E=E;
       const barE=BARRAS.find(x=>String(x[0])===String(I.phE))||BARRAS[3];E.phi=barE[0];
@@ -814,15 +824,18 @@ function drawCorte(R){
     if(mx>1e-9){const kp=46/mx,nn=30;
       const xE=y=>X(y>=R.ytop?Math.min(0,P0):F0)-1, xI=y=>X(y>=R.ytop?Math.max(R.bp/100,P1):F1)+1;
       const seg=(gl,ya,yb,xf,sg)=>{if(ya<=yb)return '';const pts=[],base=[];
-        for(let i=0;i<=nn;i++){const y=ya-(ya-yb)*i/nn,p=R.ea(gl-y),x=xf((ya+yb)/2);pts.push(`${x+sg*p*kp},${Y(y)}`);base.push(`${x},${Y(y)}`)}
+        for(let i=0;i<=nn;i++){const y=ya-(ya-yb)*i/nn,p=(sg<0?R.pE:R.pI)(y),x=xf((ya+yb)/2);pts.push(`${x+sg*p*kp},${Y(y)}`);base.push(`${x},${Y(y)}`)}
         return `<polygon points="${pts.join(' ')} ${base.reverse().join(' ')}" fill="var(--soil)" fill-opacity=".22" stroke="var(--soil)" stroke-width="1"/>`};
       const both=(gl,xf,sg)=>{const top=Math.max(I.Nf,gl);return seg(gl,top,Math.max(R.ytop,I.Nf),xf,sg)+seg(gl,Math.min(top,R.ytop),I.Nf,xf,sg)};
       s+=both(I.NT2,xE,-1)+both(I.NT,xI,1);
       const ae=I.kEmp==='repouso'?'E0':'Ea';
-      if(R.EAe.E>0){const ya=I.Nf+R.EAe.y,xa=xE(ya)-R.ea(I.NT2-ya)*kp;s+=`<line x1="${xa-34}" y1="${Y(ya)}" x2="${xa-2}" y2="${Y(ya)}" stroke="var(--soil)" stroke-width="1.8" marker-end="url(#aK)"/><text x="${xa-38}" y="${Y(ya)-6}" text-anchor="end" class="t-soil" font-size="10">${ae},ext ${f(R.EAe.E,2)} kN/m</text>`}
+      if(R.EAe.E>0){const ya=I.Nf+R.EAe.y,xa=xE(ya)-R.pE(ya)*kp;s+=`<line x1="${xa-34}" y1="${Y(ya)}" x2="${xa-2}" y2="${Y(ya)}" stroke="var(--soil)" stroke-width="1.8" marker-end="url(#aK)"/><text x="${xa-38}" y="${Y(ya)-6}" text-anchor="end" class="t-soil" font-size="10">${ae},ext ${f(R.EAe.E,2)} kN/m</text>`}
       {const ya=I.Nf+R.EAi.y,xr=X(F1)+R.EAi.pmax*kp+8;
-       if(R.EAi.E>0){const xa=xI(ya)+R.ea(I.NT-ya)*kp;s+=`<line x1="${Math.min(xr+30,546)}" y1="${Y(ya)}" x2="${xa+2}" y2="${Y(ya)}" stroke="var(--soil)" stroke-width="1.8" marker-end="url(#aK)"/><text x="548" y="${Y(ya)-6}" text-anchor="end" class="t-soil" font-size="10">${ae},int ${f(R.EAi.E,2)} kN/m</text>`}
-       s+=`<text x="548" y="${Y(ya)+14}" text-anchor="end" class="t-soil" font-size="10">${R.dh>1e-6?`líquido ${f(Math.abs(R.Eearth),2)} kN/m → ${I.NT>I.NT2?'vizinho':'lote'}`:'iguais: se equilibram'}</text>`}}}
+       if(R.EAi.E>0){const xa=xI(ya)+R.pI(ya)*kp;s+=`<line x1="${Math.min(xr+30,546)}" y1="${Y(ya)}" x2="${xa+2}" y2="${Y(ya)}" stroke="var(--soil)" stroke-width="1.8" marker-end="url(#aK)"/><text x="548" y="${Y(ya)-6}" text-anchor="end" class="t-soil" font-size="10">${ae},int ${f(R.EAi.E,2)} kN/m</text>`}
+       s+=`<text x="548" y="${Y(ya)+14}" text-anchor="end" class="t-soil" font-size="10">${Math.abs(R.Eearth)>1e-6?`líquido ${f(Math.abs(R.Eearth),2)} kN/m → ${R.Eearth<0?'vizinho':'lote'}`:'iguais: se equilibram'}</text>`}}}
+  // sobrecarga no terreno de cada lado
+  {const qa=(x1,x2,y,q,lab,an)=>{if(!(q>0))return;let g='';for(let x=x1+6;x<x2-4;x+=16)g+=`<line x1="${x}" y1="${y-32}" x2="${x}" y2="${y-15}" stroke="var(--soil)" stroke-width="1.2" marker-end="url(#aK)"/>`;g+=`<line x1="${x1}" y1="${y-32}" x2="${x2}" y2="${y-32}" stroke="var(--soil)"/><text x="${an==='end'?x2:x1}" y="${y-37}" text-anchor="${an}" class="t-soil" font-size="10">${lab} = ${f(q,1)} kN/m²</text>`;s+=g};
+   qa(90,xface-4,Y(I.NT2),R.qE,'q viz.','start');qa(X(Math.max(R.bp/100,R.enr?R.tenr/100:0))+6,550,Y(I.NT),R.qI,'q int.','end');}
   if(I.cone==='sim'&&R.Hs>0){const xi2=F1+R.Hs*R.tb;if(R.cen)s+=`<path d="M${X(F0)} ${Y(R.ytop)}L${X(F0-R.Hs*R.tb)} ${Y(I.NT2)}" stroke="var(--soil)" stroke-width="1.2" stroke-dasharray="5 3" fill="none"/>`;s+=`<path d="M${X(F1)} ${Y(R.ytop)}L${X(xi2)} ${Y(I.NT)}" stroke="var(--soil)" stroke-width="1.2" stroke-dasharray="5 3" fill="none"/><text x="${X(xi2)+4}" y="${Y(I.NT)+14}" class="t-soil" font-size="10">cunha β ${f(I.beta,0)}°</text>`}
   const xc=F0+I.B/2,k=R.kern;
   s+=`<rect x="${X(xc-k)}" y="${Y(I.Nf)+2}" width="${2*k*sc}" height="5" fill="var(--ok)" fill-opacity=".45"/>`;
@@ -865,7 +878,7 @@ function renderLoads(R){
    <div><span>q · Cf · pv</span><b>${f(R.q,3)} · ${f(R.Cf,1)} · ${f(R.pv)}</b><em>kN/m²</em></div>
    <div><span>Peso da alvenaria</span><b>${f(R.ga)}</b><em>kN/m²</em></div>
    <div><span>K usado · Kp</span><b>${f(R.Kemp,3)} · ${f(R.Kp,2)}</b><em>${I.kEmp==='repouso'?'repouso':'ativo'}</em></div>
-   <div><span>Empuxo líquido</span><b>${f(R.Eearth)}</b><em>kN/m</em></div>
+   <div><span>Empuxo líquido</span><b>${f(Math.abs(R.Eearth))}</b><em>kN/m${Math.abs(R.Eearth)>1e-6?(R.Eearth<0?' → vizinho':' → lote'):''}</em></div>
    <div><span>Normal na base N</span><b>${f(R.N,1)}</b><em>kN</em></div>`;
   $('s2lead').textContent=R.arm?'Esforços por metro de muro em balanço, com vento e empuxo no mesmo sentido, e ações na sapata corrida.':'Cortante e momento no pilar, com vento e empuxo no mesmo sentido, esforços nas cintas e na base da sapata.';
 }
@@ -972,8 +985,8 @@ function renderSec(R){
    <tr><td>M do peso (divisa)</td><td colspan="2">${f(R.Mv)} kN·m</td></tr>
    <tr><td>M do vento na base</td><td colspan="2">± ${f(R.Mw)} kN·m</td></tr>
    <tr><td>H do vento na base</td><td colspan="2">± ${f(R.Hw)} kN</td></tr>
-   <tr><td>${I.kEmp==='repouso'?'Empuxo em repouso':'Empuxo ativo'} – lado interno</td><td colspan="2">${f(R.EaInt,1)} kN · do apoio (${sgn(I.Nf)}) ao terreno interno, h = ${f(R.EAi.h)} m ${R.dh>1e-6?'':'(anula o externo)'}</td></tr>
-   <tr><td>${I.kEmp==='repouso'?'Empuxo em repouso':'Empuxo ativo'} – lado externo</td><td colspan="2">${f(R.EaExt,1)} kN · do apoio (${sgn(I.Nf)}) ao terreno externo, h = ${f(R.EAe.h)} m ${R.dh>1e-6?'':'(anula o interno)'}</td></tr>
+   <tr><td>${I.kEmp==='repouso'?'Empuxo em repouso':'Empuxo ativo'} – lado interno</td><td colspan="2">${f(R.EaInt,1)} kN · do apoio (${sgn(I.Nf)}) ao terreno interno, h = ${f(R.EAi.h)} m ${Math.abs(R.Eearth)>1e-6?'':'(anula o externo)'}${R.qI>0?` · sobrecarga ${f(R.qI,1)} kN/m²`:''}</td></tr>
+   <tr><td>${I.kEmp==='repouso'?'Empuxo em repouso':'Empuxo ativo'} – lado externo</td><td colspan="2">${f(R.EaExt,1)} kN · do apoio (${sgn(I.Nf)}) ao terreno externo, h = ${f(R.EAe.h)} m ${Math.abs(R.Eearth)>1e-6?'':'(anula o interno)'}${R.qE>0?` · sobrecarga ${f(R.qE,1)} kN/m²`:''}</td></tr>
    <tr><td>H do empuxo líquido</td><td colspan="2">${f(R.sE*R.He_)} kN</td></tr>
    <tr><td>M do empuxo líquido</td><td colspan="2">${f(R.sE*R.Me)} kN·m</td></tr>
    <tr><td>Passivo – lado interno (vento para o interior)</td><td colspan="2">${f(R.pInt.E,1)} de ${f(R.pInt.Efull,1)} kN · braço ${f(R.pInt.y,2)} m</td></tr>
@@ -1115,6 +1128,7 @@ function renderChecks(R){
   if(R.cor)obs.push(`Sapata corrida sob pilares: cada pilar mobiliza um trecho de ${f(R.s)} m. Isso supõe que a sapata, junto com o baldrame, tenha rigidez para distribuir o momento do pilar ao longo do espaçamento. A torção resultante foi verificada na seção da sapata; a armadura de torção (estribos fechados e barras longitudinais) soma-se à de flexão.`);
   if(!R.cen)obs.push(`Excentricidade de divisa: o peso do muro fica a ${f(Math.abs(R.xw),2)} m do centro da sapata e gera ${f(Math.abs(R.Mv))} kN·m, somado ao vento quando ele empurra para a divisa.`);
   if(R.dh>1e-6)obs.push('Há desnível entre os lados: o trecho enterrado trabalha como arrimo. Prever drenagem.');
+  if(R.qE>0||R.qI>0)obs.push(`Sobrecarga no terreno (NBR 6120): vizinho ${f(R.qE,1)} kN/m² e interno ${f(R.qI,1)} kN/m². Ela soma K·q de pressão horizontal em toda a altura enterrada daquele lado (empuxo líquido de ${f(Math.abs(R.Eearth),2)} kN/m ${R.Eearth<0?'para o vizinho':'para o lote'}). Sobre a sapata, a sobrecarga entra só nas tensões no solo; no tombamento e no deslizamento ela não é considerada, por ser variável e favorável.`);
   if(+I.fp>0)obs.push('Com o vento empurrando para a divisa, o passivo vem do solo do vizinho, que pode ser escavado no futuro. Use esse passivo com cautela.');
   if(I.cone==='sim')obs.push(`A cunha de arrancamento (${f(R.Wc,1)} kN, β = ${f(I.beta,0)}°) só entra no tombamento, porque só é mobilizada quando a sapata tende a levantar. Ela não entra nas tensões no solo nem no deslizamento.`);
   $('obs').innerHTML=obs.map(t=>`<div class="callout">${t}</div>`).join('');
@@ -1500,7 +1514,8 @@ function memorialXML(R,figs,state){
   b.push(H2('4.3 Empuxo de solo'));
   b.push(EQ('Coeficientes:',`${I.kEmp==='repouso'?`K0 = 1 − sen φ = ${f(R.K0,3)}`:`Ka = tan²(45° − φ/2) = ${f(R.Ka,3)}`}; Kp = tan²(45° + φ/2) = ${f(R.Kp,3)}; φ = ${f(I.phi,0)}°, c = ${f(I.c,0)} kPa, γ = ${f(I.gam,1)} kN/m³`));
   b.push(TXT(`O trecho entre a sapata e o ${arm?'assentamento do muro':'baldrame'} é preenchido (alvenaria assentada sobre a sapata${arm?' e parede de fundação':' ou pescoço'}), por isso o empuxo de cada lado atua desde o apoio da sapata (${sgn(I.Nf)} m) até o terreno daquele lado. Com ${I.kEmp==='repouso'?'empuxo em repouso':'empuxo ativo'} nos dois lados, a ação no muro e na fundação é a diferença entre eles.`));
-  b.push(EQ('Empuxo atuante:',`lado interno, h = ${f(R.EAi.h)} m: ${f(R.EAi.E,2)} kN/m a ${f(R.EAi.y,2)} m do apoio; lado externo, h = ${f(R.EAe.h)} m: ${f(R.EAe.E,2)} kN/m a ${f(R.EAe.y,2)} m do apoio; total ${f(R.EaInt,2)} e ${f(R.EaExt,2)} kN (por ${arm?'metro':'pilar'}). ${R.dh>1e-6?`Desnível Δh = ${f(R.dh)} m: empuxo líquido de ${f(R.Eearth,3)} kN/m.`:'Terreno no mesmo nível: os empuxos se equilibram e não entram como ação.'}`));
+  if(R.qE>0||R.qI>0)b.push(EQ('Sobrecarga no terreno:',`NBR 6120: vizinho q = ${f(R.qE,1)} kN/m² e interno q = ${f(R.qI,1)} kN/m². Pressão horizontal σh = K·(γ·z + q) − 2c√K em toda a altura enterrada de cada lado; acréscimo constante K·q = ${f(R.Kemp*R.qE,2)} e ${f(R.Kemp*R.qI,2)} kN/m². Sobre a sapata, ${f(R.Pq,1)} kN entram só nas tensões no solo (variável e favorável à estabilidade).`));
+  b.push(EQ('Empuxo atuante:',`lado interno, h = ${f(R.EAi.h)} m: ${f(R.EAi.E,2)} kN/m a ${f(R.EAi.y,2)} m do apoio; lado externo, h = ${f(R.EAe.h)} m: ${f(R.EAe.E,2)} kN/m a ${f(R.EAe.y,2)} m do apoio; total ${f(R.EaInt,2)} e ${f(R.EaExt,2)} kN (por ${arm?'metro':'pilar'}). ${R.dh>1e-6?`Desnível Δh = ${f(R.dh)} m: empuxo líquido de ${f(Math.abs(R.Eearth),3)} kN/m${Math.abs(R.Eearth)>1e-6?(R.Eearth<0?' para o vizinho':' para o lote'):''}.`:'Terreno no mesmo nível: os empuxos se equilibram e não entram como ação.'}`));
   b.push(EQ('Empuxo passivo:',`${+I.fp>0?`considerado com fator ${f(+I.fp,2)}, do lado para onde o muro se desloca: ${f(R.pInt.E,2)} kN (interno) e ${f(R.pExt.E,2)} kN (externo).`:'desprezado (a favor da segurança).'}`));
   b.push(EQ('Cunha de arrancamento:',I.cone==='sim'?`β = ${f(I.beta,0)}°, peso ${f(R.Wc,2)} kN, considerada apenas no tombamento.`:'desprezada.'));
   // esforços
