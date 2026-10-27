@@ -252,6 +252,7 @@ td.txt{font-family:var(--body);text-align:left;color:var(--muted);font-size:12.5
     <div id="detVerdict"></div>
     <div class="panel"><header><h3>Armaduras adotadas</h3><small>Traspasse de 1,00 m; para Ø ≥ 16 mm é calculado pela NBR 6118 (*)</small></header><div class="scroll"><table id="tabDet" class="detTab"></table></div></div>
     <div class="panel" style="background:#ffffff"><header><h3 style="color:#16212c">Esboço do detalhamento</h3><small style="color:#5a6774">Vai para o memorial em Word</small></header><div class="scroll"><div id="detDraw" style="min-width:900px"></div></div></div>
+    <div class="panel" style="background:#ffffff"><header><h3 style="color:#16212c">Seção transversal típica e drenagem</h3><small style="color:#5a6774">Cotas, níveis e detalhe do dreno · vai para o memorial em Word</small></header><div class="scroll"><div id="secDraw" style="min-width:900px"></div></div></div>
     <div class="nav"><button class="btn" type="button" data-go="3">← Verificações</button><div class="memwrap"><span class="memStatus note" role="status"></span><button class="btn primary mem" type="button">Gerar memorial (Word)</button></div></div>
   </section>
 </main>
@@ -346,6 +347,14 @@ const DEF=[
   ['FSdMin','FS mínimo ao deslizamento','–',1.5],
   ['cone','Cunha de arrancamento no tombamento','sel','sim',[['sim','Considerar'],['nao','Desprezar']]],
   ['beta','Ângulo da cunha β (padrão φ/2)','°',15]]],
+ ['Drenagem','Dreno longitudinal com manta geotêxtil, brita, areia e tubo PEAD corrugado perfurado (seção típica no Detalhamento e no memorial).',[
+  ['drLado','Dreno – lado','sel','viz',[['viz','Lado do vizinho (face da divisa)'],['int','Lado interno (lote)'],['nao','Sem dreno']]],
+  ['drB','Dreno – largura da vala','cm',40],
+  ['drPhi','Dreno – tubo PEAD corrugado perfurado','sel','150',[['100','Ø 100 mm'],['150','Ø 150 mm']]],
+  ['drLas','Dreno – lastro de brita sob o tubo','cm',10],
+  ['drAr','Dreno – camada de areia sobre a manta','cm',15],
+  ['drSel','Dreno – selamento de solo argiloso','cm',15],
+  ['drImp','Impermeabilização da face enterrada','sel','sim',[['sim','Sim (emulsão asfáltica ou manta)'],['nao','Não']]]]],
  ['Vento (NBR 6123)','',[
   ['V0','Velocidade básica V0 (isopleta)','m/s',45],
   ['S1','Fator topográfico S1','–',1.00],
@@ -400,7 +409,7 @@ function applySys(){
   document.querySelectorAll('#form [data-sys]').forEach(el=>el.hidden=el.dataset.sys!==I.sys);
   document.querySelectorAll('#form [data-only]').forEach(el=>el.hidden=el.dataset.only!==I.sys);
   const hideIf=(id,cond)=>{const el=$(id),fl=el&&el.closest&&el.closest('.field');if(fl&&cond)fl.hidden=true};
-  hideIf('S2m',I.s2mode!=='man');{const ce=(I.bloco||'')[0]==='k';hideIf('fpkM',!ce);hideIf('fpkCM',!ce);}hideIf('L',I.tipoSap==='cor');hideIf('zCi',I.cintaInt!=='sim');['lenr','tenr','eenrOut','phE'].forEach(k=>hideIf(k,I.enr!=='sim'));hideIf('p3d',I.tipoSap==='cor');
+  hideIf('S2m',I.s2mode!=='man');{const ce=(I.bloco||'')[0]==='k';hideIf('fpkM',!ce);hideIf('fpkCM',!ce);}hideIf('L',I.tipoSap==='cor');hideIf('zCi',I.cintaInt!=='sim');['drB','drPhi','drLas','drAr','drSel','drImp'].forEach(k=>hideIf(k,I.drLado==='nao'));['lenr','tenr','eenrOut','phE'].forEach(k=>hideIf(k,I.enr!=='sim'));hideIf('p3d',I.tipoSap==='cor');
 }
 
 /* ---------- cálculo ---------- */
@@ -1375,6 +1384,112 @@ function renderDet(R){
   const nf=rows.filter(r=>!r.ok).length;
   $('detVerdict').innerHTML=`<div class="verdict ${nf?'bad':'ok'}">${nf?`${nf} armadura(s) adotada(s) abaixo do necessário ou fora das regras de detalhamento.`:'Todas as armaduras adotadas atendem ao cálculo.'}</div>`;
   const sv=detSvg(R,D);$('detDraw').innerHTML=sv.svg.replace('<svg ','<svg role="img" aria-label="Esboço do detalhamento das armaduras" style="width:100%;height:auto;display:block" ');
+  const ss=secaoSvg(R);$('secDraw').innerHTML=ss.svg.replace('<svg ','<svg role="img" aria-label="Seção transversal típica e detalhe do dreno" style="width:100%;height:auto;display:block" ');
+}
+
+/* ---------- seção transversal típica e detalhe do dreno ---------- */
+function drenoGeo(R){
+  const lado=I.drLado||'viz';if(lado==='nao')return null;
+  const dw=Math.max(0.2,(+I.drB||40)/100),dP=(+I.drPhi||150)/1000,hSel=Math.max(0,(+I.drSel||0)/100),hAr=Math.max(0,(+I.drAr||0)/100),las=Math.max(0.05,(+I.drLas||10)/100);
+  const viz=lado==='viz',g=viz?I.NT2:I.NT,t=R.t/100,bp=R.bp/100,F0=R.fx0,F1=R.fx0+I.B,P0=R.px0,P1=R.px0+R.bpe/100;
+  let face,bot;
+  if(viz){if(F0<Math.min(0,P0)-1e-6){face=Math.min(0,P0);bot=R.ytop}else{face=Math.min(0,F0);bot=I.Nf}}
+  else{face=Math.max(t,bp,P1,R.enr?R.tenr/100:0);bot=F1>face+1e-6?R.ytop:I.Nf}
+  const x1=viz?face-dw:face,x2=viz?face:face+dw,h=g-bot,need=hSel+hAr+las+dP+0.10;
+  return {lado,viz,dw,dP,hSel,hAr,las,g,face,bot,x1,x2,h,ok:h>=need-1e-9,need,imp:I.drImp!=='nao'};
+}
+function secaoSvg(R){
+  const Wd=1240,Hd=1100,ink='#16212c',mut='#5a6774',conc='#e3e7eb',concl='#5f6b77',soilc='#efe4cc',soill='#9a6a25',dv='#b3261e',geo='#1c7c4a',pipe='#1c5ca3';
+  const o=[];const e=v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const T=(x,y,s,sz=13,an='start',fl=ink,w='normal')=>o.push(`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-family="Arial,Helvetica,sans-serif" font-size="${sz}" text-anchor="${an}" fill="${fl}" font-weight="${w}">${e(s)}</text>`);
+  const Ln=(x1,y1,x2,y2,c=ink,sw=1,da)=>o.push(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${c}" stroke-width="${sw}"${da?` stroke-dasharray="${da}"`:''}/>`);
+  const Rc=(x,y,w,h,fl=conc,st=concl,sw=1.2,extra='')=>o.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(0,w).toFixed(1)}" height="${Math.max(0,h).toFixed(1)}" fill="${fl}" stroke="${st}" stroke-width="${sw}"${extra}/>`);
+  const dimV=(x,y1,y2,s,side=-1)=>{Ln(x,y1,x,y2,mut,.8);Ln(x-5,y1,x+5,y1,mut,.8);Ln(x-5,y2,x+5,y2,mut,.8);const tx=x+side*8;o.push(`<text x="${tx.toFixed(1)}" y="${((y1+y2)/2).toFixed(1)}" font-family="Arial" font-size="12" text-anchor="middle" fill="${mut}" transform="rotate(-90 ${tx.toFixed(1)} ${((y1+y2)/2).toFixed(1)})">${e(s)}</text>`)};
+  const dimH=(x1,x2,y,s)=>{Ln(x1,y,x2,y,mut,.8);Ln(x1,y-5,x1,y+5,mut,.8);Ln(x2,y-5,x2,y+5,mut,.8);T((x1+x2)/2,y-6,s,12,'middle',mut)};
+  const lvl=(x,y,txt,sub)=>{o.push(`<path d="M${x-5} ${(y-8).toFixed(1)}h10l-5 8z" fill="none" stroke="${ink}"/>`);Ln(x-12,y,x+12,y);T(x+16,y+4,txt,12);if(sub)T(x+16,y+17,sub,10,'start',mut)};
+  const ground=(x1,x2,y)=>{if(x2<=x1)return;Ln(x1,y,x2,y,soill,1.6);for(let x=x1+8;x<x2-4;x+=12)Ln(x,y,x-6,y+6,soill,.9)};
+  o.push(`<rect width="${Wd}" height="${Hd}" fill="#fff"/>`);
+  o.push(`<defs><pattern id="sSoil" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="${soilc}"/><line x1="0" y1="0" x2="0" y2="10" stroke="${soill}" stroke-opacity=".28"/></pattern>
+   <pattern id="sBrita" width="18" height="16" patternUnits="userSpaceOnUse"><rect width="18" height="16" fill="#f3f1ec"/><ellipse cx="4.5" cy="4.5" rx="3.8" ry="2.8" fill="none" stroke="#6b6458" stroke-width=".9"/><ellipse cx="13" cy="11" rx="3.4" ry="2.9" fill="none" stroke="#6b6458" stroke-width=".9"/><ellipse cx="13.5" cy="3" rx="2.2" ry="1.7" fill="none" stroke="#6b6458" stroke-width=".8"/><ellipse cx="4" cy="12.5" rx="2" ry="1.6" fill="none" stroke="#6b6458" stroke-width=".8"/></pattern>
+   <pattern id="sAreia" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#fbf1d2"/><circle cx="2" cy="2" r=".9" fill="#a38a4f"/><circle cx="6" cy="5" r=".8" fill="#a38a4f"/><circle cx="3.5" cy="7" r=".7" fill="#a38a4f"/></pattern>
+   <pattern id="sArg" width="12" height="12" patternUnits="userSpaceOnUse"><rect width="12" height="12" fill="#ddc9a6"/><path d="M0 6h12M6 0v12" stroke="#8d6b3a" stroke-opacity=".4" stroke-width=".8"/></pattern>
+   <pattern id="sBlk" width="40" height="20" patternUnits="userSpaceOnUse"><rect width="40" height="20" fill="${R.Bl[0][0]==='k'?'#f2dcd2':'#eceff2'}"/><path d="M0 0H40M0 10H40M20 0V10M0 10V20" stroke="${R.Bl[0][0]==='k'?'#b0573f':'#7d8994'}" stroke-opacity=".55" stroke-width=".8"/></pattern></defs>`);
+  const Dr=drenoGeo(R);let mainBot=0,detBot=0;
+  const gE=I.NT2,gI=I.NT,F0=R.fx0,B=I.B,P0=R.px0,bpe=R.bpe/100,t=R.t/100,bp=R.bp/100,wT=Math.max(t,bp);
+  T(40,44,Dr?'SEÇÃO TRANSVERSAL TÍPICA E DETALHE DO DRENO':'SEÇÃO TRANSVERSAL TÍPICA',18,'start',ink,'bold');
+  T(40,66,`${R.arm?'Alvenaria estrutural armada':'Pilares de concreto e alvenaria de vedação'} · ${R.Bl[1]} · sapata ${R.arm||R.cor?'corrida':'isolada'} ${R.cen?'centrada':'de divisa'} · cotas em metros · sem escala exata`,13,'start',mut);
+  // ===== seção geral =====
+  {const wMain=Dr?430:900,xMin=Math.min(F0,0,Dr?Dr.x1:0)-0.35,xMax=Math.max(F0+B,Dr?Dr.x2:0)+0.35,yMax=I.NTopo+0.3,yMin=I.Nf-0.3,top=160,bot=Hd-170;
+   const sc=Math.min((bot-top)/(yMax-yMin),wMain/(xMax-xMin)),x0=60-xMin*sc,X=m=>x0+m*sc,Y=v=>top+(yMax-v)*sc;
+   T(40,108,'SEÇÃO TRANSVERSAL TÍPICA',15,'start',ink,'bold');
+   const xs0=Math.min(0,F0,P0);
+   Rc(X(xMin),Y(gE),X(xs0)-X(xMin),Y(yMin)-Y(gE),'url(#sSoil)','none',0);Rc(X(xs0),Y(Math.min(gE,gI)),X(xMax)-X(xs0),Y(yMin)-Y(Math.min(gE,gI)),'url(#sSoil)','none',0);
+   if(gI>gE)Rc(X(wT),Y(gI),X(xMax)-X(wT),Y(gE)-Y(gI),'url(#sSoil)','none',0);
+   ground(X(xMin),X(Math.min(0,P0)),Y(gE));ground(X(Math.max(wT,P0+bpe)),X(xMax),Y(gI));
+   Rc(X(F0),Y(R.ytop),B*sc,I.hs*sc);Rc(X(P0),Y(I.NA),bpe*sc,(I.NA-R.ytop)*sc);
+   if(!R.arm)Rc(X(0),Y(I.NA),bp*sc,(I.hci/100)*sc);
+   if(R.cor&&R.hEmb>0)Rc(X(0),Y(I.NA-I.hci/100),t*sc,R.hEmb*sc,'url(#sBlk)','#7d8994',.8,' stroke-dasharray="4 3"');
+   Rc(X(0),Y(I.NTopo-I.hcs/100),t*sc,(I.NTopo-I.hcs/100-I.NA)*sc,'url(#sBlk)',R.Bl[0][0]==='k'?'#b0573f':'#7d8994');
+   if(!R.arm&&bp>t+1e-6)Rc(X(t),Y(I.NTopo),(bp-t)*sc,(I.NTopo-I.NA)*sc);
+   Rc(X(0),Y(I.NTopo),wT*sc,(I.hcs/100)*sc);
+   if(R.enr)o.push(`<rect x="${X(t).toFixed(1)}" y="${Y(I.NTopo).toFixed(1)}" width="${((R.tenr/100-t)*sc).toFixed(1)}" height="${(Y(R.ytop)-Y(I.NTopo)).toFixed(1)}" fill="none" stroke="${ink}" stroke-dasharray="6 3"/>`);
+   if(!R.cen){Ln(X(0),Y(yMax)-18,X(0),Y(yMin)+14,dv,1.2,'12 4 3 4');T(X(0),Y(yMax)-24,'DIVISA',12,'middle',dv,'bold')}
+   if(Dr){const xd1=X(Dr.x1),xd2=X(Dr.x2),yt=Y(Dr.g),yb=Y(Dr.bot);
+     if(Dr.imp)Ln(X(Dr.face)+(Dr.viz?-2:2),yt,X(Dr.face)+(Dr.viz?-2:2),yb,'#222',3);
+     Rc(xd1,Y(Dr.g-Dr.hSel-Dr.hAr),xd2-xd1,yb-Y(Dr.g-Dr.hSel-Dr.hAr),'url(#sBrita)',geo,1.6,' stroke-dasharray="6 3"');
+     Rc(xd1,Y(Dr.g-Dr.hSel),xd2-xd1,Dr.hAr*sc,'url(#sAreia)','#a38a4f',.6);Rc(xd1,yt,xd2-xd1,Dr.hSel*sc,'url(#sArg)','#8d6b3a',.6);
+     o.push(`<circle cx="${((xd1+xd2)/2).toFixed(1)}" cy="${(Y(Dr.bot+Dr.las+Dr.dP/2)).toFixed(1)}" r="${Math.max(4,Dr.dP/2*sc).toFixed(1)}" fill="#fff" stroke="${pipe}" stroke-width="2"/>`);
+     const cy=(yt+yb)/2;o.push(`<circle cx="${((xd1+xd2)/2).toFixed(1)}" cy="${cy.toFixed(1)}" r="15" fill="#fff" stroke="${ink}" stroke-width="1.2"/>`);T((xd1+xd2)/2,cy+5,'A',14,'middle',ink,'bold');
+     T((xd1+xd2)/2,yb+(Dr.bot>I.Nf+1e-6?18:56),'dreno – ver detalhe A',11,'middle',geo,'bold');
+     dimH(xd1,xd2,yt-30,`${f(Dr.dw)}`);}
+   const xl=X(xMax)+30;[[I.NTopo,'topo do muro'],[gI,'terreno interno'],[I.NA,'assentamento'],[R.ytop,'topo da sapata'],[I.Nf,'apoio da sapata']].forEach(([v,l])=>lvl(xl,Y(v),sgn(v),l));
+   {const y=Y(gE),xx=X(xMin)+14;o.push(`<path d="M${xx-5} ${(y-8).toFixed(1)}h10l-5 8z" fill="none" stroke="${ink}"/>`);Ln(xx-12,y,xx+12,y);T(X(xMin)+2,y-14,`${sgn(gE)} terreno vizinho`,11,'start',ink)}
+   const xr=X(F0+B)+12;dimV(xr,Y(I.NTopo),Y(gI),`${f(I.NTopo-gI)}`,1);if(gI-I.NA>0.01)dimV(xr,Y(gI),Y(I.NA),`${f(gI-I.NA)}`,1);dimV(xr,Y(I.NA),Y(R.ytop),`${f(I.NA-R.ytop)}`,1);dimV(xr,Y(R.ytop),Y(I.Nf),`${f(I.hs)}`,1);
+   dimH(X(F0),X(F0+B),Y(I.Nf)+(Dr&&Dr.bot<=I.Nf+1e-6&&!Dr.viz?70:34),`B = ${f(B)}`);dimH(X(0),X(wT),Y(I.NTopo)-10,`${f(wT,2)}`);
+   T(X(wT)+8,Y((I.NTopo+gI)/2),R.arm?(R.enr?'alvenaria armada (enrijecedor tracejado)':'alvenaria armada'):(bp>t+1e-6?'pilar':'pilar / alvenaria'),11,'start',mut);
+   T(X(P0+bpe)+6,Y((I.NA+R.ytop)/2)+4,R.arm?'parede de fundação':(R.cor&&R.hEmb>0?'pescoço / embasamento':'pescoço'),11,'start',mut);
+   T(X(F0+B/2),Y((R.ytop+I.Nf)/2)+4,'sapata',11,'middle',mut);mainBot=Y(yMin)+80;}
+  // ===== detalhe A =====
+  if(Dr){const viz=Dr.viz,hD=Math.max(0.5,Dr.h),sd=Math.min(260,700/(hD+0.35)),top=170,face=viz?1070:760,sg=viz?-1:1;
+   const X=m=>face+m*sd,Y=v=>top+(Dr.g+0.2-v)*sd;
+   T(700,108,`DETALHE A – DRENO (${viz?'lado do vizinho':'lado interno'})`,15,'start',ink,'bold');
+   const s0=sg*(Dr.dw+0.25);Rc(X(Math.min(0,s0)),Y(Dr.g),Math.abs(s0)*sd,Y(Dr.bot-0.1)-Y(Dr.g),'url(#sSoil)','none',0);
+   ground(X(Math.min(0,s0)),X(Math.max(0,s0)),Y(Dr.g));
+   const wTop=Dr.g+0.2,ww=0.16;Rc(X(viz?0:-ww),Y(wTop),ww*sd,Y(Dr.bot)-Y(wTop),conc,concl,1.2);
+   T(X(viz?ww/2:-ww/2),Y(wTop)-8,viz?'face na divisa':'face interna',11,'middle',mut);
+   if(Dr.bot>I.Nf+1e-6){Rc(X(Math.min(0,sg*(Dr.dw+0.25))),Y(Dr.bot),(Dr.dw+0.25)*sd,0.1*sd,conc,concl,1.2);T(X(sg*(Dr.dw+0.12)),Y(Dr.bot)+0.06*sd+4,'topo da sapata',10,'middle',mut)}
+   if(Dr.imp)Ln(X(0)+sg*2,Y(Dr.g),X(0)+sg*2,Y(Dr.bot),'#222',3.2);
+   const xa=X(viz?-Dr.dw:0),xb=X(viz?0:Dr.dw),yb=Y(Dr.bot),ySel=Y(Dr.g),yAr=Y(Dr.g-Dr.hSel),yBr=Y(Dr.g-Dr.hSel-Dr.hAr),gp=4;
+   if(Dr.hSel>0)Rc(xa,ySel,xb-xa,yAr-ySel,'url(#sArg)','#8d6b3a',.9);if(Dr.hAr>0)Rc(xa,yAr,xb-xa,yBr-yAr,'url(#sAreia)','#a38a4f',.9);Rc(xa,yBr,xb-xa,yb-yBr,'url(#sBrita)','#6b6458',.9);
+   o.push(`<rect x="${(xa+gp).toFixed(1)}" y="${(yBr+gp).toFixed(1)}" width="${(xb-xa-2*gp).toFixed(1)}" height="${(yb-yBr-2*gp).toFixed(1)}" fill="none" stroke="${geo}" stroke-width="2.6" stroke-dasharray="10 4"/>`);
+   o.push(`<path d="M${(xa+gp).toFixed(1)} ${(yBr+gp).toFixed(1)}q${((xb-xa)*0.3).toFixed(1)} -10 ${((xb-xa)*0.62).toFixed(1)} -2" fill="none" stroke="${geo}" stroke-width="2.6" stroke-dasharray="10 4"/>`);
+   const pr=Dr.dP/2*sd,pcx=(xa+xb)/2,pcy=yb-gp-Dr.las*sd-pr;
+   o.push(`<circle cx="${pcx.toFixed(1)}" cy="${pcy.toFixed(1)}" r="${pr.toFixed(1)}" fill="#fff" stroke="${pipe}" stroke-width="3"/><circle cx="${pcx.toFixed(1)}" cy="${pcy.toFixed(1)}" r="${Math.max(2,pr-6).toFixed(1)}" fill="none" stroke="${pipe}" stroke-width="1" stroke-dasharray="3 3"/>`);
+   for(let k=0;k<10;k++){const a=k*Math.PI/5;o.push(`<circle cx="${(pcx+(pr-3)*Math.cos(a)).toFixed(1)}" cy="${(pcy+(pr-3)*Math.sin(a)).toFixed(1)}" r="1.8" fill="${pipe}"/>`)}
+   // cotas (do lado da estrutura)
+   const xdim=viz?X(ww)+22:X(-ww)-22,sd2=viz?1:-1;
+   dimH(xa,xb,yb+26,`${f(Dr.dw*100,0)} cm`);if(Dr.hSel>0)dimV(xdim,ySel,yAr,f(Dr.hSel*100,0),sd2);if(Dr.hAr>0)dimV(xdim,yAr,yBr,f(Dr.hAr*100,0),sd2);dimV(xdim,yb-Dr.las*sd-gp,yb,f(Dr.las*100,0),sd2);
+   dimV(viz?xa-14:xb+14,ySel,yb,`${f(Dr.h)} m`,viz?-1:1);
+   {const xx=viz?X(-Dr.dw-0.25)-20:X(Dr.dw+0.25)+20;o.push(`<path d="M${xx-5} ${(ySel-8).toFixed(1)}h10l-5 8z" fill="none" stroke="${ink}"/>`);Ln(xx-12,ySel,xx+12,ySel);T(viz?xx-16:xx+16,ySel-10,`${sgn(Dr.g)} terreno ${viz?'vizinho':'interno'}`,11,viz?'end':'start',ink)}
+   // chamadas no lado do solo
+   const CX=viz?xa-60:xb+60,an=viz?'end':'start',call=(x1,y1,y2,lines,col)=>{o.push(`<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${(CX-sg*30).toFixed(1)} ${y2.toFixed(1)}H${CX}" fill="none" stroke="${ink}" stroke-width=".8"/><circle cx="${x1.toFixed(1)}" cy="${y1.toFixed(1)}" r="2.4" fill="${ink}"/>`);lines.forEach((l,i)=>T(CX+sg*6,y2+4+i*16,l,12.5,an,i===0?col:mut,i===0?'bold':'normal'))};
+   const xin=v=>viz?xa+v:xb-v;
+   if(Dr.imp)call(X(0)+sg*2,(ySel+yb)/2-60,ySel-70,['Impermeabilização da face enterrada','emulsão asfáltica ou manta'],'#222');
+   if(Dr.hSel>0)call(xin(16),(ySel+yAr)/2,ySel+14,['Selamento: solo argiloso compactado',`espessura ${f(Dr.hSel*100,0)} cm`],'#8d6b3a');
+   if(Dr.hAr>0)call(xin(16),(yAr+yBr)/2,yAr+46,['Camada de areia média',`espessura ${f(Dr.hAr*100,0)} cm`],'#7d6a35');
+   call(xin(gp),yBr+(yb-yBr)*0.25,yBr+(yb-yBr)*0.25+10,['Manta geotêxtil não tecida','(NBR 15224) envolvendo a brita,','transpasse ≥ 20 cm no topo'],geo);
+   call(xin(20),yBr+(yb-yBr)*0.5,yBr+(yb-yBr)*0.5+40,['Brita nº 2 (19 a 38 mm)'],'#4f4a40');
+   call(pcx-sg*pr,pcy,pcy+40,['Tubo PEAD corrugado perfurado',`Ø ${f(Dr.dP*1000,0)} mm, declividade ≥ 1%`,'até a saída'],pipe);
+   call(pcx+sg*pr*0.6,yb-gp-3,yb+50,[`Lastro de brita, ${f(Dr.las*100,0)} cm`],'#4f4a40');
+   detBot=Math.max(yb+80,pcy+100);
+   if(!Dr.ok)T(700,Hd-140,`Atenção: altura disponível ${f(Dr.h)} m menor que o necessário (${f(Dr.need)} m) para as camadas e o tubo.`,12,'start',dv,'bold');}
+  // notas
+  const ny=Hd-108;T(40,ny,'NOTAS',13,'start',ink,'bold');
+  (Dr?['Dreno longitudinal ao longo de todo o muro, com saída por gravidade (caixa de passagem, sarjeta ou rede pluvial) e caixas de inspeção a cada 80 m no máximo.',
+   `Fundo do dreno no nível ${Dr.bot>I.Nf+1e-6?'do topo da sapata':'do apoio da sapata'}; reaterro do restante em camadas compactadas.${Dr.viz&&!R.cen?' Dreno no terreno vizinho: depende de autorização do vizinho.':''}`,
+   'Brita, manta e tubo conforme composição SINAPI 102722 (dreno em muro de contenção com tubo PEAD corrugado perfurado).']
+   :['Sem dreno indicado. Recomenda-se drenagem do lado do solo mais alto quando houver desnível ou água acumulada.']).forEach((n,i)=>T(40,ny+20+i*18,'• '+n,12,'start',mut));
+  return {svg:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${Wd} ${Hd}">${o.join('')}</svg>`,w:Wd,h:Hd,mainBot,detBot,dr:!!Dr};
 }
 
 /* ---------- memorial de cálculo (Word) ---------- */
@@ -1469,6 +1584,7 @@ function inputRows(){
       if((id==='L'||id==='p3d')&&I.tipoSap==='cor')return;
       if(I.enr!=='sim'&&['lenr','tenr','eenrOut','phE'].includes(id))return;
       if(id==='zCi'&&I.cintaInt!=='sim')return;
+      if(I.drLado==='nao'&&['drB','drPhi','drLas','drAr','drSel','drImp'].includes(id))return;
       if((id==='fpkM'||id==='fpkCM')&&(I.bloco||'')[0]!=='k')return;
       const l=Array.isArray(lab)?lab[I.sys==='pil'?0:1]:lab;let val;
       if(u==='sel'){const o=opts.find(o=>String(o[0])===String(I[id]));val=o?o[1]:I[id]}
@@ -1624,6 +1740,10 @@ function memorialXML(R,figs,state){
    b.push(FIG(figs[4],'Figura 5 – Detalhamento: seções e planta da sapata.'));
    b.push(TBL([['Item','Elemento','Posição','Adotado','Necessário','Traspasse','Situação'],...rows.map(r=>[r.id,r.el,r.pos,r.mode==='lock'?detText('N1',D):detText(r.id,D),r.req,r.lap?`${f(r.lap.L,2)} m`:'–',ST(r.ok)])],[0.8,1.6,3,1.6,1.6,1,1.2],['l','l','l','l','r','r','r']));
    const nf=rows.filter(r=>!r.ok).length; if(nf)b.push(TXT(`${nf} armadura(s) adotada(s) não atende(m) ao cálculo ou às regras de detalhamento. Revisar antes da emissão.`));}
+   {const Dr=drenoGeo(R);b.push(H2('9.1 Seção transversal típica e drenagem'));
+    if(Dr){b.push(TXT(`Dreno longitudinal no ${Dr.viz?'lado do vizinho':'lado interno'}, ao longo de todo o muro: vala retangular com ${f(Dr.dw*100,0)} cm de largura e ${f(Dr.h)} m de altura, com fundo no nível ${Dr.bot>I.Nf+1e-6?'do topo da sapata':'do apoio da sapata'} (${sgn(Dr.bot)} m). De baixo para cima: lastro de brita de ${f(Dr.las*100,0)} cm; tubo PEAD corrugado perfurado Ø ${f(Dr.dP*1000,0)} mm com declividade mínima de 1% até a saída por gravidade; brita nº 2 (19 a 38 mm) envolvida por manta geotêxtil não tecida (NBR 15224) com transpasse mínimo de 20 cm; camada de areia média de ${f(Dr.hAr*100,0)} cm; selamento de solo argiloso compactado de ${f(Dr.hSel*100,0)} cm.${Dr.imp?' A face enterrada do muro recebe impermeabilização (emulsão asfáltica ou manta).':''} Caixas de inspeção a cada 80 m no máximo.${Dr.viz&&!R.cen?' O dreno fica no terreno vizinho e depende de autorização do proprietário.':''}${Dr.ok?'':` Atenção: a altura disponível (${f(Dr.h)} m) é menor que a necessária para as camadas (${f(Dr.need)} m).`}`))}
+    else b.push(TXT('Sem dreno indicado neste projeto.'));
+    b.push(FIG(figs[5],'Figura 6 – Seção transversal típica.'));if(Dr)b.push(FIG(figs[6],'Figura 7 – Detalhe A: dreno '+(Dr.viz?'no lado do vizinho':'no lado interno')+'.'));}
   b.push(H1('10. Conclusão'));
   b.push(TXT(state.fails?`${state.fails} verificação(ões) não atende(m) com os dados informados. Revisar os itens indicados.`:'Todas as verificações atendem com os dados informados.'));
   state.obs.forEach(o=>b.push(PP([RUN('• '),RUN(o)],{ind:360,align:'both'})));
@@ -1642,6 +1762,7 @@ function refList(R,noExtra){
    'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. NBR 8681: Ações e segurança nas estruturas – Procedimento. Rio de Janeiro: ABNT, 2003.',
    R.cer?'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. NBR 15270-1: Componentes cerâmicos – Blocos e tijolos para alvenaria – Parte 1: Requisitos. Rio de Janeiro: ABNT, 2017.':'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. NBR 6136: Blocos vazados de concreto simples para alvenaria – Requisitos. Rio de Janeiro: ABNT, 2016.',
    'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. NBR 16868-1: Alvenaria estrutural – Parte 1: Projeto. Rio de Janeiro: ABNT, 2020.'];
+  if(I.drLado!=='nao')L.push('ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. NBR 15224: Geotêxteis – Instalação em trincheiras drenantes. Rio de Janeiro: ABNT, 2005.','CAIXA ECONÔMICA FEDERAL. SINAPI – Sistema Nacional de Pesquisa de Custos e Índices da Construção Civil: composição 102722 – dreno em muro de contenção com tubo de PEAD corrugado flexível perfurado. Brasília: CAIXA.');
   if(R.arm){L.push(
    'PARSEKIAN, Guilherme Aris; MEDEIROS, Wallison Angelim. Parâmetros de projeto de alvenaria estrutural com blocos de concreto. 2. ed. São Carlos: EdUFSCar, 2021. 147 p.',
    'PEREIRA JUNIOR, Wanderlei Malaquias; RODRIGUES, Murilo Carneiro; BARROSO, Helena Luchesi; DUTRA, Roberto Viegas; BENITTEZ, Lívia Regueira Fortunato; BENITTEZ, Leandro Henrique; PARSEKIAN, Guilherme Aris. Aplicativo online para verificação da alvenaria estrutural armada de acordo com a nova NBR 16868 em muros de arrimo. Concreto & Construções, São Paulo: IBRACON, n. 111, p. 43-52, jul./set. 2023. DOI: 10.4322/1809-7197.2023.111.0005.',
@@ -1702,6 +1823,11 @@ async function gerarMemorial(){
      // a prancha é dividida em duas figuras para caber legível na folha em retrato
      figs.push(await mkFig(crop('0 80 870 1070'),870,1070,'detalhamento_corte.png','rIdImg4',13));
      figs.push(await mkFig(crop('870 80 930 1070'),930,1070,'detalhamento_secoes.png','rIdImg5',16));}
+    {const sv=secaoSvg(R),crop=vb=>sv.svg.replace(/viewBox="[^"]*"/,`viewBox="${vb}"`);
+     if(sv.dr){const h1=Math.min(sv.h,sv.mainBot)-90,h2=Math.min(sv.h,sv.detBot)-90;
+       figs.push(await mkFig(crop(`0 90 660 ${h1}`),660,h1,'secao_tipica.png','rIdImg6',12.5));
+       figs.push(await mkFig(crop(`660 90 580 ${h2}`),580,h2,'detalhe_dreno.png','rIdImg7',12));}
+     else figs.push(await mkFig(crop(`0 0 ${sv.w} ${Math.min(sv.h,sv.mainBot)}`),sv.w,Math.min(sv.h,sv.mainBot),'secao_tipica.png','rIdImg6',15));}
     const parts=docxParts(R,figs,LAST);
     if(typeof JSZip==='undefined'){say('Não foi possível carregar o gerador de Word. Verifique a conexão e tente de novo.');return}
     const zip=new JSZip();Object.entries(parts).forEach(([k,v])=>zip.file(k,v));figs.filter(Boolean).forEach(g=>zip.file('word/media/'+g.name,g.buf));
