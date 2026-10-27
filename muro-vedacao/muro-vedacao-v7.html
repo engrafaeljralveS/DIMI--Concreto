@@ -582,6 +582,15 @@ function calc(){
   const fcd=I.fck/1.4/10, fctm=0.3*Math.pow(I.fck,2/3), fctd=0.7*fctm/1.4, tauRd=0.25*fctd*1000;
   const Eci=5600*Math.sqrt(I.fck), Ecs=Math.min(1,0.8+0.2*I.fck/80)*Eci; R.Ecs=Ecs;
   const momW=(y,ecc)=>{const Mw=R.at(MW,y)*s,Me=R.at(ME,y)*s;return Math.max(Math.abs(Mw+R.sE*Me-ecc),Math.abs(-Mw+R.sE*Me-ecc))};
+  // cortante com estribos – NBR 6118, 17.4.2.2 (Modelo I, estribos a 90°), usado quando Vd > VRd1
+  // bw, d em cm; Vd em kN; devolve Asw/s em cm²/m
+  const shearI=(Vd,bw,d,VRd1,legs=2,phiSt=I.pht)=>{const fyw=Math.min(I.fyk,500),fywd=fyw/1.15/10;
+    const VRd2=0.27*(1-I.fck/250)*fcd*bw*d,Vc=0.6*fctd/10*bw*d;
+    const AswCalc=Math.max(0,Vd-Vc)/(0.9*d*fywd)*100,AswMin=0.2*fctm/fyw*bw*100,Asw=Math.max(AswCalc,AswMin);
+    const sMax=Vd<=0.67*VRd2?Math.min(0.6*d,30):Math.min(0.3*d,20);
+    const sReq=Math.floor(Math.min(legs*area(phiSt)/(Asw/100),sMax));
+    return {need:Vd>VRd1,VRd1,VRd2,Vc,fywd,AswCalc,AswMin,Asw,sMax,sReq,legs,phiSt,ok:Vd<=VRd2+1e-9,prat:sReq>=5}};
+  R.shearI=shearI;
   const pil=(lab,y,bw,h,ecc,Nk,lfree,bar,wall)=>{const d=h-I.cob-(wall?0:I.pht/10)-bar/20;
     // NBR 6118, 13.2.3: pilar com menor dimensão entre 14 e 19 cm → γn = 1,95 − 0,05·b
     const bmin=Math.min(bw,h), gn=(!wall&&bmin<19)?Math.max(1,1.95-0.05*bmin):1;
@@ -595,8 +604,11 @@ function calc(){
     const AsTot=2*nb*area(bar),AsMax=0.04*bw*h; if(!wall&&AsTot>AsMax)r.ok=false;
     const spw=Math.floor(Math.min(20,area(bar)/Asf*100));
     const rho=Math.min(0.02,nb*area(bar)/(bw*d)),k=Math.max(1,1.6-d/100),VRd1=tauRd*k*(1.2+40*rho)*bw/100*d/100;
-    const st=Math.floor(Math.min(20,bw,h,12*bar/10));
-    return {lab,y,bw,h,d,Mk,M1d,Md,Vd,...r,Asmin,Asf,nb,txt:r.ok?(wall?`Ø${f(bar,1)} c/${spw} por face`:`${nb} Ø${f(bar,1)} por face`):'—',VRd1,vok:Vd<=VRd1,st,lam,nu,amp,gn,AsTot,AsMax,lamOk:lam<=140?true:lam<=200?'warn':false,bminOk:wall||bmin>=14}};
+    let st=Math.floor(Math.min(20,bw,h,12*bar/10));
+    // Vd ≤ VRd1: estribos construtivos; Vd > VRd1: Modelo I (VRd2 e Asw/s), espaçamento reduzido se preciso
+    let sh=shearI(Vd,wall?100:bw,d,VRd1,wall?1:2),phiSt=I.pht;
+    if(sh.need&&!wall){for(const ph of [I.pht,6.3,8,10,12.5].filter(v=>v>=I.pht)){phiSt=ph;sh=shearI(Vd,bw,d,VRd1,2,ph);if(sh.sReq>=Math.max(5,Math.min(10,Math.floor(sh.sMax))))break}st=Math.max(1,Math.min(st,sh.sReq))}
+    return {lab,y,bw,h,d,Mk,M1d,Md,Vd,...r,Asmin,Asf,nb,txt:r.ok?(wall?`Ø${f(bar,1)} c/${spw} por face`:`${nb} Ø${f(bar,1)} por face`):'—',VRd1,sh,phiSt,vok:Vd<=VRd1||(sh.ok&&(wall||sh.prat)),st,lam,nu,amp,gn,AsTot,AsMax,lamOk:lam<=140?true:lam<=200?'warn':false,bminOk:wall||bmin>=14}};
   const hcantP=Math.max(0,I.NTopo-I.NA);
   R.ecc=R.Nwall*(bpe/200-R.cw); // peso de muro + pilar fora do eixo do pescoço
   if(!arm){
@@ -767,7 +779,7 @@ function calc(){
        const Asmin=0.004*b*Ht/2,Asf=Math.max(r.As||0,Asmin),nb=Math.max(2,Math.ceil(Asf/area(E.phi)-1e-9));
        const fctd=0.7*0.3*Math.pow(I.fck,2/3)/1.4,rho2=Math.min(0.02,nb*area(E.phi)/(b*dd)),Vd=1.4*gn*Math.max(Math.abs(R.at(VW,R.ytop)+R.sE*R.at(VE,R.ytop)),Math.abs(-R.at(VW,R.ytop)+R.sE*R.at(VE,R.ytop)))*lE;
        const VRd1=0.25*fctd*1000*Math.max(1,1.6-dd/100)*(1.2+40*rho2)*b/100*dd/100;
-       E.PE={lab:'Pescoço de concreto sob o enrijecedor',bw:b,h:Ht,d:dd,Mk,Md,gn,...r,Asmin,Asf,nb,Vd,VRd1,vok:Vd<=VRd1,txt:r.ok?`${nb} Ø${f(E.phi,1)} por face`:'—'};}
+       const shP=R.shearI(Vd,b,dd,VRd1);E.PE={lab:'Pescoço de concreto sob o enrijecedor',bw:b,h:Ht,d:dd,Mk,Md,gn,...r,Asmin,Asf,nb,Vd,VRd1,sh:shP,vok:Vd<=VRd1||(shP.ok&&shP.prat),txt:r.ok?`${nb} Ø${f(E.phi,1)} por face`:'—'};}
       E.fit=R.fx0+I.B>=R.tenr/100-1e-9; E.modOk=Math.abs(((R.tenr-R.t)/R.mod)-Math.round((R.tenr-R.t)/R.mod))<0.15;
       E.ok=E.okF&&E.furoOk&&E.vOk&&E.PE.ok&&E.PE.vok&&E.fit&&(E.hOk||E.rH.ok);
     }
@@ -1028,6 +1040,9 @@ function beamSvg(q,qlab,sp){
 }
 
 /* ---------- tela 3 ---------- */
+// texto da verificação de cortante: VRd1 (sem cálculo de estribo) ou Modelo I (VRd2, Vc e Asw/s)
+const vRes=P=>P.sh&&P.sh.need?`VRd2 ${f(P.sh.VRd2)} · Vc ${f(P.sh.Vc)}`:`VRd1 ${f(P.VRd1)}`;
+const vEst=(P,st,phi,wall)=>P.sh&&P.sh.need?(wall?`Asw/s ${f(P.sh.Asw,2)} cm²/m (grampos)`:`Ø${f(phi,1)} c/${st} · Asw/s ≥ ${f(P.sh.Asw,2)} cm²/m`):(wall?'sem estribo':`Ø${f(phi,1)} c/${st} (construtivo)`);
 function renderChecks(R){
   const lim=1.3*I.sadm,cases=[R.perm,...R.cW];
   $('critTxt').textContent=(R.arm?'Sapata corrida, por metro · ':R.cor?`Sapata corrida, trecho B × s = ${f(I.B)} × ${f(R.s)} m por pilar · `:'Sapata isolada, por pilar · ')+(I.crit==='23'?'com vento ≥ 2/3 comprimida; permanente toda comprimida':'toda comprimida: |e| ≤ B/6');
@@ -1094,16 +1109,16 @@ function renderChecks(R){
   if(R.arm)html+=`<tr><td>Sapata corrida – longitudinal</td><td>–</td><td>–</td><td>–</td><td>–</td><td>${f(R.SL.Asmin)}/m</td><td>Ø${f(I.phs,1)} c/${R.SL.sp} (distribuição)</td><td>${pill(true)}</td></tr>`;
   $('tabAs').innerHTML=html;
   let v=`<tr><th>Elemento</th><th>Vd (kN)</th><th>Resistência (kN)</th><th>Estribo</th><th></th></tr>`;
-  if(!R.arm){v+=`<tr><td>${R.P1.lab}</td><td>${f(R.P1.Vd)}</td><td>VRd1 ${f(R.P1.VRd1)}</td><td>Ø${f(I.pht,1)} c/${R.P1.st}</td><td>${pill(R.P1.vok)}</td></tr>
-   <tr><td>${R.P2.lab}</td><td>${f(R.P2.Vd)}</td><td>VRd1 ${f(R.P2.VRd1)}</td><td>Ø${f(I.pht,1)} c/${R.P2.st}</td><td>${pill(R.P2.vok)}</td></tr>
+  if(!R.arm){v+=`<tr><td>${R.P1.lab}</td><td>${f(R.P1.Vd)}</td><td>${vRes(R.P1)}</td><td>${vEst(R.P1,R.P1.st,R.P1.phiSt)}</td><td>${pill(R.P1.vok)}</td></tr>
+   <tr><td>${R.P2.lab}</td><td>${f(R.P2.Vd)}</td><td>${vRes(R.P2)}</td><td>${vEst(R.P2,R.P2.st,R.P2.phiSt)}</td><td>${pill(R.P2.vok)}</td></tr>
    <tr><td>${R.BI.lab}</td><td>${f(R.BI.Vd)}</td><td>VRd2 ${f(R.BI.VRd2)}</td><td>Ø${f(I.pht,1)} c/${R.BI.sp}</td><td>${pill(R.BI.v2ok)}</td></tr>
    <tr><td>${R.BS.lab}</td><td>${f(R.BS.Vd)}</td><td>VRd2 ${f(R.BS.VRd2)}</td><td>Ø${f(I.pht,1)} c/${R.BS.sp}</td><td>${pill(R.BS.v2ok)}</td></tr>`;
    if(R.CI)v+=`<tr><td>${R.CI.lab}</td><td>${f(R.CI.Vd)}</td><td>Vc ${f(R.CI.Vc)}</td><td>${R.CI.semEstribo?'sem estribo (Vd ≤ Vc)':'grampos Ø5 c/'+R.CI.sp}</td><td>${pill(R.CI.v2ok)}</td></tr>`}
-  else v+=`<tr><td>${R.P2.lab}</td><td>${f(R.P2.Vd)}/m</td><td>VRd1 ${f(R.P2.VRd1)}/m</td><td>sem estribo</td><td>${pill(R.P2.vok)}</td></tr>`;
+  else v+=`<tr><td>${R.P2.lab}</td><td>${f(R.P2.Vd)}/m</td><td>${vRes(R.P2)}/m</td><td>${vEst(R.P2,0,0,true)}</td><td>${pill(R.P2.vok)}</td></tr>`;
   v+=`<tr><td>Sapata, a d da face</td><td>${f(R.SV.Vd)}/m</td><td>VRd1 ${f(R.SV.VRd1)}/m</td><td>sem estribo</td><td>${pill(R.SV.ok)}</td></tr>`;
   if(R.PU)v+=`<tr><td>Punção na sapata (contorno C a 2d)</td><td>τ ${f(R.PU.tau1/1000,3)} MPa</td><td>τRd1 ${f(R.PU.tRd1/1000,3)} MPa</td><td>face: ${f(R.PU.tau0/1000,2)} ≤ ${f(R.PU.tRd2/1000,2)} MPa</td><td>${pill(R.PU.ok)}</td></tr>`;
   if(R.arm)v+=`<tr><td>${R.enr?'Pano entre enrijecedores na base':'Alvenaria armada na base'}</td><td>${f(R.VdA)}/m</td><td>Va ${f(R.VaA)}/m</td><td>sem estribo</td><td>${pill(R.vAok)}</td></tr>`;
-  if(R.enr)v+=`<tr><td>Enrijecedor no assentamento</td><td>${f(R.E.Vd)}</td><td>Va ${f(R.E.Va)}</td><td>grampo ${phiTxt(+I.phH)} c/${R.E.sw}</td><td>${pill(R.E.vOk)}</td></tr><tr><td>${R.E.PE.lab}</td><td>${f(R.E.PE.Vd)}</td><td>VRd1 ${f(R.E.PE.VRd1)}</td><td>estribo Ø5 c/15</td><td>${pill(R.E.PE.vok)}</td></tr>`;
+  if(R.enr)v+=`<tr><td>Enrijecedor no assentamento</td><td>${f(R.E.Vd)}</td><td>Va ${f(R.E.Va)}</td><td>grampo ${phiTxt(+I.phH)} c/${R.E.sw}</td><td>${pill(R.E.vOk)}</td></tr><tr><td>${R.E.PE.lab}</td><td>${f(R.E.PE.Vd)}</td><td>${vRes(R.E.PE)}</td><td>${R.E.PE.sh.need?`Asw/s ≥ ${f(R.E.PE.sh.Asw,2)} cm²/m (E5)`:'estribos E5 (construtivos)'}</td><td>${pill(R.E.PE.vok)}</td></tr>`;
   if(R.cor&&R.TS)v+=`<tr><td>Torção na sapata corrida (cada lado do pilar)</td><td>Td ${f(R.TS.Td)} kN·m</td><td>TRd2 ${f(R.TS.TRd2,1)} kN·m</td><td>${f(R.TS.A90,2)} cm²/m (A90/s) · Asl ${f(R.TS.Asl,2)} cm²</td><td>${pill(R.TS.ok)}</td></tr>`;
   $('tabV').innerHTML=v;
   // observações
@@ -1112,6 +1127,7 @@ function renderChecks(R){
   if(!R.sigOk)obs.push('Tensão no solo acima do limite (permanente ≤ σadm; com vento ≤ 1,3 σadm): aumente a área da sapata.');
   if(R.PU&&!R.PU.ok)obs.push('Punção na sapata acima do resistente: aumente hs (ou torne a sapata rígida, hs ≥ 2a/3).');
   if(!R.arm&&R.P1.gn>1)obs.push(`Pilar com menor dimensão de ${f(Math.min(R.bp,R.hp),0)} cm: esforços majorados por γn = ${f(R.P1.gn,2)} (NBR 6118, 13.2.3).`);
+  [R.P1,R.P2].filter(P=>P&&P.sh&&P.sh.need&&P.bw<100&&!(P.sh.ok&&P.sh.prat)).forEach(P=>obs.push(`${P.lab}: cortante de cálculo ${f(P.Vd,1)} kN acima de VRd1; pelo Modelo I ${P.sh.ok?`os estribos ficariam a menos de 5 cm (Asw/s = ${f(P.sh.Asw,2)} cm²/m)`:`as bielas não resistem (VRd2 = ${f(P.sh.VRd2,1)} kN)`}. Aumente a seção ou o fck.`));
   if(R.arm&&!R.vAok)obs.push('Cisalhamento na base do muro armado acima de Va: aumente a espessura do bloco ou a armadura.');
   if(!R.arm){
     if(!R.P1.ok)obs.push('Pilar não resiste no assentamento: use bloco mais espesso, pilar mais longo ou reduza o espaçamento.');
@@ -1171,9 +1187,9 @@ function detDefaults(R){
   const D={};
   const stw=Asf=>Math.max(5,Math.floor(Math.min(20,area(I.phv)/Asf*100)));
   if(!R.arm){
-    D.N1={n:R.P1.nb,phi:I.phl}; D.N3={phi:I.pht,s:R.P1.st};
+    D.N1={n:R.P1.nb,phi:I.phl}; D.N3={phi:R.P1.phiSt||I.pht,s:R.P1.st};
     D.N2={n:Math.max(2,Math.ceil(Math.max(R.P1.Asf,R.P2.Asf)/area(I.phl)-1e-9)),phi:I.phl};
-    D.N2a={n:R.P2.nb,phi:I.phl}; D.N4={phi:I.pht,s:R.P2.st};
+    D.N2a={n:R.P2.nb,phi:I.phl}; D.N4={phi:R.P2.phiSt||I.pht,s:R.P2.st};
     D.N8={n:R.BI.nb,phi:I.phv}; D.N9={n:2,phi:I.phv}; D.N11={phi:I.pht,s:R.BI.sp};
     D.N10={n:R.BS.nb,phi:I.phv}; D.N12={phi:I.pht,s:R.BS.sp};
     D.N14={n:Math.max(1,Math.ceil(R.LG.As/area(5)-1e-9)),phi:5};
@@ -1199,14 +1215,15 @@ function detRows(R,D){
   if(!R.arm){
     const n1=D.N1, sl=clear(R.hp,n1.n,n1.phi), as1=n1.n*area(n1.phi);
     rows.push({id:'N1',el:'Pilar',pos:'Longitudinal, por face (2 faces)',mode:'n',req:`${f(R.P1.Asf)} cm²`,ad:`${f(as1)} cm²`,ok:R.P1.ok&&as1>=R.P1.Asf-1e-6&&sl>=2.3,note:sl<2.3?`espaçamento livre ${f(sl,1)} cm < 2,3 cm`:'',lap:lapLen(n1.phi)});
-    rows.push({id:'N3',el:'Pilar',pos:'Estribos',mode:'s',req:`s ≤ ${R.P1.st} cm · Ø ≥ ${f(Math.max(5,n1.phi/4),1)}`,ad:`${phiTxt(D.N3.phi)} c/${D.N3.s}`,ok:D.N3.s<=R.P1.st&&D.N3.phi>=Math.max(5,n1.phi/4)-1e-9});
+    const awOk=(P,v)=>!(P.sh&&P.sh.need)||2*area(v.phi)*100/v.s>=P.sh.Asw-1e-6,awTxt=P=>P.sh&&P.sh.need?` · Asw/s ≥ ${f(P.sh.Asw,2)} cm²/m`:'';
+    rows.push({id:'N3',el:'Pilar',pos:'Estribos',mode:'s',req:`s ≤ ${R.P1.st} cm · Ø ≥ ${f(Math.max(5,n1.phi/4),1)}${awTxt(R.P1)}`,ad:`${phiTxt(D.N3.phi)} c/${D.N3.s}${R.P1.sh.need?` (${f(2*area(D.N3.phi)*100/D.N3.s,2)} cm²/m)`:''}`,ok:D.N3.s<=R.P1.st&&D.N3.phi>=Math.max(5,n1.phi/4)-1e-9&&awOk(R.P1,D.N3)&&R.P1.vok});
     // N2: barras próprias do pescoço, independentes de N1, emendadas por traspasse acima do NA.
     // No NA o traspasse começa e só N2 está ancorada: N2 atende o pescoço (topo da sapata) e o pilar (NA).
     const n2=D.N2,as2=n2.n*area(n2.phi),req2=Math.max(R.P1.Asf,R.P2.Asf),sl2b=clear(Math.min(R.hp,R.hpe),n2.n,n2.phi);
     rows.push({id:'N2',el:'Pescoço',pos:'Longitudinal por face, nas faces do pilar (esperas com traspasse em N1)',mode:'n',req:`${f(req2)} cm²`,ad:`${f(as2)} cm²`,ok:R.P2.ok&&as2>=req2-1e-6&&sl2b>=2.3,note:[sl2b<2.3?`espaçamento livre ${f(sl2b,1)} cm < 2,3 cm`:'',as2<R.P1.Asf-1e-6&&as2>=R.P2.Asf-1e-6?'no NA (início do traspasse) N2 também precisa atender o pilar':''].filter(Boolean).join('; '),lap:lapLen(Math.max(n1.phi,n2.phi))});
     const as2a=D.N2a.n*area(D.N2a.phi), sl2=clear(R.hpe,D.N2a.n,D.N2a.phi);
     rows.push({id:'N2a',el:'Pescoço',pos:'Face interna',mode:'n',req:`${f(R.P2.Asf)} cm²`,ad:`${f(as2a)} cm²`,ok:as2a>=R.P2.Asf-1e-6&&sl2>=2.3,note:sl2<2.3?`espaçamento livre ${f(sl2,1)} cm < 2,3 cm`:''});
-    rows.push({id:'N4',el:'Pescoço',pos:'Estribos',mode:'s',req:`s ≤ ${R.P2.st} cm`,ad:`${phiTxt(D.N4.phi)} c/${D.N4.s}`,ok:D.N4.s<=R.P2.st&&D.N4.phi>=5});
+    rows.push({id:'N4',el:'Pescoço',pos:'Estribos',mode:'s',req:`s ≤ ${R.P2.st} cm${awTxt(R.P2)}`,ad:`${phiTxt(D.N4.phi)} c/${D.N4.s}${R.P2.sh.need?` (${f(2*area(D.N4.phi)*100/D.N4.s,2)} cm²/m)`:''}`,ok:D.N4.s<=R.P2.st&&D.N4.phi>=5&&awOk(R.P2,D.N4)&&R.P2.vok});
     const as8=D.N8.n*area(D.N8.phi);
     rows.push({id:'N8',el:'Baldrame',pos:'Inferior',mode:'n',req:`${f(R.BI.Asf)} cm²`,ad:`${f(as8)} cm²`,ok:R.BI.ok&&as8>=R.BI.Asf-1e-6,lap:lapLen(D.N8.phi)});
     rows.push({id:'N9',el:'Baldrame',pos:'Superior (construtiva)',mode:'n',req:'≥ 2 barras',ad:`${D.N9.n} ${phiTxt(D.N9.phi)}`,ok:D.N9.n>=2,lap:lapLen(D.N9.phi)});
@@ -1235,8 +1252,8 @@ function detRows(R,D){
       const aw=area(D.E3.phi)*100/D.E3.s,okS=D.E3.s<=E.sMax+1e-9&&D.E3.s%20===0;
       rows.push({id:'E3',el:'Enrijecedor',pos:'Grampos horizontais nas canaletas do enrijecedor (cisalhamento)',mode:'s',req:`${f(E.Asw)} cm²/m · s ≤ ${f(E.sMax,0)} cm`,ad:`${f(aw)} cm²/m`,ok:aw>=E.Asw-1e-6&&okS,note:okS?'':'espaçamento deve ser múltiplo de 20 cm (fiadas) e ≤ 0,5d'});
       rows.push({id:'E4',el:'Pescoço do enrijecedor',pos:`Concreto ${f(R.eenr,0)} × ${f(R.tenr,0)} cm, por face (inclui as esperas de E1 e E2)`,mode:'n',req:`${f(E.PE.Asf)} cm²`,ad:`${f(A(D.E4))} cm²`,ok:E.PE.ok&&A(D.E4)>=E.PE.Asf-1e-6,lap:lapLen(D.E4.phi)});
-      const sE5=Math.floor(Math.min(20,R.eenr,12*D.E4.phi/10));
-      rows.push({id:'E5',el:'Pescoço do enrijecedor',pos:'Estribos',mode:'s',req:`s ≤ ${sE5} cm`,ad:`${phiTxt(D.E5.phi)} c/${D.E5.s}`,ok:D.E5.s<=sE5&&D.E5.phi>=5&&E.PE.vok});
+      const shE=E.PE.sh,sE5=Math.floor(Math.min(20,R.eenr,12*D.E4.phi/10,shE.need?shE.sReq:99));
+      rows.push({id:'E5',el:'Pescoço do enrijecedor',pos:'Estribos',mode:'s',req:`s ≤ ${sE5} cm${shE.need?` · Asw/s ≥ ${f(shE.Asw,2)} cm²/m`:''}`,ad:`${phiTxt(D.E5.phi)} c/${D.E5.s}`,ok:D.E5.s<=sE5&&D.E5.phi>=5&&E.PE.vok&&(!shE.need||2*area(D.E5.phi)*100/D.E5.s>=shE.Asw-1e-6)});
     }
   }
   const as5=AsS(D.N5.phi,D.N5.s);
@@ -1604,6 +1621,10 @@ function inputRows(){
   return rows;
 }
 
+// cortante no memorial: Vd ≤ VRd1 dispensa cálculo de estribo; Vd > VRd1 → Modelo I da NBR 6118 (17.4.2.2)
+function vMem(P,est){const h=P.sh;
+  if(!h||!h.need)return `Vd = ${f(P.Vd,2)} kN ≤ VRd1 = ${f(P.VRd1,2)} kN: dispensa o cálculo da armadura transversal${est?`; ${est} construtivos`:''} (Atende)`;
+  return `${h.prat||P.bw>=100?'':'[espaçamento < 5 cm: aumentar a seção] '}Vd = ${f(P.Vd,2)} kN > VRd1 = ${f(P.VRd1,2)} kN → Modelo I (NBR 6118, 17.4.2.2): VRd2 = 0,27·αv2·fcd·bw·d = ${f(h.VRd2,1)} kN ${P.Vd<=h.VRd2?'≥':'<'} Vd (bielas ${h.ok?'atendem':'não atendem'}); Vc = 0,6·fctd·bw·d = ${f(h.Vc,2)} kN; Vsw = Vd − Vc = ${f(Math.max(0,P.Vd-h.Vc),2)} kN; Asw/s = Vsw/(0,9·d·fywd) = ${f(h.AswCalc,2)} cm²/m, mínimo 0,2·fctm/fywk·bw = ${f(h.AswMin,2)} cm²/m → ${f(h.Asw,2)} cm²/m; s ≤ ${f(Math.floor(h.sMax),0)} cm${est?`; ${est}`:''} (${h.ok&&(h.prat||P.bw>=100)?'Atende':'Não atende'})`}
 function memorialXML(R,figs,state){
   IMGID=1;const b=[];const arm=R.arm,dt=new Date().toLocaleDateString('pt-BR');
   const sysTxt=arm?`alvenaria estrutural armada em balanço${R.enr?`, com enrijecedores do próprio bloco a cada ${f(R.lenr)} m voltados para o lado interno`:''}, com sapata corrida ${R.cen?'centrada':'de divisa'}`:`pilares de concreto com alvenaria de vedação, baldrame, cinta superior e sapata ${R.cor?'corrida':'isolada'} ${R.cen?'centrada':'de divisa'}`;
@@ -1680,7 +1701,7 @@ function memorialXML(R,figs,state){
     if(P.lam!=null)b.push(EQ('Esbeltez:',`balanço único pilar + pescoço, le = 2·${f(Math.max(0,I.NTopo-R.ytop))} m; λ = le·√12/h = ${f(P.lam,0)}; ν = ${f(P.nu,3)}; amplificação de 2ª ordem (rigidez κ aproximada) = ${f(P.amp,3)} → Md = ${f(P.Md,2)} kN·m`));
     b.push(EQ('Flexão:',`b = ${f(P.bw,0)} cm, d = ${f(P.d,1)} cm, KMD = ${f(P.KMD,3)}${P.ok?`, As = ${f(P.As,2)} cm² (mín. ${f(P.Asmin,2)} cm²)`:' – excede o limite'}`));
     b.push(EQ('Adotado:',`${P.txt} · ${ST(P.ok)}`));
-    b.push(EQ('Cortante:',`Vd = ${f(P.Vd,2)} kN ≤ VRd1 = ${f(P.VRd1,2)} kN → ${P.vok?'dispensa armadura de cálculo':'requer armadura transversal'}${P.st?`; estribos Ø${f(I.pht,1)} c/${P.st}`:''}`));};
+    b.push(EQ('Cortante:',vMem(P,P.st?`estribos Ø${f(P.phiSt||I.pht,1)} c/${P.st}`:'')));};
   if(!arm){pilBlock(R.P1,'7.1 Pilar no assentamento (NA)');pilBlock(R.P2,'7.2 Pescoço no topo da sapata');
     const vg=(V,tit,qn)=>{b.push(H2(tit));b.push(EQ('Carga:',`${qn} = ${f(V.q,3)} kN/m, vão s = ${f(R.s)} m (biapoiada)`));b.push(EQ('Esforços:',`Md = 1,4·q·s²/8 = ${f(V.Md,2)} kN·m; Vd = 1,4·q·s/2 = ${f(V.Vd,2)} kN`));
       b.push(EQ('Flexão:',`b = ${f(V.bw,0)} cm, d = ${f(V.d,1)} cm, KMD = ${f(V.KMD,3)}, As = ${V.ok?f(V.As,2):'–'} cm² (mín. ${f(V.Asmin,2)}) → ${V.txt}`));b.push(EQ('Estribos:',V.semEstribo?`dispensados: Vd = ${f(V.Vd,2)} ≤ Vc = ${f(V.Vc,2)} kN; VRd2 = ${f(V.VRd2,1)} kN (${ST(V.v2ok)})`:`Ø${f(I.pht,1)} c/${V.sp} · Vd ≤ VRd2 = ${f(V.VRd2,1)} kN (${ST(V.v2ok)})`));
@@ -1691,7 +1712,7 @@ function memorialXML(R,figs,state){
     if(R.enr){const P=R.E.PE;b.push(H2('7.2 Pescoço de concreto sob o enrijecedor'));
       b.push(EQ('Seção:',`${f(P.bw,0)} × ${f(P.h,0)} cm, d = ${f(P.d,1)} cm; momento da faixa de ${f(R.lenr)} m no topo da sapata Mk = ${f(P.Mk,2)} kN·m; γn = ${f(P.gn,2)}; Md = ${f(P.Md,2)} kN·m`));
       b.push(EQ('Flexão:',`KMD = ${f(P.KMD,3)}; As = ${f(P.Asf,2)} cm² por face (mín. 0,4%) → ${P.txt} (${ST(P.ok)})`));
-      b.push(EQ('Cortante:',`Vd = ${f(P.Vd,2)} kN ≤ VRd1 = ${f(P.VRd1,2)} kN (${ST(P.vok)})`));}}
+      b.push(EQ('Cortante:',vMem(P,'estribos E5')));}}
   b.push(H2(`${arm?(R.enr?'7.3':'7.2'):(R.CI?'7.6':'7.5')} Sapata`));
   b.push(EQ('Pressão líquida:',`σliq = σsolo − (25·hs + γ·hsolo); no balanço o peso próprio e o solo sobre a sapata somam ${f(25*I.hs+I.gam*Math.max(0,I.NT-R.ytop),1)} kPa`));
   if(R.SBs)b.push(EQ('Face superior:',`onde o peso supera a reação do solo, o balanço traciona a face superior: Md = ${f(R.SBs.Md,2)} kN·m/m → ${R.SBs.txt}`));
