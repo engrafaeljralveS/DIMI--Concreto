@@ -88,6 +88,9 @@ svg .t-ok{fill:var(--ok)} svg .t-bad{fill:var(--bad)} svg .t-st{fill:var(--steel
 #corte{width:100%;height:auto;max-height:calc(100vh - 230px)}
 #diag{min-width:440px;width:100%;height:auto}
 #vista{min-width:560px;width:100%;height:auto}
+.baserow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.7fr);gap:20px;align-items:start}
+.beamcol{display:grid;gap:20px}
+@media (max-width:900px){.baserow{grid-template-columns:1fr}}
 .diagrow{display:grid;grid-template-columns:minmax(0,0.8fr) minmax(0,1.2fr);gap:20px;align-items:start}
 @media (max-width:980px){.diagrow{grid-template-columns:1fr}}
 .beam svg{width:100%;height:auto}
@@ -203,9 +206,12 @@ td.txt{font-family:var(--body);text-align:left;color:var(--muted);font-size:12.5
       <header><h3>Esforços por seção</h3><small>Característicos (sem majoração)</small></header>
       <div class="scroll"><table id="tabSec"></table></div>
     </div>
-    <div class="grid3">
-      <div class="panel beam"><header><h3>Baldrame</h3><small id="bISub"></small></header><div id="beamI"></div></div>
-      <div class="panel beam"><header><h3>Cinta superior (verga de topo)</h3><small id="bSSub"></small></header><div id="beamS"></div></div>
+    <div class="baserow">
+      <div class="beamcol">
+        <div class="panel beam"><header><h3>Baldrame</h3><small id="bISub"></small></header><div id="beamI"></div></div>
+        <div class="panel beam"><header><h3>Cinta superior (verga de topo)</h3><small id="bSSub"></small></header><div id="beamS"></div></div>
+        <div class="panel beam" id="beamCPanel" hidden><header><h3>Cinta intermediária</h3><small id="bCSub"></small></header><div id="beamC"></div></div>
+      </div>
       <div class="panel"><header><h3>Ações na base da sapata</h3><small id="baseSub"></small></header><div class="scroll"><table id="tabBase"></table></div></div>
     </div>
     <div class="nav"><button class="btn" type="button" data-go="1">← Dados</button><button class="btn primary" type="button" data-go="3">Seguinte: verificações →</button></div>
@@ -968,7 +974,8 @@ function renderSec(R){
    <tr><td>Cunha de arrancamento (só no tombamento)</td><td>${f(R.Wc,1)}</td><td class="txt">β = ${f(I.beta,0)}°, solo de ${f(R.Hs)} m sobre a sapata</td></tr>`;
   if(R.arm){$('beamI').innerHTML='<p class="note">Apoio contínuo sobre a sapata corrida: o baldrame vira parede de fundação, sem flexão no vão. Armadura construtiva.</p>';$('bISub').textContent='';
     $('beamS').innerHTML=`<p class="note">Verga de topo de amarração (canaleta grauteada), ${f(I.bws,0)} × ${f(I.hcs,0)} cm, com 2 Ø${f(I.phv,1)}. Sem pilares, não recebe reação concentrada.</p>`;$('bSSub').textContent='';}
-  else{$('beamI').innerHTML=beamSvg(R.qv,'q',R.s);$('beamS').innerHTML=beamSvg(R.qh,'qh',R.s);$('bISub').textContent='Peso do muro, vão = espaçamento';$('bSSub').textContent='Vento da metade superior do pano'}
+  else{$('beamI').innerHTML=beamSvg(R.qv,'q',R.s);$('beamS').innerHTML=beamSvg(R.qh,'qh',R.s);$('bISub').textContent='Peso do muro, vão = espaçamento';$('bSSub').textContent=R.cInt?'Vento da metade do painel superior':'Vento da metade superior do pano'}
+  $('beamCPanel').hidden=!R.CI;if(R.CI){$('beamC').innerHTML=beamSvg(R.CI.q,'qci',R.s);$('bCSub').textContent='Vento da metade de cada painel vizinho'}
 }
 function beamSvg(q,qlab,sp){
   const x1=40,x2=400,len=x2-x1,Vm=q*sp/2,Mm=q*sp*sp/8;let o=`<svg viewBox="0 0 440 250" role="img" aria-label="Diagramas da viga">`;
