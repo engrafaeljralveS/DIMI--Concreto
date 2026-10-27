@@ -886,7 +886,7 @@ function drawDiag(R){
 function drawVista(R){
   const W=760;let s='';const sup=!R.arm||R.enr; // tem apoios discretos
   const sp=!R.arm?R.s:R.enr?R.lenr:1.0, half=1.5*sp, tw=!R.arm?R.hp/100:R.enr?R.eenr/100:0; // largura do apoio ao longo do muro
-  const yTop=I.NTopo,yBot=I.Nf,sc=Math.min(640/(2*half),250/(yTop-yBot+0.3)),x0=W/2,X=m=>x0+m*sc,top=100,Y=e=>top+(yTop-e)*sc;
+  const yTop=I.NTopo,yBot=I.Nf,sc=Math.min(600/(2*half),250/(yTop-yBot+0.3)),x0=W/2-20,X=m=>x0+m*sc,top=100,Y=e=>top+(yTop-e)*sc;
   const rect=(a,b,e1,e2,fill,st,extra='')=>`<rect x="${X(Math.min(a,b))}" y="${Y(e1)}" width="${Math.abs(b-a)*sc}" height="${Math.max(0,Y(e2)-Y(e1))}" fill="${fill}" stroke="${st}" stroke-width="1"${extra}/>`;
   const blk=R.Bl[0][0]==='k'?'var(--brick)':'var(--block)',blkL=R.Bl[0][0]==='k'?'var(--brickline)':'var(--blockline)';
   const ar=(x1,y1,x2,y2,col,w=1.4)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${w}" marker-end="url(#va${col==='var(--wind)'?'W':col==='var(--accent)'?'A':'V'})"/>`;
@@ -901,6 +901,13 @@ function drawVista(R){
   const hc=I.hcs/100;s+=rect(-half,half,yTop-hc,I.NA,blk,blkL);s+=rect(-half,half,yTop,yTop-hc,'var(--conc)','var(--concline)');
   if(R.cInt)s+=rect(-half,half,I.NA+R.h1+R.hcan,I.NA+R.h1,'var(--conc)','var(--concline)');
   if(!R.arm)s+=rect(-half,half,I.NA,I.NA-I.hci/100,'var(--conc)','var(--concline)');
+  // fiadas do pano
+  {const md=R.hcan;for(let e=I.NA+md;e<yTop-hc-1e-6;e+=md)s+=`<line x1="${X(-half)}" y1="${Y(e)}" x2="${X(half)}" y2="${Y(e)}" stroke="${blkL}" stroke-opacity=".35" stroke-width=".6"/>`}
+  // alvenaria de embasamento: do fundo do baldrame ao topo da sapata corrida (altura varia com a altura do baldrame)
+  if(R.cor&&R.hEmb>0){const eT=I.NA-I.hci/100,eB=R.ytop,md=R.hcan;s+=rect(-half,half,eT,eB,blk,blkL);
+    for(let e=eB+md;e<eT-1e-6;e+=md)s+=`<line x1="${X(-half)}" y1="${Y(e)}" x2="${X(half)}" y2="${Y(e)}" stroke="${blkL}" stroke-opacity=".6" stroke-width=".7"/>`;
+    for(let k=0,e=eB;e<eT-1e-6;e+=md,k++){const cl=R.Bl[5]/100;for(let x=-half+(k%2?cl/2:0);x<half;x+=cl)s+=`<line x1="${X(x)}" y1="${Y(Math.min(eT,e+md))}" x2="${X(x)}" y2="${Y(e)}" stroke="${blkL}" stroke-opacity=".45" stroke-width=".6"/>`}
+    s+=`<text x="${X(half)+6}" y="${Y((eT+eB)/2)+4}" font-size="10" text-anchor="start" class="t-muted">embasamento</text><text x="${X(half)+6}" y="${Y((eT+eB)/2)+16}" font-size="10" class="t-muted">h = ${f(R.hEmb)} m</text>`;}
   if(R.arm&&R.canH)R.canH.forEach(z=>{s+=`<line x1="${X(-half)}" y1="${Y(I.NA+z)}" x2="${X(half)}" y2="${Y(I.NA+z)}" stroke="var(--accent)" stroke-width="1" stroke-dasharray="6 3"/>`});
   const xs=sup?[-sp,0,sp]:[];
   xs.forEach(xc=>{if(!R.arm){s+=rect(xc-tw/2,xc+tw/2,yTop,I.NA,'var(--conc)','var(--concline)');s+=rect(xc-R.hpe/200,xc+R.hpe/200,I.NA,R.ytop,'var(--conc)','var(--concline)');if(R.iso)s+=rect(xc-I.L/2,xc+I.L/2,R.ytop,yBot,'var(--conc)','var(--concline)')}
@@ -942,8 +949,8 @@ function drawVista(R){
     for(const [a,b] of [[-half,-sp],[-sp,0],[0,sp],[sp,half]]){const pts=[];const aa=a+(a===-half?0:tw/2),bb=b-(b===half?0:tw/2);
       for(let i=0;i<=20;i++){const x=aa+(bb-aa)*i/20,full=Math.abs((bb-aa)-(lp))<0.05;const k=full?Math.sin(Math.PI*i/20):(a===-half?Math.sin(Math.PI*(0.5+i/40)):Math.sin(Math.PI*(i/40)));pts.push(`${X(x)},${py+pw+4+Math.max(12,web*0.6)*k}`)}
       s+=`<polyline points="${pts.join(' ')}" fill="none" stroke="var(--accent)" stroke-dasharray="4 3"/>`}
-    s+=`<text x="${x0}" y="${pb+34}" text-anchor="middle" class="t-m" font-size="10">vão livre ℓ = ${f(lp)} m · no meio do vão Md,paralelo = ${f(R.MdPar,3)} kN·m/m (Anexo E) · reação ≈ ${f(R.pv*lp/2,2)} kN/m em cada apoio</text>`;
-    s+=`<text x="${x0}" y="${pb+52}" text-anchor="middle" class="t-muted" font-size="10">tracejado: deformada exagerada do pano; os ${R.arm?'enrijecedores':'pilares'} recebem as reações horizontais e as levam à fundação</text>`;
+    s+=`<text x="${W/2}" y="${pb+34}" text-anchor="middle" class="t-m" font-size="10">vão livre ℓ = ${f(lp)} m · no meio do vão Md,paralelo = ${f(R.MdPar,3)} kN·m/m (Anexo E) · reação ≈ ${f(R.pv*lp/2,2)} kN/m em cada apoio</text>`;
+    s+=`<text x="${W/2}" y="${pb+52}" text-anchor="middle" class="t-muted" font-size="10">tracejado: deformada exagerada do pano; os ${R.arm?'enrijecedores':'pilares'} recebem as reações horizontais e as levam à fundação</text>`;
   }else s+=`<text x="${x0}" y="${py+pw+30}" text-anchor="middle" class="t-muted" font-size="10">sem apoios intermediários: não há flexão horizontal; a armadura vertical V1 resiste ao balanço</text>`;
   $('vista').setAttribute('viewBox',`0 0 ${W} ${Math.ceil(pb+84)}`);
   $('vista').innerHTML=s;
