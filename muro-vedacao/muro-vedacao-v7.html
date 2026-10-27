@@ -70,9 +70,9 @@ fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column}
 .unit{font-family:var(--mono);font-size:12px;color:var(--muted)}
 .strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .strip div{background:var(--sheet);padding:11px 14px;min-width:0}
-.strip span{display:block;font-size:12px;color:var(--muted)}
-.strip b{font:500 19px var(--mono);font-variant-numeric:tabular-nums}
-.strip em{font-style:normal;font-size:12px;color:var(--muted);margin-left:4px}
+.strip span{display:block;font-size:11px;color:var(--muted)}
+.strip b{font:500 15px var(--mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.strip em{font-style:normal;font-size:11px;color:var(--muted);margin-left:4px}
 .note{font-size:13px;color:var(--muted);margin:0}
 .callout{border-radius:6px;padding:11px 14px;font-size:13.5px;border:1px solid var(--line);background:var(--paper)}
 .nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -180,7 +180,7 @@ td.txt{font-family:var(--body);text-align:left;color:var(--muted);font-size:12.5
       <div class="drawcol">
         <div class="panel">
           <header><h3 id="corteTitle">Corte no eixo do pilar</h3><small id="critLabel"></small></header>
-          <svg id="corte" viewBox="0 0 560 640" role="img" aria-label="Corte do muro com fundação de divisa, cargas e tensões no solo"></svg>
+          <svg id="corte" viewBox="0 0 560 680" role="img" aria-label="Corte do muro com fundação de divisa, cargas e tensões no solo"></svg>
           <div class="chips" id="chips"></div>
         </div>
       </div>
@@ -252,6 +252,7 @@ td.txt{font-family:var(--body);text-align:left;color:var(--muted);font-size:12.5
     <div id="detVerdict"></div>
     <div class="panel"><header><h3>Armaduras adotadas</h3><small>Traspasse de 1,00 m; para Ø ≥ 16 mm é calculado pela NBR 6118 (*)</small></header><div class="scroll"><table id="tabDet" class="detTab"></table></div></div>
     <div class="panel" style="background:#ffffff"><header><h3 style="color:#16212c">Esboço do detalhamento</h3><small style="color:#5a6774">Vai para o memorial em Word</small></header><div class="scroll"><div id="detDraw" style="min-width:900px"></div></div></div>
+    <div class="panel"><header><h3>Drenagem</h3><small>Dreno longitudinal com manta geotêxtil, brita, areia e tubo PEAD corrugado perfurado</small></header><div id="drenForm" class="formcol"></div></div>
     <div class="panel" style="background:#ffffff"><header><h3 style="color:#16212c">Seção transversal típica e drenagem</h3><small style="color:#5a6774">Cotas, níveis e detalhe do dreno · vai para o memorial em Word</small></header><div class="scroll"><div id="secDraw" style="min-width:900px"></div></div></div>
     <div class="nav"><button class="btn" type="button" data-go="3">← Verificações</button><div class="memwrap"><span class="memStatus note" role="status"></span><button class="btn primary mem" type="button">Gerar memorial (Word)</button></div></div>
   </section>
@@ -347,14 +348,6 @@ const DEF=[
   ['FSdMin','FS mínimo ao deslizamento','–',1.5],
   ['cone','Cunha de arrancamento no tombamento','sel','sim',[['sim','Considerar'],['nao','Desprezar']]],
   ['beta','Ângulo da cunha β (padrão φ/2)','°',15]]],
- ['Drenagem','Dreno longitudinal com manta geotêxtil, brita, areia e tubo PEAD corrugado perfurado (seção típica no Detalhamento e no memorial).',[
-  ['drLado','Dreno – lado','sel','viz',[['viz','Lado do vizinho (face da divisa)'],['int','Lado interno (lote)'],['nao','Sem dreno']]],
-  ['drB','Dreno – largura da vala','cm',40],
-  ['drPhi','Dreno – tubo PEAD corrugado perfurado','sel','150',[['100','Ø 100 mm'],['150','Ø 150 mm']]],
-  ['drLas','Dreno – lastro de brita sob o tubo','cm',10],
-  ['drAr','Dreno – camada de areia sobre a manta','cm',15],
-  ['drSel','Dreno – selamento de solo argiloso','cm',15],
-  ['drImp','Impermeabilização da face enterrada','sel','sim',[['sim','Sim (emulsão asfáltica ou manta)'],['nao','Não']]]]],
  ['Vento (NBR 6123)','',[
   ['V0','Velocidade básica V0 (isopleta)','m/s',45],
   ['S1','Fator topográfico S1','–',1.00],
@@ -373,7 +366,16 @@ const CAT={I:[1.10,0.06],II:[1.00,0.085],III:[0.94,0.10],IV:[0.86,0.12],V:[0.74,
 const KEY='muro-vedacao-v3';
 const VIDEO_EX={sys:'pil',bpw:14,NTopo:2.0,NT:0,NT2:0,NA:0,Nf:-1.2,s:3.3,V0:35,s2mode:'man',S2m:0.88,S3:0.88,fck:25,fyk:500,cob:2,pht:5,phl:10,Lm:20,borda:'iso',hp:25,bpe:14,hpe:25,bloco:'k14_29',reb:'1',bwi:14,bws:14,B:0.6,L:0.6,hs:0.25,gam:15,sadm:147.1,pos:'divisa'};
 const ARM_EX={bloco:'c19_39',bwi:19,bws:19,B:1.50,phiA:'10'};
-const DEFAULTS={sys:'pil'};DEF.forEach(g=>g[2].forEach(x=>{if(x[2]!=='ro')DEFAULTS[x[0]]=x[3]}));
+// drenagem: preenchida na aba Detalhamento
+const DREN=[
+  ['drLado','Dreno – lado','sel','viz',[['viz','Lado do vizinho (face da divisa)'],['int','Lado interno (lote)'],['nao','Sem dreno']]],
+  ['drB','Dreno – largura da vala','cm',40],
+  ['drPhi','Dreno – tubo PEAD corrugado perfurado','sel','150',[['100','Ø 100 mm'],['150','Ø 150 mm']]],
+  ['drLas','Dreno – lastro de brita sob o tubo','cm',10],
+  ['drAr','Dreno – camada de areia sobre a manta','cm',15],
+  ['drSel','Dreno – selamento de solo argiloso','cm',15],
+  ['drImp','Impermeabilização da face enterrada','sel','sim',[['sim','Sim (emulsão asfáltica ou manta)'],['nao','Não']]]];
+const DEFAULTS={sys:'pil'};DEF.forEach(g=>g[2].forEach(x=>{if(x[2]!=='ro')DEFAULTS[x[0]]=x[3]}));DREN.forEach(x=>DEFAULTS[x[0]]=x[3]);
 let I={...DEFAULTS};
 try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s)Object.assign(I,s)}catch(e){}
 if(OLD_BLOCO[I.bloco])I.bloco=OLD_BLOCO[I.bloco];
@@ -390,12 +392,15 @@ let LAST={fails:0,obs:[]};
 
 /* ---------- formulário ---------- */
 const L2=x=>Array.isArray(x)?`<span data-only="pil">${x[0]}</span><span data-only="arm">${x[1]}</span>`:x;
-function buildForm(){
-  $('form').innerHTML=DEF.map(([g,desc,fs])=>`<div class="panel"><header><h3>${L2(g)}</h3>${desc?`<small>${L2(desc)}</small>`:''}</header><fieldset>${fs.map(([id,lab,u,v,opts,sys])=>{lab=L2(lab);
+function fieldHtml([id,lab,u,v,opts,sys]){lab=L2(lab);
     const d=sys?` data-sys="${sys}"`:'';
     if(u==='sel')return `<div class="field wide"${d}><label for="${id}">${lab}</label><select id="${id}">${opts.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('')}</select></div>`;
     if(u==='ro')return `<div class="field wide ro"${d}><label>${lab}</label><output id="${id}"></output></div>`;
-    return `<div class="field"${d}><label for="${id}">${lab}</label><input id="${id}" type="number" step="any" inputmode="decimal"><span class="unit">${u}</span></div>`}).join('')}</fieldset></div>`).join('');
+    return `<div class="field"${d}><label for="${id}">${lab}</label><input id="${id}" type="number" step="any" inputmode="decimal"><span class="unit">${u}</span></div>`}
+function buildForm(){
+  $('form').innerHTML=DEF.map(([g,desc,fs])=>`<div class="panel"><header><h3>${L2(g)}</h3>${desc?`<small>${L2(desc)}</small>`:''}</header><fieldset>${fs.map(fieldHtml).join('')}</fieldset></div>`).join('');
+  $('drenForm').innerHTML=`<fieldset>${DREN.map(fieldHtml).join('')}</fieldset>`;
+  $('drenForm').addEventListener('input',e=>{const el=e.target;if(!el.id)return;if(el.tagName==='SELECT')I[el.id]=el.value;else{const v=el.valueAsNumber;if(!isFinite(v))return;I[el.id]=v}save();update()});
   fill();
   $('form').addEventListener('input',e=>{const el=e.target;if(!el.id||el.tagName==='OUTPUT')return;
     if(el.tagName==='SELECT')I[el.id]=el.value;else{const v=el.valueAsNumber;if(!isFinite(v))return;I[el.id]=v}
@@ -409,7 +414,7 @@ function applySys(){
   document.querySelectorAll('#form [data-sys]').forEach(el=>el.hidden=el.dataset.sys!==I.sys);
   document.querySelectorAll('#form [data-only]').forEach(el=>el.hidden=el.dataset.only!==I.sys);
   const hideIf=(id,cond)=>{const el=$(id),fl=el&&el.closest&&el.closest('.field');if(fl&&cond)fl.hidden=true};
-  hideIf('S2m',I.s2mode!=='man');{const ce=(I.bloco||'')[0]==='k';hideIf('fpkM',!ce);hideIf('fpkCM',!ce);}hideIf('L',I.tipoSap==='cor');hideIf('zCi',I.cintaInt!=='sim');['drB','drPhi','drLas','drAr','drSel','drImp'].forEach(k=>hideIf(k,I.drLado==='nao'));['lenr','tenr','eenrOut','phE'].forEach(k=>hideIf(k,I.enr!=='sim'));hideIf('p3d',I.tipoSap==='cor');
+  hideIf('S2m',I.s2mode!=='man');{const ce=(I.bloco||'')[0]==='k';hideIf('fpkM',!ce);hideIf('fpkCM',!ce);}hideIf('L',I.tipoSap==='cor');hideIf('zCi',I.cintaInt!=='sim');['drB','drPhi','drLas','drAr','drSel','drImp'].forEach(k=>{const el=$(k),fl=el&&el.closest&&el.closest('.field');if(fl)fl.hidden=I.drLado==='nao'});['lenr','tenr','eenrOut','phE'].forEach(k=>hideIf(k,I.enr!=='sim'));hideIf('p3d',I.tipoSap==='cor');
 }
 
 /* ---------- cálculo ---------- */
@@ -788,7 +793,7 @@ function calc(){
 }
 
 /* ---------- desenho do corte ---------- */
-function lvl(x,y,txt,sub){return `<path d="M${x-5} ${y-8}H${x+5}L${x} ${y}Z" fill="none" stroke="var(--ink)"/><line x1="${x-12}" y1="${y}" x2="${x+12}" y2="${y}" stroke="var(--ink)"/><text x="${x+16}" y="${y+4}">${txt}</text>${sub?`<text x="${x+16}" y="${y+16}" class="t-muted" font-size="10">${sub}</text>`:''}`}
+function lvl(x,y,txt,sub){return `<path d="M${x-5} ${y-8}H${x+5}L${x} ${y}Z" fill="none" stroke="var(--ink)"/><line x1="${x-12}" y1="${y}" x2="${x+12}" y2="${y}" stroke="var(--ink)"/><text x="${x+16}" y="${y+4}">${txt}</text>${sub?[].concat(sub).map((t,i)=>`<text x="${x+16}" y="${y+16+i*12}" class="t-muted" font-size="10">${t}</text>`).join(''):''}`}
 function drawCorte(R){
   const top=46,bot=500,yMax=I.NTopo+0.3,yMin=I.Nf-0.12,range=yMax-yMin;
   let sc=Math.min((bot-top)/range,330/Math.max(I.B,0.4));const xface=190+(R.cen?Math.max(0,-R.fx0*sc-80):0);
@@ -813,20 +818,20 @@ function drawCorte(R){
   s+=rect(wa-I.bws/200,wa+I.bws/200,I.NTopo,I.NTopo-I.hcs/100,'var(--conc)','var(--concline)');
   if(R.enr){const xe0=X(R.t/100),xe1=X(R.tenr/100),xp0=X(R.px0+R.bpe/100);
     s+=`<path d="M${xe0} ${Y(I.NTopo)}H${xe1}V${Y(I.NA)}M${xp0} ${Y(I.NA)}H${xe1}V${Y(R.ytop)}" fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-dasharray="6 3"/>`;
-    s+=`<text x="${xe0+4}" y="${Y(I.NTopo)-22}" class="t-muted" font-size="10">enrijecedor ${f(R.eenr,0)}×${f(R.tenr,0)} cm em vista (tracejado)</text><text x="${xe0+4}" y="${Y(I.NTopo)-9}" class="t-muted" font-size="10">a cada ${f(R.lenr)} m · ${R.E.nP}+${R.E.nN} ${phiTxt(R.E.phi)}</text>`}
+}
   if(R.cInt)s+=rect(0,R.t/100,I.NA+R.h1+R.hcan,I.NA+R.h1,'var(--conc)','var(--concline)');
   if(R.arm){const zA=Math.min(R.hA,R.ateA),zF=I.v1Full==='toda'?R.hT:zA;
     if(zF>zA+1e-6)s+=`<line x1="${X(wa)}" y1="${Y(I.NA+zA)}" x2="${X(wa)}" y2="${Y(I.NA+zF)}" stroke="var(--steel)" stroke-width="1.4" stroke-dasharray="5 3"/>`;
     s+=`<line x1="${X(wa)}" y1="${Y(R.ytop)-4}" x2="${X(wa)}" y2="${Y(I.NA+zA)}" stroke="var(--steel)" stroke-width="2.4"/>`;
     R.canH.forEach(z=>{s+=`<circle cx="${X(wa)}" cy="${Y(I.NA+z)}" r="3" fill="var(--steel)"/>`});
-    s+=`<text x="${X(R.bp/100)+8}" y="${Y(I.NA+zA/2)}" class="t-st">Ø${f(R.phiA,1)} c/${f(R.espAd,0)}</text><text x="${X(R.bp/100)+8}" y="${Y(I.NA+zA/2)+14}" class="t-muted" font-size="10">até ${sgn(I.NA+zA)}${zF>zA+1e-6?' (acima, construtiva)':''}</text>`}
+}
   s+=`<line x1="${xface}" y1="${top-30}" x2="${xface}" y2="${Yb+8}" stroke="var(--divisa)" stroke-width="1.2" stroke-dasharray="12 4 3 4"/><text x="${xface-6}" y="${top-18}" text-anchor="end" class="t-div">DIVISA</text>`;
-  s+=`<text x="96" y="${Y(I.NT2)-8}" class="t-muted" font-size="10">vizinho</text><text x="545" y="${Y(I.NT)-8}" text-anchor="end" class="t-muted" font-size="10">lote (interno)</text>`;
+  if(!(R.qE>0))s+=`<text x="96" y="${Y(I.NT2)-8}" class="t-muted" font-size="10">vizinho</text>`;if(!(R.qI>0))s+=`<text x="545" y="${Y(I.NT)-8}" text-anchor="end" class="t-muted" font-size="10">lote (interno)</text>`;
   const c=R.crit,toDiv=c.d<0;
   if(R.Hv>0){const k=Math.max(3,Math.round(R.Hv*sc/26)),xf=toDiv?X((R.enr?R.tenr:R.bp)/100)+3:X(0)-3,xw=toDiv?xf+70:xf-70;
     s+=`<line x1="${xw}" y1="${Y(I.NTopo)}" x2="${xw}" y2="${Y(R.Hg)}" stroke="var(--wind)" stroke-width="1.4"/>`;
     for(let i=0;i<=k;i++){const y=Y(I.NTopo)+(Y(R.Hg)-Y(I.NTopo))*i/k;s+=`<line x1="${xw}" y1="${y}" x2="${xf}" y2="${y}" stroke="var(--wind)" stroke-width="1.4" marker-end="url(#aW)"/>`}
-    const ym=(Y(I.NTopo)+Y(R.Hg))/2,tx=toDiv?xw+8:xw-8,an=toDiv?'start':'end';
+    const ym=(Y(I.NTopo)+Y(R.Hg))/2,tx=toDiv?xw+8:X((R.enr?R.tenr:R.bp)/100)+10,an='start';
     s+=`<text x="${tx}" y="${ym-8}" text-anchor="${an}" class="t-wind">pv = ${f(R.pv)} kN/m²</text><text x="${tx}" y="${ym+8}" text-anchor="${an}" class="t-wind">Cf ${f(R.Cf,1)} · sentido crítico</text>`;}
   {// empuxo nos dois lados, do apoio da sapata até o terreno de cada lado (face do muro/pescoço acima da sapata, face da sapata abaixo)
     const mx=Math.max(R.EAe.pmax,R.EAi.pmax);
@@ -838,13 +843,13 @@ function drawCorte(R){
       const both=(gl,xf,sg)=>{const top=Math.max(I.Nf,gl);return seg(gl,top,Math.max(R.ytop,I.Nf),xf,sg)+seg(gl,Math.min(top,R.ytop),I.Nf,xf,sg)};
       s+=both(I.NT2,xE,-1)+both(I.NT,xI,1);
       const ae=I.kEmp==='repouso'?'E0':'Ea';
-      if(R.EAe.E>0){const ya=I.Nf+R.EAe.y,xa=xE(ya)-R.pE(ya)*kp;s+=`<line x1="${xa-34}" y1="${Y(ya)}" x2="${xa-2}" y2="${Y(ya)}" stroke="var(--soil)" stroke-width="1.8" marker-end="url(#aK)"/><text x="${xa-38}" y="${Y(ya)-6}" text-anchor="end" class="t-soil" font-size="10">${ae},ext ${f(R.EAe.E,2)} kN/m</text>`}
+      if(R.EAe.E>0){const ya=I.Nf+R.EAe.y,xa=xE(ya)-R.pE(ya)*kp;s+=`<line x1="${xa-34}" y1="${Y(ya)}" x2="${xa-2}" y2="${Y(ya)}" stroke="var(--soil)" stroke-width="1.8" marker-end="url(#aK)"/><text x="${Math.max(112,X(Math.min(0,F0))-8)}" y="${Yb+16}" text-anchor="end" class="t-soil" font-size="10">${ae},ext (vizinho)</text><text x="${Math.max(112,X(Math.min(0,F0))-8)}" y="${Yb+29}" text-anchor="end" class="t-soil" font-size="10">${f(R.EAe.E,2)} kN/m</text>`}
       {const ya=I.Nf+R.EAi.y,xr=X(F1)+R.EAi.pmax*kp+8;
        if(R.EAi.E>0){const xa=xI(ya)+R.pI(ya)*kp;s+=`<line x1="${Math.min(xr+30,546)}" y1="${Y(ya)}" x2="${xa+2}" y2="${Y(ya)}" stroke="var(--soil)" stroke-width="1.8" marker-end="url(#aK)"/><text x="548" y="${Y(ya)-6}" text-anchor="end" class="t-soil" font-size="10">${ae},int ${f(R.EAi.E,2)} kN/m</text>`}
        s+=`<text x="548" y="${Y(ya)+14}" text-anchor="end" class="t-soil" font-size="10">${Math.abs(R.Eearth)>1e-6?`líquido ${f(Math.abs(R.Eearth),2)} kN/m → ${R.Eearth<0?'vizinho':'lote'}`:'iguais: se equilibram'}</text>`}}}
   // sobrecarga no terreno de cada lado
   {const qa=(x1,x2,y,q,lab,an)=>{if(!(q>0))return;let g='';for(let x=x1+6;x<x2-4;x+=16)g+=`<line x1="${x}" y1="${y-32}" x2="${x}" y2="${y-15}" stroke="var(--soil)" stroke-width="1.2" marker-end="url(#aK)"/>`;g+=`<line x1="${x1}" y1="${y-32}" x2="${x2}" y2="${y-32}" stroke="var(--soil)"/><text x="${an==='end'?x2:x1}" y="${y-37}" text-anchor="${an}" class="t-soil" font-size="10">${lab} = ${f(q,1)} kN/m²</text>`;s+=g};
-   qa(90,xface-4,Y(I.NT2),R.qE,'q viz.','start');qa(X(Math.max(R.bp/100,R.enr?R.tenr/100:0))+6,550,Y(I.NT),R.qI,'q int.','end');}
+   qa(90,xface-4,Y(I.NT2),R.qE,'vizinho: q','start');qa(X(Math.max(R.bp/100,R.enr?R.tenr/100:0))+6,550,Y(I.NT),R.qI,'lote (interno): q','end');}
   if(I.cone==='sim'&&R.Hs>0){const xi2=F1+R.Hs*R.tb;if(R.cen)s+=`<path d="M${X(F0)} ${Y(R.ytop)}L${X(F0-R.Hs*R.tb)} ${Y(I.NT2)}" stroke="var(--soil)" stroke-width="1.2" stroke-dasharray="5 3" fill="none"/>`;s+=`<path d="M${X(F1)} ${Y(R.ytop)}L${X(xi2)} ${Y(I.NT)}" stroke="var(--soil)" stroke-width="1.2" stroke-dasharray="5 3" fill="none"/><text x="${X(xi2)+4}" y="${Y(I.NT)+14}" class="t-soil" font-size="10">cunha β ${f(I.beta,0)}°</text>`}
   const xc=F0+I.B/2,k=R.kern;
   s+=`<rect x="${X(xc-k)}" y="${Y(I.Nf)+2}" width="${2*k*sc}" height="5" fill="var(--ok)" fill-opacity=".45"/>`;
@@ -859,9 +864,14 @@ function drawCorte(R){
   const yB=y0+hmax+28;s+=`<line x1="${X(F0)}" y1="${yB}" x2="${X(F1)}" y2="${yB}" stroke="var(--ink)" stroke-width=".8"/><path d="M${X(F0)} ${yB-5}V${yB+5}M${X(F1)} ${yB-5}V${yB+5}M${X(xc)} ${yB-4}V${yB+4}" stroke="var(--ink)"/><text x="${X(xc)}" y="${yB-5}" text-anchor="middle">B = ${f(I.B)} m · núcleo B/3</text>`;
   const L=[[I.NTopo,'topo do muro'],[R.Hg,I.NT>=I.NT2?'terreno interno':'terreno externo'],[I.NA,'assentamento'],[R.ytop,'topo sapata'],[I.Nf,'apoio']];
   if(R.dh>1e-6)L.splice(2,0,[R.Lg,I.NT>=I.NT2?'terreno externo':'terreno interno']);
-  L.forEach(([e,t])=>s+=lvl(18,Y(e),sgn(e),t));
-  s+=`<text x="${X(R.bp/100)+(R.arm?4:8)}" y="${R.arm?Y(I.NTopo)-(R.enr?35:9):(Y(I.NTopo)+Y(I.NA))/2+(toDiv?64:4)}" class="t-muted" font-size="10">${R.Bl[1]}${R.arm?'':` · pilar ${f(R.bp,R.bp%1?1:0)}×${f(R.hp,0)}`}</text>`;
-  s+=`<text x="${X(R.enr?Math.max(P1,R.tenr/100):P1)+8}" y="${(Y(R.yt)+Y(R.ytop))/2+4}" class="t-muted" font-size="10">${R.arm?`parede de fundação ${f(R.bpe,0)} cm`:`pescoço ${f(R.bpe,0)}×${f(R.hpe,0)}`}</text>`;
+  // níveis: cotas iguais viram um só marcador
+  {const G=[];L.forEach(([e,t])=>{const g=G.find(q=>Math.abs(q[0]-e)<0.015);if(g){if(!g[1].includes(t))g[1].push(t)}else G.push([e,[t]])});
+   G.forEach(([e,ts])=>s+=lvl(18,Y(e),sgn(e),ts));}
+  // legenda dos elementos (fora do desenho, para não sobrepor cargas)
+  {const l1=`${R.Bl[1]}${R.arm?'':` · pilar ${f(R.bp,R.bp%1?1:0)}×${f(R.hp,0)}`} · ${R.arm?`parede de fundação ${f(R.bpe,0)} cm`:`pescoço ${f(R.bpe,0)}×${f(R.hpe,0)}`}`;
+   const zA=R.arm?Math.min(R.hA,R.ateA):0,l2=R.arm?`V1 Ø${f(R.phiA,1)} c/${f(R.espAd,0)} até ${sgn(I.NA+zA)}${I.v1Full==='toda'?' (acima, construtiva)':''}${R.enr?` · enrijecedor ${f(R.eenr,0)}×${f(R.tenr,0)} a cada ${f(R.lenr)} m (tracejado), ${R.E.nP}+${R.E.nN} ${phiTxt(R.E.phi)}`:''}`:'';
+   s+=`<text x="18" y="${yB+24}" class="t-muted" font-size="10">${l1}</text>`;
+   l2.split(' · enrijecedor').forEach((t,i)=>{if(t)s+=`<text x="18" y="${yB+38+i*13}" class="t-st" font-size="10">${i?'enrijecedor'+t:t}</text>`});}
   s+=`<text x="${X(F1)-6}" y="${(Y(R.ytop)+Y(I.Nf))/2+4}" text-anchor="end" class="t-muted" font-size="10">hs ${f(I.hs)}</text>`;
   $('corte').innerHTML=s;
   $('critLabel').textContent=`Caso desenhado: ${c.lab.toLowerCase()}`;
@@ -1816,7 +1826,7 @@ async function gerarMemorial(){
     const R=calc();renderChecks(R);
     const figs=[];const EMU=360000;
     const mkFig=async(svg,w,h,name,rid,widthCm)=>{try{const buf=await svgToPng(svg,w,h);return {name,rid,buf,cx:Math.round(widthCm*EMU),cy:Math.round(widthCm*EMU*h/w)}}catch(e){return null}};
-    figs.push(await mkFig(lightSvg($('corte').innerHTML,'0 0 560 640'),560,640,'corte.png','rIdImg1',11.5));
+    figs.push(await mkFig(lightSvg($('corte').innerHTML,'0 0 560 680'),560,680,'corte.png','rIdImg1',11.5));
     const el=elevSvg(R);figs.push(await mkFig(el.svg,el.w,el.h,'elevacao.png','rIdImg2',16));
     figs.push(await mkFig(lightSvg($('diag').innerHTML,'0 0 760 560'),760,560,'diagramas.png','rIdImg3',15));
     {const dv=detSvg(R,detGet(R));const crop=(vb)=>dv.svg.replace(/viewBox="[^"]*"/,`viewBox="${vb}"`);
