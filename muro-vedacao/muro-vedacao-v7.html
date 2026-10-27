@@ -81,7 +81,7 @@ fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column}
 .btn.ghost{background:none}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 svg{display:block}
-svg text{font-family:var(--mono);font-size:11px;fill:var(--ink)}
+svg:not(.dwg) text{font-family:var(--mono);font-size:11px;fill:var(--ink)}
 svg .t-muted{fill:var(--muted)} svg .t-title{font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.03em}
 svg .t-wind{fill:var(--wind)} svg .t-soil{fill:var(--soil)} svg .t-v{fill:var(--vcol)} svg .t-m{fill:var(--accent)} svg .t-div{fill:var(--divisa);font-weight:500}
 svg .t-ok{fill:var(--ok)} svg .t-bad{fill:var(--bad)} svg .t-st{fill:var(--steel)}
@@ -1267,6 +1267,8 @@ function detRows(R,D){
 function detText(id,D){const v=D[id];if(!v)return '';return v.n!=null?`${v.n} ${phiTxt(v.phi)}`:`${phiTxt(v.phi)} c/${v.s}`}
 
 // desenho do detalhamento (prancha em fundo branco)
+// textos dos desenhos de detalhamento: pretos, Arial, entre 8 e 12
+function dwgText(x){return x.replace(/<text([^>]*)>/g,(m,a)=>{a=a.replace(/font-size="([\d.]+)"/,(q,v)=>`font-size="${Math.min(12,Math.max(8,+v))}"`).replace(/\sfill="[^"]*"/,'');if(!/font-size=/.test(a))a+=' font-size="11"';if(!/font-family=/.test(a))a+=' font-family="Arial,Helvetica,sans-serif"';return `<text${a} fill="#000">`})}
 function detSvg(R,D){
   const Wd=1800,Hd=1150,ink='#16212c',mut='#5a6774',conc='#e3e7eb',concl='#5f6b77',steel='#c0392b',st2='#7a2d22',st3='#a0522d',stir='#1c5ca3',soilc='#ecdfc6',soill='#9a6a25',dv='#b3261e';
   const o=[];const e=v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;');
@@ -1395,7 +1397,7 @@ function detSvg(R,D){
   // notas
   const nx=1550,ny=560;T(nx,ny-28,'NOTAS',15,'start',ink,'bold');
   ['Esboço sem escala exata.','Traspasse: 1,00 m para Ø < 16 mm;','para Ø ≥ 16 mm, l0t = 2,0·lb','(NBR 6118, 9.4 e 9.5).','Esperas com gancho de 30 cm','apoiadas na malha inferior.','Barras contínuas de vigas','ancoradas nos pilares.','Cobrimentos: '+f(I.cob,1)+' cm (pilar, vigas),','5 cm (sapata).','Armaduras conforme a aba','Detalhamento do aplicativo.',...(R.arm?[]:['',`N14 – ligação pano–pilar:`,`${detText('N14',D)} a cada ${f(R.LG.sl*100,0)} cm,`,'em cada lado do pilar,','ancorado no pilar e na junta.'])].forEach((n,i)=>T(nx,ny+i*19,n,12,'start',i>=13?steel:mut));
-  return {svg:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${Wd} ${Hd}">${o.join('')}</svg>`,w:Wd,h:Hd};
+  return {svg:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${Wd} ${Hd}">${dwgText(o.join(''))}</svg>`,w:Wd,h:Hd};
 }
 
 function renderDet(R){
@@ -1410,8 +1412,8 @@ function renderDet(R){
      <td>${r.req}</td><td>${r.ad}</td><td>${r.lap?`${f(r.lap.L,2)} m${r.lap.calc?' *':''}`:'–'}</td><td>${pill(r.ok)}</td></tr>`}).join('');
   const nf=rows.filter(r=>!r.ok).length;
   $('detVerdict').innerHTML=`<div class="verdict ${nf?'bad':'ok'}">${nf?`${nf} armadura(s) adotada(s) abaixo do necessário ou fora das regras de detalhamento.`:'Todas as armaduras adotadas atendem ao cálculo.'}</div>`;
-  const sv=detSvg(R,D);$('detDraw').innerHTML=sv.svg.replace('<svg ','<svg role="img" aria-label="Esboço do detalhamento das armaduras" style="width:100%;height:auto;display:block" ');
-  const ss=secaoSvg(R);$('secDraw').innerHTML=ss.svg.replace('<svg ','<svg role="img" aria-label="Seção transversal típica e detalhe do dreno" style="width:100%;height:auto;display:block" ');
+  const sv=detSvg(R,D);$('detDraw').innerHTML=sv.svg.replace('<svg ',`<svg class="dwg" role="img" aria-label="Esboço do detalhamento das armaduras" style="width:${sv.w}px;max-width:none;height:auto;display:block" `);
+  const ss=secaoSvg(R);$('secDraw').innerHTML=ss.svg.replace('<svg ',`<svg class="dwg" role="img" aria-label="Seção transversal típica e detalhe do dreno" style="width:${ss.w}px;max-width:none;height:auto;display:block" `);
 }
 
 /* ---------- seção transversal típica e detalhe do dreno ---------- */
@@ -1516,7 +1518,7 @@ function secaoSvg(R){
    `Fundo do dreno no nível ${Dr.bot>I.Nf+1e-6?'do topo da sapata':'do apoio da sapata'}; reaterro do restante em camadas compactadas.${Dr.viz&&!R.cen?' Dreno no terreno vizinho: depende de autorização do vizinho.':''}`,
    'Brita, manta e tubo conforme composição SINAPI 102722 (dreno em muro de contenção com tubo PEAD corrugado perfurado).']
    :['Sem dreno indicado. Recomenda-se drenagem do lado do solo mais alto quando houver desnível ou água acumulada.']).forEach((n,i)=>T(40,ny+20+i*18,'• '+n,12,'start',mut));
-  return {svg:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${Wd} ${Hd}">${o.join('')}</svg>`,w:Wd,h:Hd,mainBot,detBot,dr:!!Dr};
+  return {svg:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${Wd} ${Hd}">${dwgText(o.join(''))}</svg>`,w:Wd,h:Hd,mainBot,detBot,dr:!!Dr};
 }
 
 /* ---------- memorial de cálculo (Word) ---------- */
