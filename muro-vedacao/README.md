@@ -1,6 +1,6 @@
-# Muro de vedação – v10
+# Muro de vedação – v9
 
-Aplicativo em uma única página HTML para dimensionar muro de vedação de divisa. Para usar: https://engrafaeljralves.github.io/DIMI--Concreto/muro-vedacao/ (GitHub Pages), ou abra `muro-vedacao-v10.html` no navegador.
+Aplicativo em uma única página HTML para dimensionar muro de vedação de divisa. Para usar: https://engrafaeljralves.github.io/DIMI--Concreto/muro-vedacao/ (GitHub Pages), ou abra `muro-vedacao-v9.html` no navegador.
 
 **Sistemas**
 - Pilares de concreto com alvenaria de vedação, baldrame, cinta superior e sapata isolada ou corrida, de divisa ou centrada.
@@ -32,6 +32,3 @@ Versões anteriores ficam na mesma pasta (por exemplo, `muro-vedacao-v6.html`).
 - Momentos vertical e horizontal por face, cortante máximo e parcela da carga que desce pela base; o pilar passa a receber só as reações laterais da placa na altura da parede.
 - Conferido contra casos-limite (balanço longo q·h²/2 e P·h; faixa alta q·ℓ²/12, q·ℓ²/24, q·ℓ²/8) e convergência de malha.
 
-## v10
-- Empuxo: além do empuxo líquido (solo dos dois lados), cada lado é verificado sozinho com o empuxo cheio (o solo do outro lado pode não existir). Sem o solo de um lado saem também o peso dele sobre a sapata, o passivo e a cunha daquele lado.
-- Pilar, parede de concreto (placa), pano, cintas e sapata pela envoltória dos três casos de solo × vento nos dois sentidos; fundação verificada nos nove casos.
