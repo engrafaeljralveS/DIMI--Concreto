@@ -1,6 +1,6 @@
-# Muro de vedação – v10
+# Muro de vedação – v11
 
-Aplicativo em uma única página HTML para dimensionar muro de vedação de divisa. Para usar: https://engrafaeljralves.github.io/DIMI--Concreto/muro-vedacao/ (GitHub Pages), ou abra `muro-vedacao-v10.html` no navegador.
+Aplicativo em uma única página HTML para dimensionar muro de vedação de divisa. Para usar: https://engrafaeljralves.github.io/DIMI--Concreto/muro-vedacao/ (GitHub Pages), ou abra `muro-vedacao-v11.html` no navegador.
 
 **Sistemas**
 - Pilares de concreto com alvenaria de vedação, baldrame, cinta superior e sapata isolada ou corrida, de divisa ou centrada.
@@ -37,3 +37,9 @@ Versões anteriores ficam na mesma pasta (por exemplo, `muro-vedacao-v6.html`).
 - Empuxo sem desconto entre os lados: as peças (pilar, pescoço, parede de concreto, pano, cintas, nó parede–sapata) usam a envoltória do empuxo ativo cheio de cada lado com o vento nos dois sentidos; cada face é dimensionada pelo seu maior momento.
 - Estabilidade (Rankine, NBR 11682): a ação é o empuxo ativo do lado que empurra mais o vento; o lado oposto só resiste, com o empuxo passivo × fator (campo numérico, 0 a 1).
 - FS mínimo ao tombamento 2,0 (NBR 11682).
+
+## v11
+- Parede de concreto do painel inferior e pilares resolvidos como uma placa única de Kirchhoff com rigidez variável (D ∝ t³): a carga se divide pela rigidez real de cada parte; o pilar deixa de ser apoio indeslocável da parede.
+- Modelo do eixo do pilar ao meio do vão (simetria), base engastada na sapata, topo livre com a reação do pano na parede e o cortante e o momento do pilar acima na largura do pilar; dois limites para o pano (parcela na base ou inteiro no pilar).
+- Pilar na altura da parede dimensionado pelos esforços da sua faixa na placa; memorial e diagramas atualizados.
+- Memorial lista só os dados usados; item 4.3 enxuto.
