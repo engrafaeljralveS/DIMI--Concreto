@@ -236,10 +236,8 @@ td.txt{font-family:var(--body);text-align:left;color:var(--muted);font-size:12.5
       <header><h3>Alvenaria</h3><small id="alvSub"></small></header>
       <div class="scroll"><table id="tabAlv"></table></div>
     </div>
-    <div class="panel">
-      <header><h3>Armadura longitudinal</h3><small>Concreto: flexão simples, KMD ≤ 0,251 · Alvenaria armada: bloco retangular de tensões</small></header>
-      <div class="scroll"><table id="tabAs"></table></div>
-    </div>
+    <div class="panel" hidden><div class="scroll"><table id="tabAs"></table></div></div>
+    <p class="note">As armaduras adotadas e a verificação de cada uma contra a área exigida pelo cálculo estão na aba 4 – Detalhamento (tabela “Armaduras adotadas”), que é a base do memorial.</p>
     <div class="grid2">
       <div class="panel"><header><h3>Cortante</h3><small>Modelo I</small></header><div class="scroll"><table id="tabV"></table></div></div>
       <div class="panel"><header><h3>Observações</h3></header><div id="obs" style="display:flex;flex-direction:column;gap:10px"></div></div>
@@ -1132,7 +1130,7 @@ function drawVista(R){
 }
 function renderSec(R){
   if(!R.arm){const P=[R.P1,R.P2],nm=[R.cor?'Pilar no topo do pescoço':'Pilar no NA','Pescoço no topo da sapata'];
-    const DQ=detGet(R);$('pilDim').innerHTML=`<h4 style="margin:16px 0 6px">Dimensionamento do pilar</h4><table><tr><th>Seção</th><th>Mk (kN·m)</th><th>Vk (kN)</th><th>Md (kN·m)</th><th>Mínimo (cálculo)</th><th>Adotado (detalhamento)</th></tr>${P.map((p,k)=>`<tr><td>${nm[k]}</td><td>${f(p.Mk)}</td><td>${f(p.Vd/1.4/(p.gn||1))}</td><td>${f(p.Md)}</td><td>${p.txt}</td><td>${['N1','N2'][k]} ${detText(['N1','N2'][k],DQ)} por face</td></tr>`).join('')}</table>
+    const DQ=detGet(R);$('pilDim').innerHTML=`<h4 style="margin:16px 0 6px">Dimensionamento do pilar</h4><table><tr><th>Seção</th><th>Mk (kN·m)</th><th>Vk (kN)</th><th>Md (kN·m)</th><th>As nec. (cm²/face)</th><th>Adotado (detalhamento)</th></tr>${P.map((p,k)=>`<tr><td>${nm[k]}</td><td>${f(p.Mk)}</td><td>${f(p.Vd/1.4/(p.gn||1))}</td><td>${f(p.Md)}</td><td>${f(k?Math.max(R.P1.Asf,p.Asf):p.Asf)}</td><td>${['N1','N2'][k]} ${detText(['N1','N2'][k],DQ)} por face</td></tr>`).join('')}</table>
      <p class="note">Mk do dimensionamento = momento das ações horizontais no pilar${R.ecc?` menos o do peso fora do eixo do pescoço (${f(Math.abs(R.ecc))} kN·m) no sentido em que alivia`:''}${R.CW?'; na altura da parede de concreto o pilar recebe só as reações laterais da placa':''}. Md inclui γf = 1,4, γn e 2ª ordem.</p>`}else $('pilDim').innerHTML='';
   const rows=[['Nível do terreno',R.Hg],[R.cor?'Topo do pescoço':'Assentamento (NA)',NAe],['Topo da sapata',R.ytop],['Base da sapata',I.Nf]];
   $('tabSec').innerHTML=`<tr><th>Seção</th><th>Cota (m)</th><th>V (kN/m)</th><th>M (kN·m/m)</th>${R.arm?'':'<th>V pilar (kN)</th><th>M pilar (kN·m)</th>'}</tr>`+
@@ -1359,7 +1357,7 @@ function renderChecks(R){
   if(I.cone==='sim')obs.push(`A cunha de arrancamento (${f(R.Wc,1)} kN, β = ${f(I.beta,0)}°) só entra no tombamento, porque só é mobilizada quando a sapata tende a levantar. Ela não entra nas tensões no solo nem no deslizamento.`);
   $('obs').innerHTML=obs.map(t=>`<div class="callout">${t}</div>`).join('');
   const alvFails=R.arm?[R.xiOk,R.lamAOk,R.vAok,...(R.enr?[R.E.rP.ok,R.E.rN.ok,R.E.furoOk,R.E.vOk,R.E.fit,R.E.hOk||R.E.rH.ok,R.E.PE.ok,R.E.PE.vok]:[])]:[R.panoOk,R.limE,R.lamPanoOk!==false,R.P1.lamOk!==false,R.P1.bminOk,R.P2.bminOk,R.topoLivre||R.BS.uOk,R.CI?R.CI.uOk&&R.CI.v2ok:true];
-  const fails=C.filter(c=>c.ok===false).length+rowsAs.filter(r=>!r.ok&&r.Md>0).length+alvFails.filter(x=>!x).length+(R.arm?[R.P2.vok,R.SV.ok]:[R.CW?R.CW.ok&&(!R.CW.no||R.CW.no.ok):true,R.P1.vok,R.P2.vok,R.BI?R.BI.v2ok:true,R.BS.v2ok,R.SV.ok,R.TS?R.TS.ok:true,R.PU?R.PU.ok:true]).filter(x=>!x).length;
+  const fails=C.filter(c=>c.ok===false).length+detRows(R,detGet(R)).filter(r=>!r.ok).length+alvFails.filter(x=>!x).length+(R.arm?[R.P2.vok,R.SV.ok]:[R.CW?R.CW.ok&&(!R.CW.no||R.CW.no.ok):true,R.P1.vok,R.P2.vok,R.BI?R.BI.v2ok:true,R.BS.v2ok,R.SV.ok,R.TS?R.TS.ok:true,R.PU?R.PU.ok:true]).filter(x=>!x).length;
   LAST={fails,obs};
   $('verdict').innerHTML=`<div class="verdict ${fails?'bad':'ok'}">${fails?`${fails} verificação(ões) não atende(m). Ajuste os dados na aba Dados.`:'Todas as verificações atendem com os dados informados.'}</div>`;
 }
@@ -1894,7 +1892,7 @@ function memorialXML(R,figs,state){
   FIGN('diagramas.png',`Diagramas de cortante e momento ${arm?'do muro':'do pilar'} (característicos).`);
   if(!arm){const nm=[R.cor?'Pilar no topo do pescoço':'Pilar no NA','Pescoço no topo da sapata'];
     b.push(PP('Momentos de dimensionamento do pilar',{b:true,before:120,after:60}));
-    {const QD=detGet(R),PF=['N1','N2'];b.push(TBL([['Seção','Mk (kN·m)','Vk (kN)','Md (kN·m)','As nec. (cm²/face)','Mínimo (cálculo)','Adotado (detalhamento)'],...[R.P1,R.P2].map((P,k)=>[nm[k],f(P.Mk),f(P.Vd/1.4/(P.gn||1)),f(P.Md),f(k?Math.max(R.P1.Asf,P.Asf):P.Asf),P.txt.replace(' por face',''),`${PF[k]} ${detText(PF[k],QD)}`])],[2.6,1.1,1,1.1,1.3,1.6,1.9]));}
+    {const QD=detGet(R),PF=['N1','N2'];b.push(TBL([['Seção','Mk (kN·m)','Vk (kN)','Md (kN·m)','As nec. (cm²/face)','Adotado (detalhamento)'],...[R.P1,R.P2].map((P,k)=>[nm[k],f(P.Mk),f(P.Vd/1.4/(P.gn||1)),f(P.Md),f(k?Math.max(R.P1.Asf,P.Asf):P.Asf),`${PF[k]} ${detText(PF[k],QD)} por face`])],[3,1.2,1.1,1.2,1.5,2.4]));}
     b.push(TXT(`O Mk do dimensionamento é o momento das ações horizontais no pilar${R.ecc?`, descontado o momento do peso fora do eixo do pescoço (${f(Math.abs(R.ecc),2)} kN·m) no sentido em que alivia`:''}${R.CW?'; na altura da parede de concreto o pilar recebe só as reações laterais da placa':''}. Por isso difere do M da tabela de esforços por seção, que traz só as ações horizontais da faixa inteira. Md inclui γf = 1,4, γn e a 2ª ordem.`));}
   FIGN('vista_tipica.png','Seção típica: vista frontal e planta com o caminho das cargas horizontais (pano → apoios → fundação).');
   // fundação
@@ -1929,19 +1927,19 @@ function memorialXML(R,figs,state){
     if(P.gn>1)b.push(EQ('Coeficiente adicional:',`menor dimensão < 19 cm → γn = 1,95 − 0,05·b = ${f(P.gn,2)} (NBR 6118, 13.2.3), aplicado a Md e Vd`));
     if(P.lam!=null)b.push(EQ('Esbeltez:',`balanço único pilar + pescoço, le = 2·${f(Math.max(0,I.NTopo-R.ytop))} m; λ = le·√12/h = ${f(P.lam,0)}; ν = ${f(P.nu,3)}; amplificação de 2ª ordem (rigidez κ aproximada) = ${f(P.amp,3)} → Md = ${f(P.Md,2)} kN·m`));
     b.push(EQ('Flexão:',`b = ${f(P.bw,0)} cm, d = ${f(P.d,1)} cm, KMD = ${f(P.KMD,3)}${P.ok?`, As = ${f(P.As,2)} cm² (mín. ${f(P.Asmin,2)} cm²)`:' – excede o limite'}`));
-    b.push(EQ('Mínimo pelo cálculo:',`${P.txt} (As = ${f(P.Asf,2)} cm² por face) · ${ST(P.ok)}`));if(ids)pushA(ids);
+    b.push(EQ('Armadura necessária:',`As = ${f(P.Asf,2)} cm² por face (mín. ${f(P.Asmin,2)} cm²) · ${ST(P.ok)}`));if(ids)pushA(ids);
     b.push(EQ('Cortante:',vMem(P,P.st?`estribos Ø${f(P.phiSt||I.pht,1)} c/${P.st}`:'')));};
   if(!arm){pilBlock(R.P1,R.cor?'7.1 Pilar no topo do pescoço':'7.1 Pilar no assentamento (NA)',['N1']);pilBlock(R.P2,'7.2 Pescoço no topo da sapata',['N2','N2a']);
     const vg=(V,tit,qn,ids,fg)=>{b.push(H2(tit));if(fg)FIGN(fg,`${tit.replace(/^7\.\d+ /,'')}: carga, cortante e momento (característicos).`);b.push(EQ('Carga:',`${qn} = ${f(V.q,3)} kN/m, vão s = ${f(R.s)} m (biapoiada)`));b.push(EQ('Esforços:',`Md = 1,4·q·s²/8 = ${f(V.Md,2)} kN·m; Vd = 1,4·q·s/2 = ${f(V.Vd,2)} kN`));
-      b.push(EQ('Flexão:',`b = ${f(V.bw,0)} cm, d = ${f(V.d,1)} cm, KMD = ${f(V.KMD,3)}, As = ${V.ok?f(V.As,2):'–'} cm² (mín. ${f(V.Asmin,2)}) → ${V.txt}`));b.push(EQ('Estribos:',V.semEstribo?`dispensados: Vd = ${f(V.Vd,2)} ≤ Vc = ${f(V.Vc,2)} kN; VRd2 = ${f(V.VRd2,1)} kN (${ST(V.v2ok)})`:`Ø${f(I.pht,1)} c/${V.sp} · Vd ≤ VRd2 = ${f(V.VRd2,1)} kN (${ST(V.v2ok)})`));
+      b.push(EQ('Flexão:',`b = ${f(V.bw,0)} cm, d = ${f(V.d,1)} cm, KMD = ${f(V.KMD,3)}, As = ${V.ok?f(V.As,2):'–'} cm² (mín. ${f(V.Asmin,2)})`));b.push(EQ('Estribos:',V.semEstribo?`dispensados: Vd = ${f(V.Vd,2)} ≤ Vc = ${f(V.Vc,2)} kN; VRd2 = ${f(V.VRd2,1)} kN (${ST(V.v2ok)})`:`Ø${f(I.pht,1)} c/${V.sp} · Vd ≤ VRd2 = ${f(V.VRd2,1)} kN (${ST(V.v2ok)})`));
       if(V.u!=null)b.push(EQ('Rigidez (apoio do pano):',`flecha característica com 0,5·Ecs·I: u = 5·q·s⁴/(384·0,5·Ecs·I) = ${f(V.u,2)} cm ≤ L/500 e 1 cm = ${f(V.uLim,2)} cm (${ST(V.uOk)}; NBR 6118, Tabela 13.3)`));if(ids)pushA(ids)};
     let nv=3;
     if(R.CW){const W=R.CW;b.push(H2(`7.${nv++} Parede de concreto no painel inferior`));
       b.push(TXT(`Parede de concreto armado com ${f(W.b,0)} cm, do topo da sapata corrida (${sgn(R.ytop)}) até ${sgn(R.yA)} (h = ${f(W.h)} m), engastada na sapata por esperas e ligada aos pilares; o topo é livre e recebe a base do pano de alvenaria. A parede foi calculada como placa delgada (Kirchhoff, ν = 0,2) resolvida numericamente por diferenças finitas, com malha de ${W.PL.nx} × ${W.PL.ny} divisões no vão livre ℓ = ${f(W.ln)} m e na altura: base engastada, topo livre com a reação do pano, e laterais nos pilares em dois casos (engastadas, pela continuidade com o painel vizinho, e apoiadas). A carga é a pressão lateral real em cada altura (vento acima do terreno e empuxo líquido com sobrecarga), nos dois sentidos do vento. Cada armadura usa o maior esforço entre os quatro casos (método equivalente ao das tabelas de Czerny, sem interpolação).`));
       FIGN('parede_placa.png','Parede de concreto: momento vertical My e cortante Qy no meio do vão ao longo da altura, e momento horizontal Mx entre pilares (característicos, envoltória).');
       b.push(EQ('Caminho da carga:',`pela base (sapata) descem entre ${f(W.share*100,0)}% e ${f(W.shareMax*100,0)}% da carga lateral do painel; o restante, até ${f(W.Fs,2)} kN por painel, vai para os pilares (metade para cada um)`));
-      b.push(EQ('Flexão vertical:',`Mk,máx = ${f(W.MyE,2)} kN·m/m tracionando a face do vizinho (base) e ${f(W.MyI,2)} kN·m/m a face interna; d = ${f(W.d,1)} cm; KMD ${f(W.ext.KMD,3)} e ${f(W.int.KMD,3)}; As = ${f(W.ext.As,2)} e ${f(W.int.As,2)} cm²/m (mín. 0,15%·b·h = ${f(W.ext.Amin,2)}) → ${phiTxt(W.phi)} c/${W.ext.sp} e c/${W.int.sp} (${ST(W.ext.ok&&W.int.ok)})`));
-      b.push(EQ('Flexão horizontal:',`Mk,máx = ${f(W.MxE,2)} kN·m/m na face do vizinho (junto ao pilar) e ${f(W.MxI,2)} kN·m/m na face interna (vão); As = ${f(W.hor.As,2)} cm²/m por face (mín. ${f(W.hor.Amin,2)}) → ${phiTxt(W.phi)} c/${W.hor.sp} (${ST(W.horE.ok&&W.horI.ok)})`));
+      b.push(EQ('Flexão vertical:',`Mk,máx = ${f(W.MyE,2)} kN·m/m tracionando a face do vizinho (base) e ${f(W.MyI,2)} kN·m/m a face interna; d = ${f(W.d,1)} cm; KMD ${f(W.ext.KMD,3)} e ${f(W.int.KMD,3)}; As = ${f(W.ext.As,2)} e ${f(W.int.As,2)} cm²/m (mín. 0,15%·b·h = ${f(W.ext.Amin,2)}) (${ST(W.ext.ok&&W.int.ok)})`));
+      b.push(EQ('Flexão horizontal:',`Mk,máx = ${f(W.MxE,2)} kN·m/m na face do vizinho (junto ao pilar) e ${f(W.MxI,2)} kN·m/m na face interna (vão); As = ${f(W.hor.As,2)} cm²/m por face (mín. ${f(W.hor.Amin,2)}) (${ST(W.horE.ok&&W.horI.ok)})`));
       pushA(['N18','N19','N20']);
       if(W.no)b.push(EQ('Nó parede–sapata:',`o momento da base da parede continua na sapata de divisa: face do vizinho tracionada → armadura inferior (Md = 1,4 × ${f(W.MyE,2)} = ${f(W.no.MdE,2)} kN·m/m), face interna → superior (Md = ${f(W.no.MdI,2)} kN·m/m). A armadura transversal da sapata foi dimensionada para o maior entre esse momento e o do balanço pelo solo (${f(W.no.solo,2)} kN·m/m): MRd = ${f(W.no.MRdInf,2)} e ${f(W.no.MRdSup,2)} kN·m/m (${ST(W.no.ok)})`));
       b.push(EQ('Cortante:',`maior cortante na placa (base ou apoio no pilar) Vd = 1,4 × ${f(W.Qmax,2)} = ${f(W.Vd,2)} kN/m ≤ VRd1 = ${f(W.VRd1,2)} kN/m (${ST(W.vOk)}), sem estribos`));
@@ -1955,9 +1953,9 @@ function memorialXML(R,figs,state){
       b.push(EQ('Cortante:',vMem(P,'estribos E5')));}}
   b.push(H2(`${arm?(R.enr?'7.3':'7.2'):'7.'+(3+(R.CW?1:0)+(R.BI?1:0)+1+(R.CI?1:0))} Sapata`));
   b.push(EQ('Pressão líquida:',`σliq = σsolo − (25·hs + γ·hsolo); no balanço o peso próprio e o solo sobre a sapata somam ${f(25*I.hs+I.gam*Math.max(0,I.NT-R.ytop),1)} kPa`));
-  if(R.SBs)b.push(EQ('Face superior:',`onde o peso supera a reação do solo, o balanço traciona a face superior: Md = ${f(R.SBs.Md,2)} kN·m/m → ${R.SBs.txt}`));
-  b.push(EQ('Balanço transversal:',`a = ${f(R.aMax,3)} m; Md = 1,4·∫σliq·x dx = ${f(R.SB.Md,2)} kN·m/m; d = ${f(R.SB.d,1)} cm; KMD = ${f(R.SB.KMD,3)}; As = ${f(R.SB.Asf,2)} cm²/m → ${R.SB.txt}`));
-  if(R.SL&&R.SL.Md>0)b.push(EQ(R.cor?'Longitudinal entre pilares:':'Direção L:',`Md = ${f(R.SL.Md,2)} kN·m${R.cor?' (1,4·P·s/12, P = carga do pilar)':'/m'}; As = ${f(R.SL.Asf,2)} cm² → ${R.SL.txt}`));
+  if(R.SBs)b.push(EQ('Face superior:',`onde o peso supera a reação do solo, o balanço traciona a face superior: Md = ${f(R.SBs.Md,2)} kN·m/m; As = ${f(R.SBs.Asf,2)} cm²/m`));
+  b.push(EQ('Balanço transversal:',`a = ${f(R.aMax,3)} m; Md = 1,4·∫σliq·x dx = ${f(R.SB.Md,2)} kN·m/m; d = ${f(R.SB.d,1)} cm; KMD = ${f(R.SB.KMD,3)}; As = ${f(R.SB.Asf,2)} cm²/m (necessária)`));
+  if(R.SL&&R.SL.Md>0)b.push(EQ(R.cor?'Longitudinal entre pilares:':'Direção L:',`Md = ${f(R.SL.Md,2)} kN·m${R.cor?' (1,4·P·s/12, P = carga do pilar)':'/m'}; As = ${f(R.SL.Asf,2)} cm² (necessária)`));
   pushA(['N5','N6','N7']);
   b.push(EQ('Cortante a d da face:',`Vd = ${f(R.SV.Vd,2)} kN/m ≤ VRd1 = ${f(R.SV.VRd1,2)} kN/m (${ST(R.SV.ok)})`));
   if(R.PU)b.push(EQ('Punção:',`sapata flexível; Fsd = ${f(R.PU.Fsd,1)} kN; na face τ = ${f(R.PU.tau0/1000,3)} ≤ τRd2 = ${f(R.PU.tRd2/1000,2)} MPa; no contorno a 2d (u = ${f(R.PU.u1,2)} m, β = ${f(R.PU.beta,2)}) τ = ${f(R.PU.tau1/1000,3)} ≤ τRd1 = ${f(R.PU.tRd1/1000,3)} MPa${R.PU.fits?'':' (contorno a 2d sai da sapata: não se forma)'} (${ST(R.PU.ok)})`));
@@ -1992,7 +1990,7 @@ function memorialXML(R,figs,state){
     b.push(EQ('Materiais:',`bloco ${R.Bl[1]}, fbk = ${f(+I.fbk,0)} MPa; prisma oco fpk = ${f(R.fpk,1)} MPa e prisma cheio fpk* = ${f(R.fpkC,1)} MPa ${R.cer?'(valores informados)':'(Parsekian e Medeiros, 2021, Tabela 3.2)'}; graute fgk ≥ 15 MPa; argamassa ${['','','1,5 a 3,4','','','3,5 a 7,0','','','acima de 7,0'][+I.fa]||''} MPa → ftk = ${f(R.ftkN,2)} MPa (normal) e ${f(R.ftkP,2)} MPa (paralela à fiada); Ea = ${R.Ecoef}·fpk = ${f(R.Ealv/1000,0)} MPa`));
     b.push(EQ('Flexão (estádio III):',`fd = 0,7·fpk*/γm = 0,7 × ${f(R.fpkC,1)} / ${f(I.gm,1)} = ${f(R.fdA*10,2)} MPa; d = t/2 = ${f(R.dA,1)} cm; MRd,máx = 0,3·fd·b·d² = ${f(R.MRdMax,3)} kN·m/m ${R.MdA<=R.MRdMax?'≥':'<'} Md`));
     b.push(EQ('Linha neutra:',`x = 1,25·d·[1 − √(1 − Md/(0,5·b·d²·fd))] = ${f(R.xA,2)} cm; x/d = ${f(R.xi,3)} ≤ 0,45 (${ST(R.xiOk)}); z = d − 0,4x = ${f(R.zA,2)} cm`));
-    b.push(EQ('Armadura:',`fyd = ${f(R.fsA*10,0)} MPa; As = Md/(fyd·z) = ${f(R.AsCalc,2)} cm²/m; As,mín = 0,10%·b·t = ${f(R.AsMinA,2)} cm²/m; espaçamento ${f(R.espA,1)} cm → Ø${f(R.phiA,1)} c/${f(R.espAd,0)} (módulo ${f(R.mod,0)} cm)`));
+    b.push(EQ('Armadura:',`fyd = ${f(R.fsA*10,0)} MPa; As = Md/(fyd·z) = ${f(R.AsCalc,2)} cm²/m; As,mín = 0,10%·b·t = ${f(R.AsMinA,2)} cm²/m; barras nos furos grauteados, no módulo de ${f(R.mod,0)} cm`));
     pushA(['V1','N2']);
     b.push(EQ('Armadura horizontal:',`NBR 16868-1, 12.2: armadura secundária ≥ 0,05% da seção = 0,0005 × 100 × ${f(R.t,0)} = ${f(R.AsHmin,2)} cm²/m; canaletas H1 com ${R.nH1} ${phiTxt(R.phH)} (${f(R.nH1*area(R.phH),2)} cm²) na 1ª fiada acima do assentamento, a cada ${f(R.ehI)} m no terço inferior e a cada ${f(R.ehG)} m acima: ${f(R.nH1*area(R.phH)/R.ehG,2)} cm²/m no trecho menos armado (${ST(R.nH1*area(R.phH)/R.ehG>=R.AsHmin-1e-9)})`));
     b.push(EQ('Detalhamento:',`V1 ${I.v1Full==='toda'?'em toda a altura (construtiva acima do trecho de cálculo)':'até o ponto de corte calculado'}; V2 construtivas nas extremidades, cantos e juntas de controle; aço por furo ou canaleta ≤ 8% da área de graute, contando o traspasse (NBR 16868-1, 12.3)`));
