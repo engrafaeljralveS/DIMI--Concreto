@@ -1132,7 +1132,7 @@ function drawVista(R){
 }
 function renderSec(R){
   if(!R.arm){const P=[R.P1,R.P2],nm=[R.cor?'Pilar no topo do pescoço':'Pilar no NA','Pescoço no topo da sapata'];
-    $('pilDim').innerHTML=`<h4 style="margin:16px 0 6px">Dimensionamento do pilar</h4><table><tr><th>Seção</th><th>Mk (kN·m)</th><th>Vk (kN)</th><th>Md (kN·m)</th><th>Armadura</th></tr>${P.map((p,k)=>`<tr><td>${nm[k]}</td><td>${f(p.Mk)}</td><td>${f(p.Vd/1.4/(p.gn||1))}</td><td>${f(p.Md)}</td><td>${p.txt}</td></tr>`).join('')}</table>
+    const DQ=detGet(R);$('pilDim').innerHTML=`<h4 style="margin:16px 0 6px">Dimensionamento do pilar</h4><table><tr><th>Seção</th><th>Mk (kN·m)</th><th>Vk (kN)</th><th>Md (kN·m)</th><th>Mínimo (cálculo)</th><th>Adotado (detalhamento)</th></tr>${P.map((p,k)=>`<tr><td>${nm[k]}</td><td>${f(p.Mk)}</td><td>${f(p.Vd/1.4/(p.gn||1))}</td><td>${f(p.Md)}</td><td>${p.txt}</td><td>${['N1','N2'][k]} ${detText(['N1','N2'][k],DQ)} por face</td></tr>`).join('')}</table>
      <p class="note">Mk do dimensionamento = momento das ações horizontais no pilar${R.ecc?` menos o do peso fora do eixo do pescoço (${f(Math.abs(R.ecc))} kN·m) no sentido em que alivia`:''}${R.CW?'; na altura da parede de concreto o pilar recebe só as reações laterais da placa':''}. Md inclui γf = 1,4, γn e 2ª ordem.</p>`}else $('pilDim').innerHTML='';
   const rows=[['Nível do terreno',R.Hg],[R.cor?'Topo do pescoço':'Assentamento (NA)',NAe],['Topo da sapata',R.ytop],['Base da sapata',I.Nf]];
   $('tabSec').innerHTML=`<tr><th>Seção</th><th>Cota (m)</th><th>V (kN/m)</th><th>M (kN·m/m)</th>${R.arm?'':'<th>V pilar (kN)</th><th>M pilar (kN·m)</th>'}</tr>`+
@@ -1853,16 +1853,17 @@ function memorialXML(R,figs,state){
   b.push(H1('1. Objeto e critérios'));
   b.push(TXT(`Este memorial apresenta o dimensionamento de um muro de vedação no sistema de ${sysTxt}. As ações consideradas são o peso próprio, o vento e o empuxo de solo; a fundação é verificada quanto a tensões no solo, excentricidade, tombamento e deslizamento.`));
   b.push(TXT('Normas de referência: ABNT NBR 6118 (estruturas de concreto), NBR 6122 (fundações), NBR 6123 (forças devidas ao vento) e NBR 16868 (alvenaria estrutural). Estabilidade e tensões no solo em valores característicos; dimensionamento no ELU com γf = 1,4, γc = 1,4 e γs = 1,15.'));
-  {const c=R.crit,row=(a,v,l,ok)=>[a,v,l,ST(ok)],L=[];
+  {const c=R.crit,row=(a,v,l,ok)=>[a,v,l,ST(ok)],L=[],QD=detGet(R),QR=detRows(R,QD);
+   const PF=/^(N1|N2|N2a|N10|N15)$/,adQ=ids=>ids.filter(id=>QD[id]&&QR.some(r=>r.id===id)).map(id=>`${id} ${detText(id,QD)}${PF.test(id)?' por face':''}`).join(' + '),okQ=ids=>ids.every(id=>{const r=QR.find(x=>x.id===id);return !r||r.ok});
    L.push(row('Tensão no solo (com vento)',`${f(R.sigW,1)} kPa`,`≤ ${f(1.3*I.sadm,0)} kPa`,R.sigW<=1.3*I.sadm));
    L.push(row('Contato com o solo',`${f(Math.min(...R.cW.map(q=>q.lc))/I.B*100,0)}%`,I.crit==='23'?'≥ 67%':'100%',R.cW.every(q=>q.ok)&&R.perm.ok));
    L.push(row('Tombamento',`FS ${f(Math.min(...R.cW.map(q=>q.FSt)),2)}`,`≥ ${f(+I.FStMin||1.5,1)}`,Math.min(...R.cW.map(q=>q.FSt))>=(+I.FStMin||1.5)-1e-9));
    L.push(row('Deslizamento',`FS ${f(Math.min(...R.cW.map(q=>q.FSd)),2)}`,`≥ ${f(+I.FSdMin||1.5,1)}`,Math.min(...R.cW.map(q=>q.FSd))>=(+I.FSdMin||1.5)-1e-9));
-   if(!arm){L.push(row(R.cor?'Pilar no topo do pescoço':'Pilar no NA',R.P1.txt,`Md ${f(R.P1.Md)} kN·m`,R.P1.ok&&R.P1.vok));L.push(row('Pescoço no topo da sapata',R.P2.txt,`Md ${f(R.P2.Md)} kN·m`,R.P2.ok&&R.P2.vok));
-     R.panels.forEach(P=>L.push(row(P.lab,P.can?`canaletas ${P.can.n} ${phiTxt(P.can.phi)} c/${f(P.can.eh)} m`:`σ ${f(P.sigPar/1000,3)} MPa`,P.can?`MRd,h ${f(P.can.Mh,2)} kN·m/m`:`ftd ${f(R.ftdP/1000,3)} MPa`,P.ok&&P.limE)));
-     if(R.CW)L.push(row('Parede de concreto',`${phiTxt(R.CW.phi)} c/${R.CW.ext.sp} (vertical)`,`Mk base ${f(R.CW.MyE,2)} kN·m/m`,R.CW.ok&&(!R.CW.no||R.CW.no.ok)));}
-   else L.push(row('Alvenaria armada',isFinite(R.AsA)?`Ø${f(R.phiA,1)} c/${f(R.espAd,0)}`:'—',`x/d ${f(R.xi,3)} ≤ 0,45`,R.xiOk&&R.lamAOk));
-   L.push(row('Sapata (transversal)',R.SB.txt,`Md ${f(R.SB.Md)} kN·m/m`,R.SB.ok&&R.SV.ok));
+   if(!arm){L.push(row(R.cor?'Pilar no topo do pescoço':'Pilar no NA',adQ(['N1']),`As nec. ${f(R.P1.Asf)} cm²/face · Md ${f(R.P1.Md)} kN·m`,R.P1.ok&&R.P1.vok&&okQ(['N1','N3'])));L.push(row('Pescoço no topo da sapata',adQ(['N2','N2a']),`As nec. ${f(Math.max(R.P1.Asf,R.P2.Asf))} cm²/face · Md ${f(R.P2.Md)} kN·m`,R.P2.ok&&R.P2.vok&&okQ(['N2','N2a','N4'])));
+     R.panels.forEach((P,j)=>L.push(row(P.lab,P.can&&j===0?`canaletas ${adQ(['N17'])} c/${f(P.can.eh)} m`:`σ ${f(P.sigPar/1000,3)} MPa (sem aço)`,P.can&&j===0?`MRd,h ${f(P.can.Mh,2)} kN·m/m`:`ftd ${f(R.ftdP/1000,3)} MPa`,P.ok&&P.limE&&(!(P.can&&j===0)||okQ(['N17'])))));
+     if(R.CW)L.push(row('Parede de concreto',adQ(['N18','N19','N20']),`Mk base ${f(R.CW.MyE,2)} kN·m/m`,R.CW.ok&&(!R.CW.no||R.CW.no.ok)&&okQ(['N18','N19','N20'])));}
+   else L.push(row('Alvenaria armada',adQ(['V1'])||'—',`x/d ${f(R.xi,3)} ≤ 0,45`,R.xiOk&&R.lamAOk));
+   L.push(row('Sapata (transversal)',adQ(['N5']),`As nec. ${f(R.SB.Asf)} cm²/m · Md ${f(R.SB.Md)} kN·m/m`,R.SB.ok&&R.SV.ok&&okQ(['N5','N6'])));
    b.push(PP('Quadro-resumo',{b:true,before:160,after:60}));
    b.push(TBL([['Verificação','Resultado','Limite / esforço','Situação'],...L],[3.6,3.2,2.6,1.4]));
    b.push(TXT(state.fails?`${state.fails} verificação(ões) não atende(m); ver item 10.`:'Todas as verificações atendem com os dados informados.'));}
@@ -1906,7 +1907,7 @@ function memorialXML(R,figs,state){
   FIGN('diagramas.png',`Diagramas de cortante e momento ${arm?'do muro':'do pilar'} (característicos).`);
   if(!arm){const nm=[R.cor?'Pilar no topo do pescoço':'Pilar no NA','Pescoço no topo da sapata'];
     b.push(PP('Momentos de dimensionamento do pilar',{b:true,before:120,after:60}));
-    b.push(TBL([['Seção','Mk (kN·m)','Vk (kN)','Md (kN·m)','γn','Armadura (cálculo)'],...[R.P1,R.P2].map((P,k)=>[nm[k],f(P.Mk),f(P.Vd/1.4/(P.gn||1)),f(P.Md),f(P.gn||1,2),P.txt])],[3.4,1.5,1.4,1.5,0.9,2.6]));
+    {const QD=detGet(R),PF=['N1','N2'];b.push(TBL([['Seção','Mk (kN·m)','Vk (kN)','Md (kN·m)','As nec. (cm²/face)','Mínimo (cálculo)','Adotado (detalhamento)'],...[R.P1,R.P2].map((P,k)=>[nm[k],f(P.Mk),f(P.Vd/1.4/(P.gn||1)),f(P.Md),f(k?Math.max(R.P1.Asf,P.Asf):P.Asf),P.txt.replace(' por face',''),`${PF[k]} ${detText(PF[k],QD)}`])],[2.6,1.1,1,1.1,1.3,1.6,1.9]));}
     b.push(TXT(`O Mk do dimensionamento é o momento das ações horizontais no pilar${R.ecc?`, descontado o momento do peso fora do eixo do pescoço (${f(Math.abs(R.ecc),2)} kN·m) no sentido em que alivia`:''}${R.CW?'; na altura da parede de concreto o pilar recebe só as reações laterais da placa':''}. Por isso difere do M da tabela de esforços por seção, que traz só as ações horizontais da faixa inteira. Md inclui γf = 1,4, γn e a 2ª ordem.`));}
   FIGN('vista_tipica.png','Seção típica: vista frontal e planta com o caminho das cargas horizontais (pano → apoios → fundação).');
   // fundação
