@@ -312,11 +312,12 @@ const DEF=[
   ['s','Espaçamento entre pilares','m',2.80,null,'pil'],
   ['topoP','Topo do pano (NBR 16868-1, Anexo E)','sel','apoiado',[['apoiado','Apoiado na cinta superior (4 lados apoiados)'],['livre','Livre (laterais e base apoiadas)']],'pil'],
   ['cintaInt','Cinta intermediária (canaleta armada ancorada nos pilares)','sel','nao',[['nao','Sem cinta intermediária'],['sim','Com cinta intermediária – divide o pano em dois']],'pil'],
-  ['zCi','Cinta intermediária – altura acima do assentamento (0 = meia altura)','m',0,null,'pil'],
+  ['zCi','Cinta intermediária – altura acima da base do pano (0 = meia altura)','m',0,null,'pil'],
   ['bpw','Pilar – espessura (sentido do vento, ≥ bloco)','cm',19,null,'pil'],
   ['hp','Pilar – comprimento ao longo do muro','cm',30,null,'pil'],
   ['bpe','Pescoço abaixo de NA – sentido do vento','cm',30,null,'pil'],
   ['hpe','Pescoço abaixo de NA – ao longo do muro','cm',20,null,'pil'],
+  ['hPes','Pescoço – altura acima do topo da sapata (sapata corrida)','m',0.50,null,'pil'],
   ['bwi',['Baldrame – largura','Parede de fundação – largura'],'cm',19],
   ['hci','Baldrame – altura','cm',30,null,'pil'],
   ['bws',['Cinta superior – largura','Verga de topo – largura'],'cm',19],
@@ -414,7 +415,7 @@ function applySys(){
   document.querySelectorAll('#form [data-sys]').forEach(el=>el.hidden=el.dataset.sys!==I.sys);
   document.querySelectorAll('#form [data-only]').forEach(el=>el.hidden=el.dataset.only!==I.sys);
   const hideIf=(id,cond)=>{const el=$(id),fl=el&&el.closest&&el.closest('.field');if(fl&&cond)fl.hidden=true};
-  hideIf('S2m',I.s2mode!=='man');{const ce=(I.bloco||'')[0]==='k';hideIf('fpkM',!ce);hideIf('fpkCM',!ce);}hideIf('L',I.tipoSap==='cor');if(I.sys==='pil'){hideIf('bwi',I.tipoSap==='cor');hideIf('hci',I.tipoSap==='cor')}hideIf('zCi',I.cintaInt!=='sim');['drB','drPhi','drLas','drAr','drSel','drImp'].forEach(k=>{const el=$(k),fl=el&&el.closest&&el.closest('.field');if(fl)fl.hidden=I.drLado==='nao'});['lenr','tenr','eenrOut','phE'].forEach(k=>hideIf(k,I.enr!=='sim'));hideIf('p3d',I.tipoSap==='cor');
+  hideIf('S2m',I.s2mode!=='man');{const ce=(I.bloco||'')[0]==='k';hideIf('fpkM',!ce);hideIf('fpkCM',!ce);}hideIf('L',I.tipoSap==='cor');['NA','bwi'].forEach(k=>{const fl=$(k).closest('.field');if(fl)fl.hidden=I.sys==='pil'&&I.tipoSap==='cor'});if(I.sys==='pil'){hideIf('bwi',I.tipoSap==='cor');hideIf('hci',I.tipoSap==='cor');hideIf('hPes',I.tipoSap!=='cor')}else hideIf('hPes',true);hideIf('zCi',I.cintaInt!=='sim');['drB','drPhi','drLas','drAr','drSel','drImp'].forEach(k=>{const el=$(k),fl=el&&el.closest&&el.closest('.field');if(fl)fl.hidden=I.drLado==='nao'});['lenr','tenr','eenrOut','phE'].forEach(k=>hideIf(k,I.enr!=='sim'));hideIf('p3d',I.tipoSap==='cor');
 }
 
 /* ---------- cálculo ---------- */
@@ -460,6 +461,8 @@ function betaF(T,MU,HL,mu,hl){mu=Math.min(MU[0],Math.max(MU[MU.length-1],mu));hl
 const FVK0={2:0.10,5:0.15,8:0.35}; // fvk = fvk0 + 0,5σ (MPa), alvenaria não armada, NBR 16868-1
 const alfaPlaca=r=>{for(let i=1;i<PLACA.length;i++){if(r<=PLACA[i][0]){const[a0,b0]=PLACA[i-1],[a1,b1]=PLACA[i];return b0+(b1-b0)*(r-a0)/(a1-a0)}}return .125};
 
+// NA efetivo: na sapata corrida (pilares) é o topo do pescoço = topo da sapata + altura do pescoço; nos demais casos, o NA informado
+let NAe=0;
 function calc(){
   const R={},arm=I.sys==='arm';R.arm=arm;
   const Bl=BLOCOS.find(b=>b[0]===I.bloco)||BLOCOS[3];R.Bl=Bl;
@@ -472,6 +475,8 @@ function calc(){
   const ft=FTK[I.fa]||FTK[5]; R.ftkN=ft[0]; R.ftkP=ft[1];
   R.mod=Math.round((Bl[5]+1)/2); // furos a cada meio bloco: família 39 → 20 cm, família 29 → 15 cm
   const cor=!arm&&I.tipoSap==='cor', iso=!arm&&!cor; R.cor=cor; R.iso=iso;
+  // sapata corrida: não há baldrame; o pano começa no topo da sapata e o NA informado não entra; o pescoço tem altura própria
+  {const yt0=I.Nf+I.hs;R.hPes=cor?Math.min(Math.max(0.05,+I.hPes||0),Math.max(0.05,I.NTopo-yt0-0.3)):0;NAe=cor?yt0+R.hPes:I.NA;R.yA=cor?yt0:NAe;}
   const s=arm?1:I.s, L=arm?1:(cor?I.s:I.L); R.s=s;R.L=L; // corrida com pilares: faixa de um espaçamento s por pilar
   const bp=arm?R.t:Math.max(R.t,I.bpw||R.t), hp=arm?100:I.hp, bpe=arm?I.bwi:I.bpe, hpe=arm?100:I.hpe;
   Object.assign(R,{bp,hp,bpe,hpe});
@@ -480,7 +485,7 @@ function calc(){
   R.Hg=Math.max(I.NT,I.NT2); R.Lg=Math.min(I.NT,I.NT2); R.dh=R.Hg-R.Lg;
   R.sE=1; // empuxo com sinal próprio: + empurra para o interior (vem do vizinho), − empurra para a divisa (vem do lote)
   R.qE=Math.max(0,+I.qT2||0); R.qI=Math.max(0,+I.qT||0);
-  R.Hv=Math.max(0,I.NTopo-R.Hg); R.He=Math.max(0,R.Lg-I.NA);
+  R.Hv=Math.max(0,I.NTopo-R.Hg); R.He=Math.max(0,R.Lg-NAe);
   // vento
   R.Cf=(I.borda==='borda'||I.Lm>60*Math.max(R.Hv,0.1))?1.2:1.5;
   const [b,p]=CAT[I.cat]||CAT.III;
@@ -499,24 +504,24 @@ function calc(){
   R.EAe=sideE(I.NT2,R.qE); R.EAi=sideE(I.NT,R.qI); R.ea=ea; // por metro; y medido a partir do apoio
   // cargas verticais (por metro)
   const hcs=I.hcs/100,hci=I.hci/100;
-  R.Halv=Math.max(0,I.NTopo-I.NA-hcs);
+  R.Halv=Math.max(0,I.NTopo-R.yA-hcs); // pano: da base (topo da sapata na corrida; baldrame na isolada) à face inferior da cinta superior
   // cinta intermediária (sistema com pilares): canaleta grauteada e armada numa fiada, ancorada nos pilares
   R.hcan=(R.Bl[6]+1)/100; R.cInt=!arm&&I.cintaInt==='sim'&&R.Halv>=4*R.hcan;
   if(R.cInt){const md=R.hcan;const zc=+I.zCi>0?+I.zCi:R.Halv/2;let zb=Math.round((zc-md/2)/md)*md;zb=Math.min(Math.max(md,zb),R.Halv-2*md);R.h1=zb;R.zCi=zb+md/2;R.h2=Math.max(0,R.Halv-zb-md)}
   R.g4=R.cInt?Math.max(0,(22*t-R.ga))*R.hcan:0; // graute/concreto da canaleta no lugar da alvenaria
   R.g1=R.ga*R.Halv; R.g2=25*I.bws/100*hcs; R.g3=arm||cor?0:25*I.bwi/100*hci; R.qv=R.g1+R.g2+R.g3+R.g4; // sapata corrida: sem baldrame, o bloco apoia direto na sapata
-  R.yt=I.NA; R.ytop=I.Nf+I.hs;
+  R.yt=NAe; R.ytop=I.Nf+I.hs;
   R.Nalv=R.qv*(arm?s:Math.max(0,s-hp/100)); // o trecho do pilar não leva alvenaria
-  R.Npil=arm?0:25*bp*hp/1e4*Math.max(0,I.NTopo-I.NA);
+  R.Npil=arm?0:25*bp*hp/1e4*Math.max(0,I.NTopo-NAe);
   // sapata corrida sob pilares: sem baldrame; alvenaria de embasamento do topo da sapata até o NA, apoiada direto na sapata
-  R.hEmb=cor?Math.max(0,I.NA-R.ytop):0; R.Nemb=R.Bl[3][0]*G*R.hEmb*Math.max(0,s-hpe/100);
+  R.hEmb=cor?Math.max(0,NAe-R.ytop):0; R.Nemb=0; // corrida: a alvenaria desde o topo da sapata já está no pano (g1); hEmb só para os desenhos
   R.Nwall=R.Nalv+R.Npil+R.Nemb;
   R.cw=R.Nwall>0?((R.Nalv+R.Nemb)*R.t/200+R.Npil*bp/200)/R.Nwall:R.t/200; // centro de gravidade de muro + pilar, medido da face externa
   // enrijecedores de bloco (alvenaria armada): alma para o lado interno, grauteada, e pescoço de concreto abaixo de NA
   R.enr=arm&&I.enr==='sim';
   if(R.enr){R.eenr=R.t;R.tenr=Math.max(R.t,+I.tenr||R.t);R.lenr=Math.max(+I.lenr||1,2*R.eenr/100);R.gGr=R.cer?20:22;
-    R.WwebE=R.gGr*(R.tenr-R.t)/100*R.eenr/100*Math.max(0,I.NTopo-I.NA); // por enrijecedor (kN)
-    R.WpeE=25*Math.max(0,R.tenr-I.bwi)/100*R.eenr/100*Math.max(0,I.NA-R.ytop);
+    R.WwebE=R.gGr*(R.tenr-R.t)/100*R.eenr/100*Math.max(0,I.NTopo-NAe); // por enrijecedor (kN)
+    R.WpeE=25*Math.max(0,R.tenr-I.bwi)/100*R.eenr/100*Math.max(0,NAe-R.ytop);
     const xw=(R.t+R.tenr)/200,xp0=(cenPos=>cenPos?R.t/200-I.bwi/200:0)(I.pos==='centro')+I.bwi/100,xp=(xp0+R.tenr/100)/2;
     const Wm=R.WwebE/R.lenr,Wp=R.WpeE/R.lenr,Nn=R.Nwall+Wm+Wp;
     R.cw=(R.Nwall*R.cw+Wm*xw+Wp*xp)/Nn;R.Nwall=Nn;R.NenrM=Wm+Wp;}
@@ -528,7 +533,7 @@ function calc(){
   // solo sobre a sapata, por faixas: do lado externo da divisa usa o terreno externo
   // não há solo na faixa ocupada pelo muro: sapata corrida (e armada) = alvenaria até a sapata; isolada = solo só abaixo do fundo do baldrame
   const inW=x=>x>0&&x<t,inB=x=>!arm&&!cor&&(inW(x)||Math.abs(x-wa)<I.bwi/200);
-  const hSolo=(x,gl)=>inB(x)?Math.max(0,Math.min(gl,I.NA-hci)-R.ytop):inW(x)?0:Math.max(0,gl-R.ytop);
+  const hSolo=(x,gl)=>inB(x)?Math.max(0,Math.min(gl,NAe-hci)-R.ytop):inW(x)?0:Math.max(0,gl-R.ytop);
   {let W=0,Mx=0;const k=200,dx=I.B/k,P0=R.px0,P1=R.px0+bpe/100,lp=Math.min(L,hpe/100);
    for(let i=0;i<k;i++){const x=R.fx0+(i+.5)*dx,gl=x<0?I.NT2:I.NT,hh=hSolo(x,gl),len=(x>P0&&x<P1)?L-lp:L,w=I.gam*hh*len*dx;W+=w;Mx+=w*(x-fc)}
    R.Psolo=W;R.xs=W>0?Mx/W:0;
@@ -612,11 +617,11 @@ function calc(){
     let sh=shearI(Vd,wall?100:bw,d,VRd1,wall?1:2),phiSt=I.pht;
     if(sh.need&&!wall){for(const ph of [I.pht,6.3,8,10,12.5].filter(v=>v>=I.pht)){phiSt=ph;sh=shearI(Vd,bw,d,VRd1,2,ph);if(sh.sReq>=Math.max(5,Math.min(10,Math.floor(sh.sMax))))break}st=Math.max(1,Math.min(st,sh.sReq))}
     return {lab,y,bw,h,d,Mk,M1d,Md,Vd,...r,Asmin,Asf,nb,txt:r.ok?(wall?`Ø${f(bar,1)} c/${spw} por face`:`${nb} Ø${f(bar,1)} por face`):'—',VRd1,sh,phiSt,vok:Vd<=VRd1||(sh.ok&&(wall||sh.prat)),st,lam,nu,amp,gn,AsTot,AsMax,lamOk:lam<=140?true:lam<=200?'warn':false,bminOk:wall||bmin>=14}};
-  const hcantP=Math.max(0,I.NTopo-I.NA);
+  const hcantP=Math.max(0,I.NTopo-NAe);
   R.ecc=R.Nwall*(bpe/200-R.cw); // peso de muro + pilar fora do eixo do pescoço
   if(!arm){
     const lTot=Math.max(0,I.NTopo-R.ytop); // o pilar e o pescoço formam um único balanço engastado na sapata
-    R.P1=pil('Pilar no assentamento (NA)',R.yt,hp,bp,0,25*bp*hp/1e4*hcantP+R.g2*s,lTot,I.phl);
+    R.P1=pil(cor?'Pilar no topo do pescoço':'Pilar no assentamento (NA)',R.yt,hp,bp,0,25*bp*hp/1e4*hcantP+R.g2*s,lTot,I.phl);
     R.P2=pil('Pescoço no topo da sapata',R.ytop,hpe,bpe,R.ecc,R.Nwall+R.Npes,lTot,I.phl);
   }else{
     R.P2=pil('Parede de fundação no topo da sapata (por m)',R.ytop,100,bpe,R.ecc,R.Nwall+R.Npes,Math.max(0,R.yt-R.ytop),I.phv,true);
@@ -631,9 +636,14 @@ function calc(){
     // rigidez para servir de apoio ao pano: flecha característica com 0,5·Ecs·I, limite L/500 e 1 cm (NBR 6118, Tabela 13.3, elementos que suportam alvenaria)
     let u=null,uLim=null,uOk=true;if(horiz){const Ii=(bw/100)*Math.pow(h/100,3)/12;u=5*q*Math.pow(s,4)/(384*0.5*Ecs*1000*Ii)*100;uLim=Math.min(s*100/500,1);uOk=u<=uLim+1e-9}
     return {lab,q,Md,Vd,bw,h,d,...r,Asmin,Asf:As,nb,txt:r.ok?`${nb} Ø${f(I.phv,1)}${horiz?' por face':' inferior'}`:'—',VRd2,Vc,sp,v2ok:Vd<=VRd2,u,uLim,uOk}};
-  R.qh=R.pv*(R.cInt?R.h2:R.Halv)/2;
+  // pressão lateral característica na altura y (envoltória dos dois sentidos) e faixa vertical biapoiada entre ya e yb
+  const pEnv=y=>{const i=Math.min(n,Math.max(0,Math.round((y0-y)/dy)));return Math.max(Math.abs(WW[i]+R.sE*WE[i]),Math.abs(-WW[i]+R.sE*WE[i]))};
+  const strip=(ya,yb)=>{const L0=Math.max(1e-6,yb-ya),k=100;let pm=0,Rb=0,Rt=0;for(let i=0;i<k;i++){const y=ya+(i+.5)*L0/k,pp=pEnv(y);pm=Math.max(pm,pp);Rt+=pp*(y-ya)/L0*L0/k;Rb+=pp*(yb-y)/L0*L0/k}return {ya,yb,pm,Rb,Rt}};
+  if(!arm){const yC=I.NTopo-hcs;if(R.cInt){R.stL=strip(R.yA,R.yA+R.h1);R.stU=strip(R.yA+R.h1+R.hcan,yC)}else R.stP=strip(R.yA,yC)}
+  R.qh=arm?R.pv*R.Halv/2:(R.cInt?R.stU.Rt:R.stP.Rt); // reação no topo do pano superior
   if(!arm){R.BI=cor?null:viga('Baldrame',R.qv,I.bwi,I.hci,false);R.BS=viga('Cinta superior',R.qh,I.hcs,I.bws,true);
-    if(R.cInt){R.qci=R.pv*(R.h1+R.h2)/2;R.CI=viga('Cinta intermediária (canaleta)',R.qci,R.Bl[6],R.t,true);R.CI.semEstribo=R.CI.Vd<=R.CI.Vc}}
+    if(R.cInt){R.qci=R.stL.Rt+R.stU.Rb; // recebe o pano inferior (topo) e o superior (base)
+      R.CI=viga('Cinta intermediária (canaleta)',R.qci,R.Bl[6],R.t,true);R.CI.semEstribo=R.CI.Vd<=R.CI.Vc}}
   // sapata
   const dS=I.hs*100-5,aB=R.aMax,pl=R.pl,pr=R.pr;
   // balanços: esquerdo [0, pl] e direito [pr, B]; integra a pressão do solo (por metro de L)
@@ -679,16 +689,17 @@ function calc(){
     const lp=Math.max(0.1,s-hp/100),lx=Math.min(lp,R.Halv),ly=Math.max(lp,R.Halv);R.lp=lp;R.lx=lx;R.ly=ly;
     // vão menor vertical → tração normal à fiada; vão menor horizontal → tração paralela à fiada
     // placa ortotrópica – NBR 16868-1, Anexo E (Tabela E.1, alvenaria não armada)
-    R.topoLivre=I.topoP==='livre'; R.wd=1.4*R.pv;
+    R.topoLivre=I.topoP==='livre';
     // cada painel: altura hh, topo livre ou apoiado, carga permanente acima do meio do painel (para Pf/Ae)
-    const panel=(lab,hh,livre,wAbove)=>{const P={lab,h:hh,livre,hl:hh/lp};
+    const panel=(lab,hh,livre,wAbove,st)=>{const P={lab,h:hh,livre,hl:hh/lp,wd:1.4*st.pm,pk:st.pm};
       P.PfAe=Math.min(150,0.9*wAbove/t); // kN/m², seção bruta (a favor da segurança), ≤ 0,15 MPa
       P.mu=Math.min(1,(R.ftdN+P.PfAe)/R.ftdP);P.betaF=betaF(livre?E1B:E1A,E1_MU,E1_HL,P.mu,P.hl);P.hlFora=P.hl<0.3||P.hl>3;
-      P.MdPar=P.betaF*R.wd*lp*lp;P.MdNor=P.mu*P.MdPar;P.sigPar=P.MdPar/R.W;P.sigNor=P.MdNor/R.W;P.ftdNef=R.ftdN+P.PfAe;
+      P.MdPar=P.betaF*P.wd*lp*lp;P.MdNor=P.mu*P.MdPar;P.sigPar=P.MdPar/R.W;P.sigNor=P.MdNor/R.W;P.ftdNef=R.ftdN+P.PfAe;
       P.ok=P.sigPar<=R.ftdP+1e-9&&P.sigNor<=P.ftdNef+1e-9;P.limA=(livre?1350:2025)*t*t;P.limE=Math.max(lp,hh)<=50*t+1e-9&&hh*lp<=P.limA+1e-9;
       P.taxa=Math.max(P.sigPar/R.ftdP,P.sigNor/P.ftdNef);return P};
-    R.panels=R.cInt?[panel(`Painel inferior (${cor?'embasamento':'baldrame'} à cinta intermediária)`,R.h1,false,R.g2+R.ga*(R.h2+R.h1/2)+R.g4),panel('Painel superior (cinta intermediária ao topo)',R.h2,R.topoLivre,R.g2+R.ga*R.h2*(R.topoLivre?1:0.5))]
-      :[panel('Pano inteiro',R.Halv,R.topoLivre,R.g2+R.ga*R.Halv*(R.topoLivre?1:0.5))];
+    R.panels=R.cInt?[panel(`Painel inferior (${cor?'embasamento':'baldrame'} à cinta intermediária)`,R.h1,false,R.g2+R.ga*(R.h2+R.h1/2)+R.g4,R.stL),panel('Painel superior (cinta intermediária ao topo)',R.h2,R.topoLivre,R.g2+R.ga*R.h2*(R.topoLivre?1:0.5),R.stU)]
+      :[panel('Pano inteiro',R.Halv,R.topoLivre,R.g2+R.ga*R.Halv*(R.topoLivre?1:0.5),R.stP)];
+    R.wd=Math.max(...R.panels.map(P=>P.wd));
     const PW=R.panels.reduce((a,b)=>b.taxa>a.taxa?b:a);
     Object.assign(R,{hl:PW.hl,PfAe:PW.PfAe,mu:PW.mu,betaF:PW.betaF,hlFora:PW.hlFora,MdPar:PW.MdPar,MdNor:PW.MdNor,sigPar:PW.sigPar,sigNor:PW.sigNor,ftdNef:PW.ftdNef,limA:PW.limA});
     R.panoOk=R.panels.every(P=>P.ok);R.lim50=50*t;R.limE=R.panels.every(P=>P.limE);
@@ -697,21 +708,21 @@ function calc(){
      R.LG={Vd,sl,Fd:Vd*sl,As:Vd*sl/fyd,tau:Vd/t,fvd,tauOk:Vd/t<=fvd};}
     R.lamPano=Math.max(...R.panels.map(P=>P.h))/t; R.lamPanoOk=R.lamPano<=24?true:R.lamPano<=30?'warn':false;
   }else{
-    const h=Math.max(0,I.NTopo-I.NA),hef=2*h;R.hA=h;R.hef=hef;
+    const h=Math.max(0,I.NTopo-NAe),hef=2*h;R.hA=h;R.hef=hef;
     // enrijecedores: espessura efetiva tef = δ·t e divisão da carga do pano (método das faixas, flechas iguais no centro)
     R.tef=R.t;R.dEnr=1;R.fV=1;
     if(R.enr){R.rlE=R.lenr*100/R.eenr;R.rtE=R.tenr/R.t;R.dEnr=deltaEnr(R.rlE,R.rtE);R.tef=R.dEnr*R.t;
       R.lpE=Math.max(0.1,R.lenr-R.eenr/100);
       // pano: placa ortotrópica armada – NBR 16868-1, Anexo E, Tabela E.2 (laterais e base apoiadas, topo livre)
-      let pm=0;for(let i=0;i<=n;i++){if(Y[i]<I.NA)break;pm=Math.max(pm,Math.abs(WW[i]+R.sE*WE[i]),Math.abs(-WW[i]+R.sE*WE[i]))}R.pmE=pm;
+      let pm=0;for(let i=0;i<=n;i++){if(Y[i]<NAe)break;pm=Math.max(pm,Math.abs(WW[i]+R.sE*WE[i]),Math.abs(-WW[i]+R.sE*WE[i]))}R.pmE=pm;
       R.PfAe=Math.min(150,0.9*(R.g1+R.g2)/t);R.mu=Math.min(1,(R.ftdN+R.PfAe)/R.ftdP);R.hl=h/R.lpE;R.hlFora=R.hl<0.3||R.hl>2;
       R.betaF=betaF(E2A,E2_MU,E2_HL,R.mu,R.hl);R.wd=1.4*pm;R.MdPar=R.betaF*R.wd*R.lpE*R.lpE;R.MdNor=R.mu*R.MdPar;
-      const m0=1.4*momW(I.NA,0);R.fV=m0>1e-9?Math.min(1,R.MdNor/m0):0; // escala do diagrama vertical do pano
+      const m0=1.4*momW(NAe,0);R.fV=m0>1e-9?Math.min(1,R.MdNor/m0):0; // escala do diagrama vertical do pano
     }
     const tefm=R.tef/100;
     R.lamA=hef/tefm; R.lamAOk=R.lamA<=30?true:false;
     R.NkA=R.g1+R.g2; R.NdA=1.4*R.NkA;
-    R.MdvA=1.4*momW(I.NA,0)*R.fV;
+    R.MdvA=1.4*momW(NAe,0)*R.fV;
     R.Md2A=R.NdA*hef*hef/(2000*tefm);
     R.MdA=R.MdvA+R.Md2A;
     R.Mest=0.9*R.NkA*t/6; // compressão favorável (γ = 0,9), usada só no trecho sem armadura
@@ -729,10 +740,10 @@ function calc(){
     R.espOk=R.espAd>=R.mod; if(!R.espOk)R.xiOk=false;
     R.MrA=R.W*R.ftdN+R.Mest; // 1,4·M − 0,9·G ≤ ftk/γm, tração normal à fiada
     // trecho sem armadura pelo diagrama real de momentos, com 40Ø de ancoragem além do ponto
-    {let yc=I.NA;const nn=200;for(let i=0;i<=nn;i++){const yy=I.NTopo-h*i/nn,zz=I.NTopo-yy,Mdy=1.4*momW(yy,0)*R.fV+R.Md2A*Math.pow(zz/Math.max(h,1e-6),2),Mry=R.W*R.ftdN+0.9*R.ga*zz*t/6;if(Mdy>Mry){yc=yy;break}}
-     R.yCorte=yc; R.ateA=Math.min(h,Math.max(0,yc-I.NA)+(yc>I.NA?40*R.phiA/1000:0)); if(R.MdA<=R.MrA)R.ateA=0; R.zfree=h-R.ateA;}
+    {let yc=NAe;const nn=200;for(let i=0;i<=nn;i++){const yy=I.NTopo-h*i/nn,zz=I.NTopo-yy,Mdy=1.4*momW(yy,0)*R.fV+R.Md2A*Math.pow(zz/Math.max(h,1e-6),2),Mry=R.W*R.ftdN+0.9*R.ga*zz*t/6;if(Mdy>Mry){yc=yy;break}}
+     R.yCorte=yc; R.ateA=Math.min(h,Math.max(0,yc-NAe)+(yc>NAe?40*R.phiA/1000:0)); if(R.MdA<=R.MrA)R.ateA=0; R.zfree=h-R.ateA;}
     // cisalhamento na base (Parsekian e Medeiros, 2021, item 3.3): fvk = 0,35 + 17,5ρ ≤ 0,7 MPa
-    R.VdA=1.4*(Math.abs(R.at(VW,I.NA))+Math.abs(R.at(VE,I.NA)))*R.fV; const rhoA=isFinite(R.AsA)&&R.espAd>0?(area(R.phiA)*100/R.espAd)/(100*R.dA):0;
+    R.VdA=1.4*(Math.abs(R.at(VW,NAe))+Math.abs(R.at(VE,NAe)))*R.fV; const rhoA=isFinite(R.AsA)&&R.espAd>0?(area(R.phiA)*100/R.espAd)/(100*R.dA):0;
     R.fvkA=Math.min(0.35+17.5*rhoA,0.7); R.VaA=R.fvkA*1000/I.gm*1*R.dA/100; R.vAok=R.VdA<=R.VaA;
     if(R.enr){const E={},lE=R.lenr,b=R.eenr,tf=R.t,Ht=R.tenr;R.E=E;
       const barE=BARRAS.find(x=>String(x[0])===String(I.phE))||BARRAS[3];E.phi=barE[0];
@@ -740,7 +751,7 @@ function calc(){
       E.d=Ht-tf/2; // barras no furo da junta (face externa) e no furo da ponta da alma
       // momentos característicos no assentamento com sinal: + empurra para o interior (alma comprimida), − para a divisa (mesa comprimida)
       const sm=(y,arr1,arr2)=>{const w=R.at(arr1,y),e=R.at(arr2,y);return [w+R.sE*e,-w+R.sE*e]};
-      const [m1,m2]=sm(I.NA,MW,ME),[v1,v2]=sm(I.NA,VW,VE);
+      const [m1,m2]=sm(NAe,MW,ME),[v1,v2]=sm(NAe,VW,VE);
       E.MkPos=Math.max(0,m1,m2)*lE;E.MkNeg=Math.max(0,-m1,-m2)*lE;E.Vk=Math.max(Math.abs(v1),Math.abs(v2))*lE;
       E.Nk=(R.g1+R.g2)*lE+R.WwebE;E.Md2=1.4*E.Nk*hef*hef/(2000*tefm);
       E.MdPos=E.MkPos>0?1.4*E.MkPos+E.Md2:0;E.MdNeg=E.MkNeg>0?1.4*E.MkNeg+E.Md2:0;
@@ -770,7 +781,7 @@ function calc(){
        const kd=(-nA+Math.sqrt(nA*nA+2*b*nA*E.d))/b;E.Icr=b*kd**3/3+nA*(E.d-kd)**2;
        const k3=E.Ma>E.Mr?Math.pow(E.Mr/E.Ma,3):1;E.Ie=Math.min(E.Ig,k3*E.Ig+(1-k3)*E.Icr);E.fiss=E.Ma>E.Mr;}
       // pano entre enrijecedores: faixas horizontais biapoiadas, parcela (1 − fV) da pressão
-      {let pm=0;for(let i=0;i<=n;i++){if(Y[i]<I.NA)break;pm=Math.max(pm,Math.abs(WW[i]+R.sE*WE[i]),Math.abs(-WW[i]+R.sE*WE[i]))}
+      {let pm=0;for(let i=0;i<=n;i++){if(Y[i]<NAe)break;pm=Math.max(pm,Math.abs(WW[i]+R.sE*WE[i]),Math.abs(-WW[i]+R.sE*WE[i]))}
        E.pm=pm;E.MdH=R.MdPar;E.sigH=E.MdH/R.W;E.hOk=E.sigH<=R.ftdP;
        const barH=BARRAS.find(x=>String(x[0])===String(I.phH))||BARRAS[2];E.phH=barH[0];
        const fsH=I.fsMode==='elu'?Math.min(I.fyk,500)/1.15/10:barH[1]*0.3077*G;E.eh=Math.max(0.2,+I.ehor||0.6);
@@ -790,7 +801,7 @@ function calc(){
     {const barH=BARRAS.find(x=>String(x[0])===String(I.phH))||BARRAS[2];R.phH=barH[0];R.AsHmin=0.0005*100*R.t; // cm²/m de altura
      R.ehG=Math.max(R.hcan,+I.ehor||0.6);R.ehI=Math.min(R.ehG,Math.max(R.hcan,+I.ehorI||R.ehG));
      R.nHmin=Math.max(1,Math.ceil(R.AsHmin*R.ehG/area(R.phH)-1e-9));R.nH1=Math.max(R.nHmin,R.enr?R.E.nH:0);
-     const md=R.hcan,hT=Math.max(0,I.NTopo-I.hcs/100-I.NA),z=[];let zz=md/2;
+     const md=R.hcan,hT=Math.max(0,I.NTopo-I.hcs/100-NAe),z=[];let zz=md/2;
      while(zz<hT-md/2+1e-9){z.push(zz);zz+=zz<hT/3?R.ehI:R.ehG;zz=Math.round((zz-md/2)/md)*md+md/2}
      R.canH=z;R.hT=hT;R.ehMod=[R.ehG,R.ehI].every(v=>Math.abs(v/md-Math.round(v/md))<0.05);}
   }
@@ -798,7 +809,7 @@ function calc(){
   R.Agr=Math.max(1,(R.t-5)*(R.mod-5)); R.Acan=Math.max(1,(R.t-5)*(R.Bl[6]-5));
   R.ok8=(nBars,phi,A)=>2*nBars*area(phi)<=0.08*A+1e-9;
   // deslocamento no topo (integração da curvatura a partir do topo da sapata)
-  const EIat=y=>{if(y>=I.NA)return R.enr?R.Ealv*R.E.Ie/1e8/R.lenr:arm?R.Ealv*(t**3/12):0.5*Ecs*1000*(hp/100)*((bp/100)**3)/12; // kN·m² (por metro)
+  const EIat=y=>{if(y>=NAe)return R.enr?R.Ealv*R.E.Ie/1e8/R.lenr:arm?R.Ealv*(t**3/12):0.5*Ecs*1000*(hp/100)*((bp/100)**3)/12; // kN·m² (por metro)
     return 0.5*Ecs*1000*((hpe/100)*((bpe/100)**3)/12+(R.enr?(R.eenr/100)*((R.tenr/100)**3)/12/R.lenr:0))};
   let th=0,u=0;const iTop=Math.round((y0-R.ytop)/dy);
   for(let i=iTop;i>0;i--){const y=Y[i],k=M[i]*s/EIat(y);th+=k*dy;u+=th*dy}
@@ -826,21 +837,21 @@ function drawCorte(R){
   const F0=R.fx0,F1=R.fx0+I.B,P0=R.px0,P1=R.px0+R.bpe/100;
   s+=rect(F0,F1,R.ytop,I.Nf,'var(--conc)','var(--concline)');
   s+=rect(P0,P1,R.yt,R.ytop,'var(--conc)','var(--concline)');
-  if(!R.arm&&!R.cor)s+=rect(wa-I.bwi/200,wa+I.bwi/200,I.NA,I.NA-I.hci/100,'var(--conc)','var(--concline)');
-  if(R.cor&&R.hEmb>0){s+=rect(0,R.t/100,I.NA,R.ytop,'url(#pBlk)',R.Bl[0][0]==='k'?'var(--brickline)':'var(--blockline)');
-    s+=`<rect x="${X(Math.min(P0,P1))}" y="${Y(I.NA)}" width="${R.bpe/100*sc}" height="${Y(R.ytop)-Y(I.NA)}" fill="none" stroke="var(--concline)" stroke-dasharray="5 3" stroke-width="1.2"/>`}
-  s+=rect(0,R.t/100,I.NTopo-I.hcs/100,I.NA,'url(#pBlk)',R.Bl[0][0]==='k'?'var(--brickline)':'var(--blockline)');
-  if(!R.arm){if(R.bp>R.t+1e-9)s+=rect(R.t/100,R.bp/100,I.NTopo,I.NA,'var(--conc)','var(--concline)');
-    s+=`<rect x="${X(0)}" y="${Y(I.NTopo)}" width="${R.bp/100*sc}" height="${Y(I.NA)-Y(I.NTopo)}" fill="none" stroke="var(--concline)" stroke-dasharray="5 3" stroke-width="1.2"/>`}
+  if(!R.arm&&!R.cor)s+=rect(wa-I.bwi/200,wa+I.bwi/200,NAe,NAe-I.hci/100,'var(--conc)','var(--concline)');
+  if(R.cor&&R.hEmb>0){s+=rect(0,R.t/100,NAe,R.ytop,'url(#pBlk)',R.Bl[0][0]==='k'?'var(--brickline)':'var(--blockline)');
+    s+=`<rect x="${X(Math.min(P0,P1))}" y="${Y(NAe)}" width="${R.bpe/100*sc}" height="${Y(R.ytop)-Y(NAe)}" fill="none" stroke="var(--concline)" stroke-dasharray="5 3" stroke-width="1.2"/>`}
+  s+=rect(0,R.t/100,I.NTopo-I.hcs/100,NAe,'url(#pBlk)',R.Bl[0][0]==='k'?'var(--brickline)':'var(--blockline)');
+  if(!R.arm){if(R.bp>R.t+1e-9)s+=rect(R.t/100,R.bp/100,I.NTopo,NAe,'var(--conc)','var(--concline)');
+    s+=`<rect x="${X(0)}" y="${Y(I.NTopo)}" width="${R.bp/100*sc}" height="${Y(NAe)-Y(I.NTopo)}" fill="none" stroke="var(--concline)" stroke-dasharray="5 3" stroke-width="1.2"/>`}
   s+=rect(wa-I.bws/200,wa+I.bws/200,I.NTopo,I.NTopo-I.hcs/100,'var(--conc)','var(--concline)');
   if(R.enr){const xe0=X(R.t/100),xe1=X(R.tenr/100),xp0=X(R.px0+R.bpe/100);
-    s+=`<path d="M${xe0} ${Y(I.NTopo)}H${xe1}V${Y(I.NA)}M${xp0} ${Y(I.NA)}H${xe1}V${Y(R.ytop)}" fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-dasharray="6 3"/>`;
+    s+=`<path d="M${xe0} ${Y(I.NTopo)}H${xe1}V${Y(NAe)}M${xp0} ${Y(NAe)}H${xe1}V${Y(R.ytop)}" fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-dasharray="6 3"/>`;
 }
-  if(R.cInt)s+=rect(0,R.t/100,I.NA+R.h1+R.hcan,I.NA+R.h1,'var(--conc)','var(--concline)');
+  if(R.cInt)s+=rect(0,R.t/100,R.yA+R.h1+R.hcan,R.yA+R.h1,'var(--conc)','var(--concline)');
   if(R.arm){const zA=Math.min(R.hA,R.ateA),zF=I.v1Full==='toda'?R.hT:zA;
-    if(zF>zA+1e-6)s+=`<line x1="${X(wa)}" y1="${Y(I.NA+zA)}" x2="${X(wa)}" y2="${Y(I.NA+zF)}" stroke="var(--steel)" stroke-width="1.4" stroke-dasharray="5 3"/>`;
-    s+=`<line x1="${X(wa)}" y1="${Y(R.ytop)-4}" x2="${X(wa)}" y2="${Y(I.NA+zA)}" stroke="var(--steel)" stroke-width="2.4"/>`;
-    R.canH.forEach(z=>{s+=`<circle cx="${X(wa)}" cy="${Y(I.NA+z)}" r="3" fill="var(--steel)"/>`});
+    if(zF>zA+1e-6)s+=`<line x1="${X(wa)}" y1="${Y(NAe+zA)}" x2="${X(wa)}" y2="${Y(NAe+zF)}" stroke="var(--steel)" stroke-width="1.4" stroke-dasharray="5 3"/>`;
+    s+=`<line x1="${X(wa)}" y1="${Y(R.ytop)-4}" x2="${X(wa)}" y2="${Y(NAe+zA)}" stroke="var(--steel)" stroke-width="2.4"/>`;
+    R.canH.forEach(z=>{s+=`<circle cx="${X(wa)}" cy="${Y(NAe+z)}" r="3" fill="var(--steel)"/>`});
 }
   s+=`<line x1="${xface}" y1="${top-30}" x2="${xface}" y2="${Yb+8}" stroke="var(--divisa)" stroke-width="1.2" stroke-dasharray="12 4 3 4"/><text x="${xface-6}" y="${top-18}" text-anchor="end" class="t-div">DIVISA</text>`;
   if(!(R.qE>0))s+=`<text x="96" y="${Y(I.NT2)-8}" class="t-muted" font-size="10">vizinho</text>`;if(!(R.qI>0))s+=`<text x="545" y="${Y(I.NT)-8}" text-anchor="end" class="t-muted" font-size="10">lote (interno)</text>`;
@@ -879,14 +890,14 @@ function drawCorte(R){
   const xe=X(xc+Math.max(-I.B/2,Math.min(I.B/2,c.e)));
   s+=`<line x1="${xe}" y1="${Y(R.ytop)-26}" x2="${xe}" y2="${Y(I.Nf)-2}" stroke="${col}" stroke-width="2" marker-end="url(#aK)"/><text x="${xe+(c.e<0?6:-6)}" y="${Y(R.ytop)-30}" text-anchor="${c.e<0?'start':'end'}" class="${okC?'t-ok':'t-bad'}">e = ${f(c.e,3)} m</text>`;
   const yB=y0+hmax+28;s+=`<line x1="${X(F0)}" y1="${yB}" x2="${X(F1)}" y2="${yB}" stroke="var(--ink)" stroke-width=".8"/><path d="M${X(F0)} ${yB-5}V${yB+5}M${X(F1)} ${yB-5}V${yB+5}M${X(xc)} ${yB-4}V${yB+4}" stroke="var(--ink)"/><text x="${X(xc)}" y="${yB-5}" text-anchor="middle">B = ${f(I.B)} m · núcleo B/3</text>`;
-  const L=[[I.NTopo,'topo do muro'],[R.Hg,I.NT>=I.NT2?'terreno interno':'terreno externo'],[I.NA,'assentamento'],[R.ytop,'topo sapata'],[I.Nf,'apoio']];
+  const L=[[I.NTopo,'topo do muro'],[R.Hg,I.NT>=I.NT2?'terreno interno':'terreno externo'],[NAe,R.cor?'topo do pescoço':'assentamento'],[R.ytop,'topo sapata'],[I.Nf,'apoio']];
   if(R.dh>1e-6)L.splice(2,0,[R.Lg,I.NT>=I.NT2?'terreno externo':'terreno interno']);
   // níveis: cotas iguais viram um só marcador
   {const G=[];L.forEach(([e,t])=>{const g=G.find(q=>Math.abs(q[0]-e)<0.015);if(g){if(!g[1].includes(t))g[1].push(t)}else G.push([e,[t]])});
    G.forEach(([e,ts])=>s+=lvl(18,Y(e),sgn(e),ts));}
   // legenda dos elementos (fora do desenho, para não sobrepor cargas)
   {const l1=`${R.Bl[1]}${R.arm?'':` · pilar ${f(R.bp,R.bp%1?1:0)}×${f(R.hp,0)}`} · ${R.arm?`parede de fundação ${f(R.bpe,0)} cm`:`pescoço ${f(R.bpe,0)}×${f(R.hpe,0)}`}`;
-   const zA=R.arm?Math.min(R.hA,R.ateA):0,l2=R.arm?`V1 Ø${f(R.phiA,1)} c/${f(R.espAd,0)} até ${sgn(I.NA+zA)}${I.v1Full==='toda'?' (acima, construtiva)':''}${R.enr?` · enrijecedor ${f(R.eenr,0)}×${f(R.tenr,0)} a cada ${f(R.lenr)} m (tracejado), ${R.E.nP}+${R.E.nN} ${phiTxt(R.E.phi)}`:''}`:'';
+   const zA=R.arm?Math.min(R.hA,R.ateA):0,l2=R.arm?`V1 Ø${f(R.phiA,1)} c/${f(R.espAd,0)} até ${sgn(NAe+zA)}${I.v1Full==='toda'?' (acima, construtiva)':''}${R.enr?` · enrijecedor ${f(R.eenr,0)}×${f(R.tenr,0)} a cada ${f(R.lenr)} m (tracejado), ${R.E.nP}+${R.E.nN} ${phiTxt(R.E.phi)}`:''}`:'';
    s+=`<text x="18" y="${yB+24}" class="t-muted" font-size="10">${l1}</text>`;
    l2.split(' · enrijecedor').forEach((t,i)=>{if(t)s+=`<text x="18" y="${yB+38+i*13}" class="t-st" font-size="10">${i?'enrijecedor'+t:t}</text>`});}
   s+=`<text x="${X(F1)-6}" y="${(Y(R.ytop)+Y(I.Nf))/2+4}" text-anchor="end" class="t-muted" font-size="10">hs ${f(I.hs)}</text>`;
@@ -920,7 +931,7 @@ function renderLoads(R){
 }
 function drawDiag(R){
   const top=48,bot=530,yMax=I.NTopo+0.2,yMin=I.Nf-0.1,sc=(bot-top)/(yMax-yMin),Y=e=>top+(yMax-e)*sc,D=R.D,s0=R.s;let s='';
-  const keys=[[I.NTopo,'topo'],[R.Hg,'terreno'],[I.NA,'NA'],[R.ytop,'topo sapata'],[I.Nf,'base']];
+  const keys=[[I.NTopo,'topo'],[R.Hg,'terreno'],[NAe,R.cor?'topo pescoço':'NA'],[R.ytop,'topo sapata'],[I.Nf,'base']];
   keys.forEach(([e,t])=>{s+=lvl(18,Y(e),sgn(e),t);s+=`<line x1="120" y1="${Y(e)}" x2="752" y2="${Y(e)}" stroke="var(--line)" stroke-dasharray="3 4"/>`});
   const un=R.arm?['CORTANTE (kN/m)','MOMENTO (kN·m/m)']:['CORTANTE NO PILAR (kN)','MOMENTO NO PILAR (kN·m)'];
   [[un[0],D.V,'var(--vcol)','t-v',190,260],[un[1],D.M,'var(--accent)','t-m',480,270]].forEach(([t,arr,col,tc,x0,pw])=>{let mx=0;arr.forEach(v=>mx=Math.max(mx,Math.abs(v*s0)));mx=mx||1;const sx=(pw-80)/mx,pts=[];
@@ -945,43 +956,43 @@ function drawVista(R){
   s+=`<rect x="${X(-half)-10}" y="${Y(R.Hg)}" width="${2*half*sc+20}" height="${Y(yBot)-Y(R.Hg)+8}" fill="var(--soilfill)"/><line x1="${X(-half)-10}" y1="${Y(R.Hg)}" x2="${X(half)+10}" y2="${Y(R.Hg)}" stroke="var(--soil)" stroke-width="1.4"/>`;
   // fundação
   if(R.arm||R.cor)s+=rect(-half,half,R.ytop,yBot,'var(--conc)','var(--concline)');
-  if(R.arm)s+=rect(-half,half,I.NA,R.ytop,'var(--conc)','var(--concline)');
+  if(R.arm)s+=rect(-half,half,NAe,R.ytop,'var(--conc)','var(--concline)');
   // alvenaria e cintas
-  const hc=I.hcs/100;s+=rect(-half,half,yTop-hc,I.NA,blk,blkL);s+=rect(-half,half,yTop,yTop-hc,'var(--conc)','var(--concline)');
-  if(R.cInt)s+=rect(-half,half,I.NA+R.h1+R.hcan,I.NA+R.h1,'var(--conc)','var(--concline)');
-  if(!R.arm&&!R.cor)s+=rect(-half,half,I.NA,I.NA-I.hci/100,'var(--conc)','var(--concline)');
+  const hc=I.hcs/100;s+=rect(-half,half,yTop-hc,NAe,blk,blkL);s+=rect(-half,half,yTop,yTop-hc,'var(--conc)','var(--concline)');
+  if(R.cInt)s+=rect(-half,half,R.yA+R.h1+R.hcan,R.yA+R.h1,'var(--conc)','var(--concline)');
+  if(!R.arm&&!R.cor)s+=rect(-half,half,NAe,NAe-I.hci/100,'var(--conc)','var(--concline)');
   // fiadas do pano
-  {const md=R.hcan;for(let e=I.NA+md;e<yTop-hc-1e-6;e+=md)s+=`<line x1="${X(-half)}" y1="${Y(e)}" x2="${X(half)}" y2="${Y(e)}" stroke="${blkL}" stroke-opacity=".35" stroke-width=".6"/>`}
+  {const md=R.hcan;for(let e=NAe+md;e<yTop-hc-1e-6;e+=md)s+=`<line x1="${X(-half)}" y1="${Y(e)}" x2="${X(half)}" y2="${Y(e)}" stroke="${blkL}" stroke-opacity=".35" stroke-width=".6"/>`}
   // alvenaria de embasamento: do fundo do baldrame ao topo da sapata corrida (altura varia com a altura do baldrame)
   if(R.cor&&R.hEmb>0){const eT=R.ytop+R.hEmb,eB=R.ytop,md=R.hcan;s+=rect(-half,half,eT,eB,blk,blkL);
     for(let e=eB+md;e<eT-1e-6;e+=md)s+=`<line x1="${X(-half)}" y1="${Y(e)}" x2="${X(half)}" y2="${Y(e)}" stroke="${blkL}" stroke-opacity=".6" stroke-width=".7"/>`;
     for(let k=0,e=eB;e<eT-1e-6;e+=md,k++){const cl=R.Bl[5]/100;for(let x=-half+(k%2?cl/2:0);x<half;x+=cl)s+=`<line x1="${X(x)}" y1="${Y(Math.min(eT,e+md))}" x2="${X(x)}" y2="${Y(e)}" stroke="${blkL}" stroke-opacity=".45" stroke-width=".6"/>`}
     s+=`<text x="${X(half)+6}" y="${Y((eT+eB)/2)+4}" font-size="10" text-anchor="start" class="t-muted">embasamento</text><text x="${X(half)+6}" y="${Y((eT+eB)/2)+16}" font-size="10" class="t-muted">h = ${f(R.hEmb)} m</text>`;}
-  if(R.arm&&R.canH)R.canH.forEach(z=>{s+=`<line x1="${X(-half)}" y1="${Y(I.NA+z)}" x2="${X(half)}" y2="${Y(I.NA+z)}" stroke="var(--accent)" stroke-width="1" stroke-dasharray="6 3"/>`});
+  if(R.arm&&R.canH)R.canH.forEach(z=>{s+=`<line x1="${X(-half)}" y1="${Y(NAe+z)}" x2="${X(half)}" y2="${Y(NAe+z)}" stroke="var(--accent)" stroke-width="1" stroke-dasharray="6 3"/>`});
   const xs=sup?[-sp,0,sp]:[];
-  xs.forEach(xc=>{if(!R.arm){s+=rect(xc-tw/2,xc+tw/2,yTop,I.NA,'var(--conc)','var(--concline)');s+=rect(xc-R.hpe/200,xc+R.hpe/200,I.NA,R.ytop,'var(--conc)','var(--concline)');if(R.iso)s+=rect(xc-I.L/2,xc+I.L/2,R.ytop,yBot,'var(--conc)','var(--concline)')}
-    else{s+=rect(xc-tw/2,xc+tw/2,yTop,I.NA,'#c9c2b6',blkL);s+=rect(xc-tw/2,xc+tw/2,I.NA,R.ytop,'var(--conc)','var(--concline)')}});
+  xs.forEach(xc=>{if(!R.arm){s+=rect(xc-tw/2,xc+tw/2,yTop,NAe,'var(--conc)','var(--concline)');s+=rect(xc-R.hpe/200,xc+R.hpe/200,NAe,R.ytop,'var(--conc)','var(--concline)');if(R.iso)s+=rect(xc-I.L/2,xc+I.L/2,R.ytop,yBot,'var(--conc)','var(--concline)')}
+    else{s+=rect(xc-tw/2,xc+tw/2,yTop,NAe,'#c9c2b6',blkL);s+=rect(xc-tw/2,xc+tw/2,NAe,R.ytop,'var(--conc)','var(--concline)')}});
   // faixa de influência do apoio central
-  const fb=sup?sp:1.0,yMid=(Y(yTop)+Y(I.NA))/2;
+  const fb=sup?sp:1.0,yMid=(Y(yTop)+Y(NAe))/2;
   s+=`<rect x="${X(-fb/2)}" y="${Y(yTop)-6}" width="${fb*sc}" height="${Y(R.ytop)-Y(yTop)+6}" fill="var(--accent)" fill-opacity=".08" stroke="var(--accent)" stroke-dasharray="6 4"/>`;
   s+=`<line x1="${X(-fb/2)}" y1="${Y(yTop)-16}" x2="${X(fb/2)}" y2="${Y(yTop)-16}" stroke="var(--accent)"/><path d="M${X(-fb/2)} ${Y(yTop)-21}V${Y(yTop)-11}M${X(fb/2)} ${Y(yTop)-21}V${Y(yTop)-11}" stroke="var(--accent)"/>`;
   s+=`<text x="${x0}" y="${Y(yTop)-26}" text-anchor="middle" class="t-m">${sup?`faixa do ${R.arm?'enrijecedor':'pilar'} típico: ${f(fb)} m (${f(fb/2)} m para cada lado)`:'faixa de cálculo: 1,00 m de muro'}</text>`;
   if(sup){
     const lp=!R.arm?R.lp:R.lpE,wd=R.wd||1.4*R.pv,Rh=(R.pv*lp/2);
     // reação horizontal dos panos nos apoios, setas do meio dos panos para o apoio central
-    [[-1,'esq'],[1,'dir']].forEach(([sg])=>{const xm=X(sg*sp/2),xa=X(sg*tw/2)+sg*4;for(const fr of [0.3,0.55,0.8]){const y=Y(I.NA+fr*(yTop-hc-I.NA));s+=ar(xm,y,xa,y,'var(--accent)')}});
-    s+=`<text x="${X(sp/2)}" y="${Y(I.NA+0.92*(yTop-hc-I.NA))}" text-anchor="middle" class="t-m" font-size="10">reação do pano no apoio ≈ pv·ℓ/2</text><text x="${X(sp/2)}" y="${Y(I.NA+0.92*(yTop-hc-I.NA))+13}" text-anchor="middle" class="t-m" font-size="10">= ${f(Rh,2)} kN/m de altura (cada lado)</text>`;
+    [[-1,'esq'],[1,'dir']].forEach(([sg])=>{const xm=X(sg*sp/2),xa=X(sg*tw/2)+sg*4;for(const fr of [0.3,0.55,0.8]){const y=Y(R.yA+fr*(yTop-hc-R.yA));s+=ar(xm,y,xa,y,'var(--accent)')}});
+    s+=`<text x="${X(sp/2)}" y="${Y(R.yA+0.92*(yTop-hc-R.yA))}" text-anchor="middle" class="t-m" font-size="10">reação do pano no apoio ≈ pv·ℓ/2</text><text x="${X(sp/2)}" y="${Y(R.yA+0.92*(yTop-hc-R.yA))+13}" text-anchor="middle" class="t-m" font-size="10">= ${f(Rh,2)} kN/m de altura (cada lado)</text>`;
     // parcela vertical: para a cinta superior/baldrame (pilares) ou base (enrijecedores)
-    if(!R.arm){const xl=X(-0.72*sp);for(const fr of [0.15,0.85]){const y1=Y(I.NA+(0.5+(fr-0.5)*0.4)*(yTop-hc-I.NA)),y2=fr>0.5?Y(yTop-hc)+3:Y(I.NA)-3;s+=ar(xl,y1,xl,y2,'var(--vcol)')}
+    if(!R.arm){const xl=X(-0.72*sp);for(const fr of [0.15,0.85]){const y1=Y(NAe+(0.5+(fr-0.5)*0.4)*(yTop-hc-NAe)),y2=fr>0.5?Y(yTop-hc)+3:Y(NAe)-3;s+=ar(xl,y1,xl,y2,'var(--vcol)')}
       s+=`<text x="${xl}" y="${yMid+4}" text-anchor="middle" class="t-v" font-size="10">parcela vertical</text>`;
       if(!R.topoLivre)s+=`<text x="16" y="${Y(yTop)-48}" class="t-v" font-size="10">cinta superior: qh = ${f(R.BS.q,2)} kN/m → ${f(R.BS.q*R.s,2)} kN no pilar</text>`;
-      if(R.CI)s+=`<text x="${X(half)+4}" y="${Y(I.NA+R.zCi)+4}" class="t-v" font-size="10" text-anchor="end">cinta intermediária: ${f(R.CI.q,2)} kN/m</text>`;}
+      if(R.CI)s+=`<text x="${X(half)+4}" y="${Y(R.yA+R.zCi)+4}" class="t-v" font-size="10" text-anchor="end">cinta intermediária: ${f(R.CI.q,2)} kN/m</text>`;}
     // apoio central: esforços totais
-    const Vna=R.at(R.D.V,I.NA)*(R.arm?R.lenr:1)*(R.arm?1:R.s),Mna=R.at(R.D.M,I.NA)*(R.arm?R.lenr:1)*(R.arm?1:R.s);
-    s+=`<text x="${x0}" y="${Y(yBot)+22}" text-anchor="middle" class="t-title" font-size="12">${R.arm?'Enrijecedor':'Pilar'} típico no NA: V = ${f(Vna,2)} kN · M = ${f(Mna,2)} kN·m (característicos)</text>`;
+    const Vna=R.at(R.D.V,NAe)*(R.arm?R.lenr:1)*(R.arm?1:R.s),Mna=R.at(R.D.M,NAe)*(R.arm?R.lenr:1)*(R.arm?1:R.s);
+    s+=`<text x="${x0}" y="${Y(yBot)+22}" text-anchor="middle" class="t-title" font-size="12">${R.arm?'Enrijecedor':'Pilar'} típico no ${R.cor?'topo do pescoço':'NA'}: V = ${f(Vna,2)} kN · M = ${f(Mna,2)} kN·m (característicos)</text>`;
   }else{
-    for(const fr of [0.25,0.5,0.75]){const y=Y(I.NA+fr*(yTop-hc-I.NA));s+=ar(x0,y,x0,Y(I.NA)-3,'var(--vcol)')}
-    s+=`<text x="${x0}" y="${Y(yBot)+22}" text-anchor="middle" class="t-title" font-size="12">Muro contínuo: cada faixa de 1 m trabalha em balanço vertical · M(NA) = ${f(R.at(R.D.M,I.NA),2)} kN·m/m</text>`;
+    for(const fr of [0.25,0.5,0.75]){const y=Y(R.yA+fr*(yTop-hc-R.yA));s+=ar(x0,y,x0,Y(R.yA)-3,'var(--vcol)')}
+    s+=`<text x="${x0}" y="${Y(yBot)+22}" text-anchor="middle" class="t-title" font-size="12">Muro contínuo: cada faixa de 1 m trabalha em balanço vertical · M(NA) = ${f(R.at(R.D.M,NAe),2)} kN·m/m</text>`;
   }
   // planta
   const py=Y(yBot)+92,pw=Math.max(8,R.t/100*sc*2.2),web=R.enr?Math.max(10,(R.tenr-R.t)/100*sc):(!R.arm?Math.max(0,R.bp/100*sc*2.2-pw):0),pb=py+pw+web;
@@ -1008,7 +1019,7 @@ function drawVista(R){
   $('vistaSub').textContent=sup?`Panos vizinhos inteiros (${R.arm?'enrijecedores':'pilares'} a cada ${f(sp)} m) · caminho das cargas horizontais: pano → apoios → fundação`:'Por metro de muro';
 }
 function renderSec(R){
-  const rows=[['Nível do terreno',R.Hg],['Assentamento (NA)',I.NA],['Topo da sapata',R.ytop],['Base da sapata',I.Nf]];
+  const rows=[['Nível do terreno',R.Hg],[R.cor?'Topo do pescoço':'Assentamento (NA)',NAe],['Topo da sapata',R.ytop],['Base da sapata',I.Nf]];
   $('tabSec').innerHTML=`<tr><th>Seção</th><th>Cota (m)</th><th>V (kN/m)</th><th>M (kN·m/m)</th>${R.arm?'':'<th>V pilar (kN)</th><th>M pilar (kN·m)</th>'}</tr>`+
    rows.map(([n,y])=>{const v=R.at(R.D.V,y),m=R.at(R.D.M,y);return `<tr><td>${n}</td><td>${sgn(y)}</td><td>${f(v)}</td><td>${f(m)}</td>${R.arm?'':`<td>${f(v*R.s)}</td><td>${f(m*R.s)}</td>`}</tr>`}).join('');
   $('baseSub').textContent=R.arm?'Por metro de sapata corrida, em relação ao centro':R.cor?`Por pilar: trecho de ${f(R.s)} m de sapata corrida`:'Por pilar, em relação ao centro da sapata';
@@ -1030,9 +1041,9 @@ function renderSec(R){
    <tr><td>Cunha de arrancamento (só no tombamento)</td><td>${f(R.Wc,1)}</td><td class="txt">β = ${f(I.beta,0)}°, solo de ${f(R.Hs)} m sobre a sapata</td></tr>`;
   if(R.arm){$('beamI').innerHTML='<p class="note">Apoio contínuo sobre a sapata corrida: o baldrame vira parede de fundação, sem flexão no vão. Armadura construtiva.</p>';$('bISub').textContent='';
     $('beamS').innerHTML=`<p class="note">Verga de topo de amarração (canaleta grauteada), ${f(I.bws,0)} × ${f(I.hcs,0)} cm, com 2 Ø${f(I.phv,1)}. Sem pilares, não recebe reação concentrada.</p>`;$('bSSub').textContent='';}
-  else if(R.cor){$('beamI').innerHTML=`<p class="note">Sapata corrida: não há baldrame. A alvenaria apoia direto na sapata (embasamento de ${f(R.hEmb)} m do topo da sapata ao NA) e o peso do muro, ${f(R.qv,2)} kN/m + embasamento, vai para a sapata corrida, dimensionada como viga contínua entre pilares.</p>`;$('beamS').innerHTML=beamSvg(R.qh,'qh',R.s);$('bISub').textContent='';$('bSSub').textContent=R.cInt?'Vento da metade do painel superior':'Vento da metade superior do pano'}
-  else{$('beamI').innerHTML=beamSvg(R.qv,'q',R.s);$('beamS').innerHTML=beamSvg(R.qh,'qh',R.s);$('bISub').textContent='Peso do muro, vão = espaçamento';$('bSSub').textContent=R.cInt?'Vento da metade do painel superior':'Vento da metade superior do pano'}
-  $('beamCPanel').hidden=!R.CI;if(R.CI){$('beamC').innerHTML=beamSvg(R.CI.q,'qci',R.s);$('bCSub').textContent='Vento da metade de cada painel vizinho'}
+  else if(R.cor){$('beamI').innerHTML=`<p class="note">Sapata corrida: não há baldrame. A alvenaria apoia direto na sapata (o pano vai do topo da sapata à cinta superior, ${f(R.Halv)} m) e o peso do muro, ${f(R.qv,2)} kN/m, vai para a sapata corrida, dimensionada como viga contínua entre pilares.</p>`;$('beamS').innerHTML=beamSvg(R.qh,'qh',R.s);$('bISub').textContent='';$('bSSub').textContent='Reação no topo do pano (faixa vertical biapoiada)'}
+  else{$('beamI').innerHTML=beamSvg(R.qv,'q',R.s);$('beamS').innerHTML=beamSvg(R.qh,'qh',R.s);$('bISub').textContent='Peso do muro, vão = espaçamento';$('bSSub').textContent='Reação no topo do pano (faixa vertical biapoiada)'}
+  $('beamCPanel').hidden=!R.CI;if(R.CI){$('beamC').innerHTML=beamSvg(R.CI.q,'qci',R.s);$('bCSub').textContent='Reação do painel inferior + do superior'}
 }
 function beamSvg(q,qlab,sp){
   const x1=40,x2=400,len=x2-x1,Vm=q*sp/2,Mm=q*sp*sp/8;let o=`<svg viewBox="0 0 440 250" role="img" aria-label="Diagramas da viga">`;
@@ -1064,13 +1075,13 @@ function renderChecks(R){
   if(!R.arm){
     $('alvSub').textContent=`Pano de vedação apoiado nos pilares, ${R.cor?'no embasamento':'no baldrame'}${R.cInt?', na cinta intermediária':''}${R.topoLivre?' (topo livre)':' e na cinta superior'}`;
     $('tabAlv').innerHTML=`<tr><th>Verificação</th><th>Valor</th><th>Limite</th><th>Critério</th><th></th></tr>
-     <tr><td>Esbeltez do pano h/t</td><td>${f(R.lamPano,1)}</td><td>24</td><td class="txt">${R.cInt?`maior painel entre ${R.cor?'NA':'baldrame'}, cinta intermediária e cinta superior`:`altura livre entre ${R.cor?'NA':'baldrame'} e cinta`} / espessura do bloco</td><td>${pill(R.lamPanoOk)}</td></tr>
+     <tr><td>Esbeltez do pano h/t</td><td>${f(R.lamPano,1)}</td><td>24</td><td class="txt">${R.cInt?`maior painel entre ${R.cor?'sapata':'baldrame'}, cinta intermediária e cinta superior`:`altura livre entre ${R.cor?'sapata':'baldrame'} e cinta`} / espessura do bloco</td><td>${pill(R.lamPanoOk)}</td></tr>
      ${R.panels.map(P=>`<tr><td>${P.lab}: coeficientes (Anexo E)</td><td>βf ${f(P.betaF,4)}</td><td>–</td><td class="txt">${P.livre?'laterais e base apoiadas, topo livre':'apoiado nos 4 lados'}; ℓ = ${f(R.lp)} m, h = ${f(P.h)} m, h/ℓ = ${f(P.hl,2)}${P.hlFora?' (fora da tabela: valor do extremo)':''}; μ = (${f(R.ftdN/1000,3)} + ${f(P.PfAe/1000,3)})/${f(R.ftdP/1000,3)} = ${f(P.mu,3)} (Tabela E.1, interpolada)</td><td></td></tr>
-     <tr><td>${P.lab}: flexão horizontal (paralela à fiada)</td><td>${f(P.sigPar/1000,3)} MPa</td><td>${f(R.ftdP/1000,3)} MPa</td><td class="txt">Md,paralelo = βf·wd·ℓ² = ${f(P.MdPar,3)} kN·m/m; wd = 1,4·pv = ${f(R.wd,2)} kN/m²</td><td>${pill(P.sigPar<=R.ftdP+1e-9)}</td></tr>
+     <tr><td>${P.lab}: flexão horizontal (paralela à fiada)</td><td>${f(P.sigPar/1000,3)} MPa</td><td>${f(R.ftdP/1000,3)} MPa</td><td class="txt">Md,paralelo = βf·wd·ℓ² = ${f(P.MdPar,3)} kN·m/m; wd = 1,4·p,máx = ${f(P.wd,2)} kN/m²</td><td>${pill(P.sigPar<=R.ftdP+1e-9)}</td></tr>
      <tr><td>${P.lab}: flexão vertical (normal à fiada)</td><td>${f(P.sigNor/1000,3)} MPa</td><td>${f(P.ftdNef/1000,3)} MPa</td><td class="txt">Md,normal = μ·Md,paralelo = ${f(P.MdNor,3)} kN·m/m; limite ftd,normal + Pf/Ae</td><td>${pill(P.sigNor<=P.ftdNef+1e-9)}</td></tr>
      <tr><td>${P.lab}: dimensões-limite</td><td>${f(P.h*R.lp,2)} m²</td><td>${f(P.limA,2)} m²</td><td class="txt">h × ℓ ≤ ${P.livre?'1 350':'2 025'}·t² e h, ℓ ≤ 50t = ${f(R.lim50,2)} m (Anexo E, E.4.1)</td><td>${pill(P.limE)}</td></tr>`).join('')}
      ${!R.topoLivre?`<tr><td>Rigidez da cinta superior</td><td>${f(R.BS.u,2)} cm</td><td>${f(R.BS.uLim,2)} cm</td><td class="txt">flecha característica deitada (vão s = ${f(R.s)} m, qh = ${f(R.BS.q,2)} kN/m, 0,5·Ecs·I); limite L/500 e 1 cm para servir de apoio ao pano (NBR 6118, Tabela 13.3)</td><td>${pill(R.BS.uOk)}</td></tr>`:''}
-     ${R.cInt?`<tr><td>Rigidez da cinta intermediária</td><td>${f(R.CI.u,2)} cm</td><td>${f(R.CI.uLim,2)} cm</td><td class="txt">canaleta ${f(R.Bl[6],0)} × ${f(R.t,0)} cm a ${f(R.zCi,2)} m acima do assentamento; q = pv·(h1 + h2)/2 = ${f(R.CI.q,2)} kN/m</td><td>${pill(R.CI.uOk)}</td></tr>`:''}
+     ${R.cInt?`<tr><td>Rigidez da cinta intermediária</td><td>${f(R.CI.u,2)} cm</td><td>${f(R.CI.uLim,2)} cm</td><td class="txt">canaleta ${f(R.Bl[6],0)} × ${f(R.t,0)} cm a ${f(R.zCi,2)} m acima da base do pano; q = reação do painel inferior + do superior = ${f(R.qci,2)} kN/m</td><td>${pill(R.CI.uOk)}</td></tr>`:''}
      <tr><td>Ligação pano–pilar</td><td>${f(R.LG.Vd,2)} kN/m</td><td>–</td><td class="txt">reação de cálculo na junta com o pilar, Vd = wd·ℓ/2; a junta bloco–concreto não tem amarração: ferro-cabelo ou tela a cada ${f(R.LG.sl*100,0)} cm (2 fiadas), Fd = ${f(R.LG.Fd,2)} kN por ponto, As ≥ ${f(R.LG.As,3)} cm² (ver N14). Na junta argamassada τd = ${f(R.LG.tau/1000,3)} MPa ${R.LG.tauOk?'≤':'>'} fvd = ${f(R.LG.fvd/1000,3)} MPa</td><td>${pill(R.LG.tauOk?true:'warn')}</td></tr>
      <tr><td>Esbeltez do pilar λ</td><td>${f(R.P1.lam,0)}</td><td>140</td><td class="txt">balanço único pilar + pescoço, le = 2 × ${f(Math.max(0,I.NTopo-R.ytop))} m; ν = ${f(R.P1.nu,3)}; amplificação de 2ª ordem ${f(R.P1.amp,3)}</td><td>${pill(R.P1.lamOk)}</td></tr>
      <tr><td>Coeficiente γn do pilar</td><td>${f(R.P1.gn,2)}</td><td>–</td><td class="txt">menor dimensão ${f(Math.min(R.bp,R.hp),0)} cm; γn = 1,95 − 0,05·b para b &lt; 19 cm (NBR 6118, 13.2.3)</td><td>${pill(R.P1.bminOk)}</td></tr>
@@ -1145,7 +1156,7 @@ function renderChecks(R){
     obs.push(`Terço inferior do pano: armadura de junta (treliça ou fios, Ø ≤ 6,3 mm – NBR 16868-1, 12.4) a cada 2 fiadas, ancorada nos pilares (N16). É reforço construtivo contra fissuração e impacto onde os esforços são maiores; não entra no cálculo do pano.`);
     if(!R.topoLivre&&!R.BS.uOk)obs.push('Cinta superior flexível demais para servir de apoio ao pano: aumente a altura da cinta, reduza o espaçamento entre pilares ou calcule com o topo livre.');
     if(R.CI&&!R.CI.uOk)obs.push('Cinta intermediária flexível demais: reduza o espaçamento entre pilares ou use bloco mais espesso.');
-    if(R.cInt)obs.push(`Cinta intermediária: canaleta na fiada a ${f(R.zCi,2)} m acima do assentamento, grauteada com o mesmo concreto dos pilares e com as barras N15 ancoradas nos pilares (traspasse ou dobra dentro do pilar).`);
+    if(R.cInt)obs.push(`Cinta intermediária: canaleta na fiada a ${f(R.zCi,2)} m acima da base do pano, grauteada com o mesmo concreto dos pilares e com as barras N15 ancoradas nos pilares (traspasse ou dobra dentro do pilar).`);
   }else{
     if(!R.espOk&&isFinite(R.xi))obs.push(`Espaçamento calculado (${f(R.espA,1)} cm) menor que o módulo dos furos: use vergalhão de diâmetro maior.`);
     else if(!R.xiOk)obs.push('Alvenaria armada sem capacidade à flexão: use bloco mais espesso ou maior fbk.');
@@ -1239,9 +1250,9 @@ function detRows(R,D){
     {const a14=D.N14.n*area(D.N14.phi);rows.push({id:'N14',el:'Ligação pano–pilar',pos:`Ferro-cabelo ou tela na junta, a cada ${f(R.LG.sl*100,0)} cm (2 fiadas), em cada lado do pilar`,mode:'n',req:`${f(R.LG.As,3)} cm² por ponto`,ad:`${f(a14,3)} cm²`,ok:a14>=R.LG.As-1e-9})}
     rows.push({id:'N12',el:'Cinta superior',pos:'Estribos',mode:'s',req:`s ≤ ${R.BS.sp} cm`,ad:`${phiTxt(D.N12.phi)} c/${D.N12.s}`,ok:D.N12.s<=R.BS.sp&&D.N12.phi>=5});
     if(R.CI){const a15=D.N15.n*area(D.N15.phi),o8=R.ok8(2*D.N15.n,D.N15.phi,R.Acan);
-      rows.push({id:'N15',el:'Cinta intermediária',pos:`Canaleta grauteada a ${f(R.zCi,2)} m acima do NA, por face, ancorada nos pilares`,mode:'n',req:`${f(R.CI.Asf)} cm²`,ad:`${f(a15)} cm²`,ok:R.CI.ok&&a15>=R.CI.Asf-1e-6&&o8,note:o8?'':'aço acima de 8% do graute da canaleta (NBR 16868-1, 12.3)',lap:lapLen(D.N15.phi)})}
+      rows.push({id:'N15',el:'Cinta intermediária',pos:`Canaleta grauteada a ${f(R.zCi,2)} m acima da base do pano, por face, ancorada nos pilares`,mode:'n',req:`${f(R.CI.Asf)} cm²`,ad:`${f(a15)} cm²`,ok:R.CI.ok&&a15>=R.CI.Asf-1e-6&&o8,note:o8?'':'aço acima de 8% do graute da canaleta (NBR 16868-1, 12.3)',lap:lapLen(D.N15.phi)})}
     {const ok16=D.N16.phi<=6.3+1e-9&&D.N16.s%20===0&&D.N16.s<=60;
-     rows.push({id:'N16',el:'Pano – terço inferior',pos:`Armadura de junta (treliça ou 2 fios) a cada ${D.N16.s} cm, até ${f((R.cInt?R.h1:R.Halv)/3,2)} m acima do NA, ancorada nos pilares`,mode:'s',req:'construtiva · Ø ≤ 6,3 mm',ad:`${phiTxt(D.N16.phi)} c/${D.N16.s}`,ok:ok16,note:ok16?'':'em junta de assentamento Ø ≤ 6,3 mm (NBR 16868-1, 12.4), a cada 1 a 3 fiadas'})}
+     rows.push({id:'N16',el:'Pano – terço inferior',pos:`Armadura de junta (treliça ou 2 fios) a cada ${D.N16.s} cm, até ${f((R.cInt?R.h1:R.Halv)/3,2)} m acima ${R.cor?'do topo da sapata':'do NA'}, ancorada nos pilares`,mode:'s',req:'construtiva · Ø ≤ 6,3 mm',ad:`${phiTxt(D.N16.phi)} c/${D.N16.s}`,ok:ok16,note:ok16?'':'em junta de assentamento Ø ≤ 6,3 mm (NBR 16868-1, 12.4), a cada 1 a 3 fiadas'})}
   }else{
     const asv=AsS(D.V1.phi,D.V1.s),modOk=D.V1.s%R.mod===0&&D.V1.s<=6*R.t;
     const o8v=R.ok8(1,D.V1.phi,R.Agr);
@@ -1296,47 +1307,47 @@ function detSvg(R,D){
   o.push(`<rect x="${X(Math.min(R.fx0,0)-0.3).toFixed(1)}" y="${Y(I.NT).toFixed(1)}" width="${((I.B+0.6)*sc).toFixed(1)}" height="${(Y(yMin)-Y(I.NT)).toFixed(1)}" fill="${soilc}"/>`);
   Ln(X(Math.min(R.fx0,0)-0.3),Y(I.NT),X(R.fx0+I.B+0.3),Y(I.NT),soill,1.6);
   const bp=R.bp/100,bpe=R.bpe/100,ytop=R.ytop,hs=I.hs,B=I.B,F0=R.fx0,P0=R.px0,c=I.cob/100,ct=c+I.pht/1000,cs=0.05,t=R.t/100;
-  Rc(X(F0),Y(ytop),B*sc,hs*sc); Rc(X(P0),Y(I.NA),bpe*sc,(I.NA-ytop)*sc);
-  if(R.cor&&R.hEmb>0){Rc(X(0),Y(I.NA),t*sc,(I.NA-ytop)*sc,'#efe9df','#8a7d6b',1);for(let v=ytop+R.hcan;v<I.NA-1e-6;v+=R.hcan)Ln(X(0),Y(v),X(t),Y(v),'#8a7d6b',.7);
-    o.push(`<rect x="${X(P0).toFixed(1)}" y="${Y(I.NA).toFixed(1)}" width="${(bpe*sc).toFixed(1)}" height="${((I.NA-ytop)*sc).toFixed(1)}" fill="none" stroke="${concl}" stroke-width="1.2" stroke-dasharray="6 3"/>`);}
-  if(R.arm){Rc(X(0),Y(I.NTopo-I.hcs/100),t*sc,(I.NTopo-I.hcs/100-I.NA)*sc,'#efe9df','#8a7d6b');Rc(X(0),Y(I.NTopo),t*sc,I.hcs/100*sc)}
-  else Rc(X(0),Y(I.NTopo),bp*sc,(I.NTopo-I.NA)*sc);
+  Rc(X(F0),Y(ytop),B*sc,hs*sc); Rc(X(P0),Y(NAe),bpe*sc,(NAe-ytop)*sc);
+  if(R.cor&&R.hEmb>0){Rc(X(0),Y(NAe),t*sc,(NAe-ytop)*sc,'#efe9df','#8a7d6b',1);for(let v=ytop+R.hcan;v<NAe-1e-6;v+=R.hcan)Ln(X(0),Y(v),X(t),Y(v),'#8a7d6b',.7);
+    o.push(`<rect x="${X(P0).toFixed(1)}" y="${Y(NAe).toFixed(1)}" width="${(bpe*sc).toFixed(1)}" height="${((NAe-ytop)*sc).toFixed(1)}" fill="none" stroke="${concl}" stroke-width="1.2" stroke-dasharray="6 3"/>`);}
+  if(R.arm){Rc(X(0),Y(I.NTopo-I.hcs/100),t*sc,(I.NTopo-I.hcs/100-NAe)*sc,'#efe9df','#8a7d6b');Rc(X(0),Y(I.NTopo),t*sc,I.hcs/100*sc)}
+  else Rc(X(0),Y(I.NTopo),bp*sc,(I.NTopo-NAe)*sc);
   if(!R.cen){Ln(X(0),Y(yMax)-10,X(0),Y(yMin)+10,dv,1.2,'12 4 3 4');T(X(0)-6,Y(yMax)+4,'DIVISA',12,'end',dv,'bold')}
   const ybot=Y(I.Nf+cs+0.012),hook=0.30;
   if(!R.arm){
     const n1=D.N1,n2=D.N2,lpO=lapLen(Math.max(n1.phi,n2.phi)),lp=lpO.L,xa1=X(ct+n1.phi/2000),xa2=X(bp-ct-n1.phi/2000);
-    [xa1,xa2].forEach(xa=>{Pp(`M${xa.toFixed(1)} ${(Y(I.NTopo-c)+14).toFixed(1)} L${xa.toFixed(1)} ${Y(I.NA).toFixed(1)}`);Pp(`M${xa.toFixed(1)} ${(Y(I.NTopo-c)+14).toFixed(1)} q0 -12 10 -12`)});
-    [xa1,xa2].forEach(xa=>Pp(`M${(xa+hook*sc).toFixed(1)} ${ybot.toFixed(1)} L${xa.toFixed(1)} ${ybot.toFixed(1)} L${xa.toFixed(1)} ${Y(I.NA+lp).toFixed(1)}`,st2));
+    [xa1,xa2].forEach(xa=>{Pp(`M${xa.toFixed(1)} ${(Y(I.NTopo-c)+14).toFixed(1)} L${xa.toFixed(1)} ${Y(NAe).toFixed(1)}`);Pp(`M${xa.toFixed(1)} ${(Y(I.NTopo-c)+14).toFixed(1)} q0 -12 10 -12`)});
+    [xa1,xa2].forEach(xa=>Pp(`M${(xa+hook*sc).toFixed(1)} ${ybot.toFixed(1)} L${xa.toFixed(1)} ${ybot.toFixed(1)} L${xa.toFixed(1)} ${Y(NAe+lp).toFixed(1)}`,st2));
     const xc2=X(P0+bpe-ct-D.N2a.phi/2000);
-    if(bpe>bp+0.02)Pp(`M${(xc2+hook*sc).toFixed(1)} ${ybot.toFixed(1)} L${xc2.toFixed(1)} ${ybot.toFixed(1)} L${xc2.toFixed(1)} ${Y(I.NA+c).toFixed(1)} L${(xc2-0.12*sc).toFixed(1)} ${Y(I.NA+c).toFixed(1)}`,st3,2.4);
-    for(let v=I.NTopo-0.05;v>I.NA+0.02;v-=D.N3.s/100)Ln(X(0.012),Y(v),X(bp-0.012),Y(v),stir,1.4);
-    for(let v=I.NA-0.05;v>ytop+0.03;v-=D.N4.s/100)Ln(X(P0+0.012),Y(v),X(P0+bpe-0.012),Y(v),stir,1.4);
+    if(bpe>bp+0.02)Pp(`M${(xc2+hook*sc).toFixed(1)} ${ybot.toFixed(1)} L${xc2.toFixed(1)} ${ybot.toFixed(1)} L${xc2.toFixed(1)} ${Y(NAe+c).toFixed(1)} L${(xc2-0.12*sc).toFixed(1)} ${Y(NAe+c).toFixed(1)}`,st3,2.4);
+    for(let v=I.NTopo-0.05;v>NAe+0.02;v-=D.N3.s/100)Ln(X(0.012),Y(v),X(bp-0.012),Y(v),stir,1.4);
+    for(let v=NAe-0.05;v>ytop+0.03;v-=D.N4.s/100)Ln(X(P0+0.012),Y(v),X(P0+bpe-0.012),Y(v),stir,1.4);
     T(X(bp)+14,Y(I.NTopo)+12,'cinta superior (ver seção D)',11,'start',mut);
     T(X(bp)+14,Y(I.NTopo)+30,`N1 – ${detText('N1',D)} por face (2 faces)`,13,'start',steel,'bold');
     T(X(bp)+14,Y(I.NTopo)+48,`estribos N3 – ${detText('N3',D)}`,13,'start',stir);
-    if(R.CI){const yc=Y(I.NA+R.zCi);o.push(`<rect x="${X(0).toFixed(1)}" y="${Y(I.NA+R.h1+R.hcan).toFixed(1)}" width="${(t*sc).toFixed(1)}" height="${(R.hcan*sc).toFixed(1)}" fill="none" stroke="${ink}" stroke-width="1" stroke-dasharray="5 3"/>`);
+    if(R.CI){const yc=Y(R.yA+R.zCi);o.push(`<rect x="${X(0).toFixed(1)}" y="${Y(R.yA+R.h1+R.hcan).toFixed(1)}" width="${(t*sc).toFixed(1)}" height="${(R.hcan*sc).toFixed(1)}" fill="none" stroke="${ink}" stroke-width="1" stroke-dasharray="5 3"/>`);
       T(X(bp)+14,yc+4,`N15 – cinta intermediária ${detText('N15',D)} por face, ancorada no pilar (tracejado: canaleta fora do corte)`,12,'start',steel,'bold');}
-    T(X(bp)+14,Y(I.NA+Math.min(0.4,(R.cInt?R.h1:R.Halv)/3))+4,`N16 – treliça ${detText('N16',D)} no terço inferior do pano, ancorada no pilar`,12,'start',steel);
-    T(X(Math.max(bp,P0+bpe))+14,Y(I.NA)-6,R.cor?'sem baldrame: alvenaria apoiada na sapata corrida':'baldrame (ver seção C), cruza o pescoço',11,'start',mut);
-    T(X(Math.max(bp,P0+bpe))+14,Y(I.NA)+18,`N2 – pescoço/esperas, ${detText('N2',D)} por face`,13,'start',st2,'bold');
-    T(X(Math.max(bp,P0+bpe))+14,Y(I.NA)+36,`traspasse com N1: ${f(lp,2)} m acima do NA${lpO.calc?' (calculado, Ø ≥ 16)':''}`,12,'start',mut);
-    if(bpe>bp+0.02)T(X(Math.max(bp,P0+bpe))+14,Y(I.NA)+54,`N2a – face interna do pescoço, ${detText('N2a',D)}`,13,'start',st3,'bold');
-    T(X(Math.max(bp,P0+bpe))+14,Y(I.NA)+72,`estribos N4 – ${detText('N4',D)}`,13,'start',stir);
+    T(X(bp)+14,Y(R.yA+Math.min(0.4,(R.cInt?R.h1:R.Halv)/3))+4,`N16 – treliça ${detText('N16',D)} no terço inferior do pano, ancorada no pilar`,12,'start',steel);
+    T(X(Math.max(bp,P0+bpe))+14,Y(NAe)-6,R.cor?'sem baldrame: alvenaria apoiada na sapata corrida':'baldrame (ver seção C), cruza o pescoço',11,'start',mut);
+    T(X(Math.max(bp,P0+bpe))+14,Y(NAe)+18,`N2 – pescoço/esperas, ${detText('N2',D)} por face`,13,'start',st2,'bold');
+    T(X(Math.max(bp,P0+bpe))+14,Y(NAe)+36,`traspasse com N1: ${f(lp,2)} m acima ${R.cor?'do topo do pescoço':'do NA'}${lpO.calc?' (calculado, Ø ≥ 16)':''}`,12,'start',mut);
+    if(bpe>bp+0.02)T(X(Math.max(bp,P0+bpe))+14,Y(NAe)+54,`N2a – face interna do pescoço, ${detText('N2a',D)}`,13,'start',st3,'bold');
+    T(X(Math.max(bp,P0+bpe))+14,Y(NAe)+72,`estribos N4 – ${detText('N4',D)}`,13,'start',stir);
   }else{
     const v=D.V1,lp=lapLen(v.phi).L,xm=X(t/2),xw=X(R.px0+bpe/2);
-    Pp(`M${(xw+hook*sc).toFixed(1)} ${ybot.toFixed(1)} L${xw.toFixed(1)} ${ybot.toFixed(1)} L${xw.toFixed(1)} ${Y(I.NA+lp).toFixed(1)}`,st2);
+    Pp(`M${(xw+hook*sc).toFixed(1)} ${ybot.toFixed(1)} L${xw.toFixed(1)} ${ybot.toFixed(1)} L${xw.toFixed(1)} ${Y(NAe+lp).toFixed(1)}`,st2);
     const zV=I.v1Full==='toda'?R.hT:Math.max(R.ateA,lp);
-    o.push(`<rect x="${(xm-6).toFixed(1)}" y="${Y(I.NA+zV).toFixed(1)}" width="12" height="${(zV*sc).toFixed(1)}" fill="#c9c2b6"/>`);
-    Pp(`M${xm.toFixed(1)} ${Y(I.NA+0.05).toFixed(1)} L${xm.toFixed(1)} ${Y(I.NA+zV).toFixed(1)}`);
-    R.canH.forEach(z=>{Rc(X(0),Y(I.NA+z+R.hcan/2),t*sc,R.hcan*sc,'#d8d2c6','#8a7d6b',.8);Cc(xm,Y(I.NA+z),3.6,stir)});
-    T(X(t)+14,Y(I.NA+R.hT*0.8)+4,`H1 – ${detText('H1',D)} em canaleta: 1ª fiada, a cada ${f(R.ehI)} m no terço inferior, a cada ${f(R.ehG)} m acima`,12,'start',stir,'bold');
-    const xn2a=X(R.px0+cs),xn2b=X(R.px0+bpe-cs);[xn2a,xn2b].forEach(x=>Pp(`M${x.toFixed(1)} ${ybot.toFixed(1)} L${x.toFixed(1)} ${Y(I.NA+0.03).toFixed(1)}`,st3,2));
-    T(X(t)+14,Y(I.NA+R.ateA/2)-6,`V1 – ${detText('V1',D)} no furo grauteado, ${I.v1Full==='toda'?`em toda a altura (cálculo até ${f(R.ateA)} m)`:`até ${f(R.ateA)} m`}`,13,'start',steel,'bold');
-    T(X(t)+14,Y(I.NA+R.ateA/2)+18,`espera na parede de fundação, traspasse ${f(lp,2)} m`,12,'start',mut);
+    o.push(`<rect x="${(xm-6).toFixed(1)}" y="${Y(NAe+zV).toFixed(1)}" width="12" height="${(zV*sc).toFixed(1)}" fill="#c9c2b6"/>`);
+    Pp(`M${xm.toFixed(1)} ${Y(NAe+0.05).toFixed(1)} L${xm.toFixed(1)} ${Y(NAe+zV).toFixed(1)}`);
+    R.canH.forEach(z=>{Rc(X(0),Y(NAe+z+R.hcan/2),t*sc,R.hcan*sc,'#d8d2c6','#8a7d6b',.8);Cc(xm,Y(NAe+z),3.6,stir)});
+    T(X(t)+14,Y(NAe+R.hT*0.8)+4,`H1 – ${detText('H1',D)} em canaleta: 1ª fiada, a cada ${f(R.ehI)} m no terço inferior, a cada ${f(R.ehG)} m acima`,12,'start',stir,'bold');
+    const xn2a=X(R.px0+cs),xn2b=X(R.px0+bpe-cs);[xn2a,xn2b].forEach(x=>Pp(`M${x.toFixed(1)} ${ybot.toFixed(1)} L${x.toFixed(1)} ${Y(NAe+0.03).toFixed(1)}`,st3,2));
+    T(X(t)+14,Y(NAe+R.ateA/2)-6,`V1 – ${detText('V1',D)} no furo grauteado, ${I.v1Full==='toda'?`em toda a altura (cálculo até ${f(R.ateA)} m)`:`até ${f(R.ateA)} m`}`,13,'start',steel,'bold');
+    T(X(t)+14,Y(NAe+R.ateA/2)+18,`espera na parede de fundação, traspasse ${f(lp,2)} m`,12,'start',mut);
     T(X(t)+14,Y(I.NTopo)+12,`N13 – verga de topo ${detText('N13',D)}`,13,'start',steel);
     T(X(t)+14,Y(I.NTopo)+(R.enr?88:30),`V2 – ${detText('V2',D)} nas extremidades, cantos e juntas de controle`,12,'start',steel);
-    T(X(R.px0+bpe)+14,Y(I.NA)+40,`N2 – parede de fundação ${detText('N2',D)} por face`,13,'start',st3,'bold');
-    if(R.enr){const te=R.tenr/100;o.push(`<path d="M${X(t).toFixed(1)} ${Y(I.NTopo).toFixed(1)}H${X(te).toFixed(1)}V${Y(I.NA).toFixed(1)}M${X(R.px0+bpe).toFixed(1)} ${Y(I.NA).toFixed(1)}H${X(te).toFixed(1)}V${Y(ytop).toFixed(1)}" fill="none" stroke="${ink}" stroke-width="1.2" stroke-dasharray="7 4"/>`);
+    T(X(R.px0+bpe)+14,Y(NAe)+40,`N2 – parede de fundação ${detText('N2',D)} por face`,13,'start',st3,'bold');
+    if(R.enr){const te=R.tenr/100;o.push(`<path d="M${X(t).toFixed(1)} ${Y(I.NTopo).toFixed(1)}H${X(te).toFixed(1)}V${Y(NAe).toFixed(1)}M${X(R.px0+bpe).toFixed(1)} ${Y(NAe).toFixed(1)}H${X(te).toFixed(1)}V${Y(ytop).toFixed(1)}" fill="none" stroke="${ink}" stroke-width="1.2" stroke-dasharray="7 4"/>`);
       T(X(te)+12,Y(I.NTopo)+34,`enrijecedor ${f(R.eenr,0)}×${f(R.tenr,0)} cm a cada ${f(R.lenr)} m (em vista)`,12,'start',mut);
       T(X(te)+12,Y(I.NTopo)+52,`E1 ${detText('E1',D)} · E2 ${detText('E2',D)} · grampos E3 ${detText('E3',D)} – ver planta B`,12,'start',steel,'bold');
       T(X(te)+12,Y(I.NTopo)+70,`H1 – ${detText('H1',D)} em canaleta a cada ${f(R.E.eh)} m no pano`,12,'start',stir);}
@@ -1352,7 +1363,7 @@ function detSvg(R,D){
   T(X(F0+B/2),yi+40,R.cor?`N7 – ${detText('N7',D)} longitudinal, em cada face`:`N7 – ${detText('N7',D)} (${R.arm?'distribuição':'direção L'}, nas duas malhas)`,12,'middle',st2);
   T(X(F0+0.55),ybot-8,'ganchos de 30 cm sobre a malha inferior',11,'start',mut);
   dimH(X(F0),X(F0+B),Y(I.Nf)+70,`B = ${f(B)} m`); dimV(X(F0+B)+40,Y(ytop),Y(I.Nf),`hs ${f(hs)}`);
-  [[I.NTopo,'topo'],[I.NT,'terreno'],[I.NA,'NA'],[ytop,'topo sapata'],[I.Nf,'apoio']].forEach(([v,lab])=>{const y=Y(v),x0=46;o.push(`<path d="M${x0-5} ${(y-8).toFixed(1)}h10l-5 8z" fill="none" stroke="${ink}"/>`);Ln(x0-12,y,x0+12,y);T(x0+16,y+4,sgn(v),12);T(x0+16,y+17,lab,10,'start',mut)});
+  [[I.NTopo,'topo'],[I.NT,'terreno'],[NAe,R.cor?'topo pescoço':'NA'],[ytop,'topo sapata'],[I.Nf,'apoio']].forEach(([v,lab])=>{const y=Y(v),x0=46;o.push(`<path d="M${x0-5} ${(y-8).toFixed(1)}h10l-5 8z" fill="none" stroke="${ink}"/>`);Ln(x0-12,y,x0+12,y);T(x0+16,y+4,sgn(v),12);T(x0+16,y+17,lab,10,'start',mut)});
   // ---- seções ----
   const sec=(x0,y0,bwc,hc,nTop,nBot,phi,tit,sub,mid,scl=6)=>{const w=bwc*scl,h=hc*scl,cc=(I.cob+I.pht/10)*scl,r=Math.max(3.5,phi/20*scl);
     T(x0,y0-28,tit,15,'start',ink,'bold');T(x0,y0-10,sub,12,'start',mut);Rc(x0,y0,w,h);
@@ -1463,11 +1474,11 @@ function secaoSvg(R){
    Rc(X(xMin),Y(gE),X(xs0)-X(xMin),Y(yMin)-Y(gE),'url(#sSoil)','none',0);Rc(X(xs0),Y(Math.min(gE,gI)),X(xMax)-X(xs0),Y(yMin)-Y(Math.min(gE,gI)),'url(#sSoil)','none',0);
    if(gI>gE)Rc(X(wT),Y(gI),X(xMax)-X(wT),Y(gE)-Y(gI),'url(#sSoil)','none',0);
    ground(X(xMin),X(Math.min(0,P0)),Y(gE));ground(X(Math.max(wT,P0+bpe)),X(xMax),Y(gI));
-   Rc(X(F0),Y(R.ytop),B*sc,I.hs*sc);Rc(X(P0),Y(I.NA),bpe*sc,(I.NA-R.ytop)*sc);
-   if(!R.arm&&!R.cor)Rc(X(0),Y(I.NA),bp*sc,(I.hci/100)*sc);
-   if(R.cor&&R.hEmb>0)Rc(X(0),Y(I.NA),t*sc,R.hEmb*sc,'url(#sBlk)','#7d8994',.8);
-   Rc(X(0),Y(I.NTopo-I.hcs/100),t*sc,(I.NTopo-I.hcs/100-I.NA)*sc,'url(#sBlk)',R.Bl[0][0]==='k'?'#b0573f':'#7d8994');
-   if(!R.arm&&bp>t+1e-6)Rc(X(t),Y(I.NTopo),(bp-t)*sc,(I.NTopo-I.NA)*sc);
+   Rc(X(F0),Y(R.ytop),B*sc,I.hs*sc);Rc(X(P0),Y(NAe),bpe*sc,(NAe-R.ytop)*sc);
+   if(!R.arm&&!R.cor)Rc(X(0),Y(NAe),bp*sc,(I.hci/100)*sc);
+   if(R.cor&&R.hEmb>0)Rc(X(0),Y(NAe),t*sc,R.hEmb*sc,'url(#sBlk)','#7d8994',.8);
+   Rc(X(0),Y(I.NTopo-I.hcs/100),t*sc,(I.NTopo-I.hcs/100-NAe)*sc,'url(#sBlk)',R.Bl[0][0]==='k'?'#b0573f':'#7d8994');
+   if(!R.arm&&bp>t+1e-6)Rc(X(t),Y(I.NTopo),(bp-t)*sc,(I.NTopo-NAe)*sc);
    Rc(X(0),Y(I.NTopo),wT*sc,(I.hcs/100)*sc);
    if(R.enr)o.push(`<rect x="${X(t).toFixed(1)}" y="${Y(I.NTopo).toFixed(1)}" width="${((R.tenr/100-t)*sc).toFixed(1)}" height="${(Y(R.ytop)-Y(I.NTopo)).toFixed(1)}" fill="none" stroke="${ink}" stroke-dasharray="6 3"/>`);
    if(!R.cen){Ln(X(0),Y(yMax)-18,X(0),Y(yMin)+14,dv,1.2,'12 4 3 4');T(X(0),Y(yMax)-24,'DIVISA',12,'middle',dv,'bold')}
@@ -1479,12 +1490,12 @@ function secaoSvg(R){
      const cy=(yt+yb)/2;o.push(`<circle cx="${((xd1+xd2)/2).toFixed(1)}" cy="${cy.toFixed(1)}" r="15" fill="#fff" stroke="${ink}" stroke-width="1.2"/>`);T((xd1+xd2)/2,cy+5,'A',14,'middle',ink,'bold');
      T((xd1+xd2)/2,yb+(Dr.bot>I.Nf+1e-6?18:56),'dreno – ver detalhe A',11,'middle',geo,'bold');
      dimH(xd1,xd2,yt-30,`${f(Dr.dw)}`);}
-   const xl=X(xMax)+30;[[I.NTopo,'topo do muro'],[gI,'terreno interno'],[I.NA,'assentamento'],[R.ytop,'topo da sapata'],[I.Nf,'apoio da sapata']].forEach(([v,l])=>lvl(xl,Y(v),sgn(v),l));
+   const xl=X(xMax)+30;[[I.NTopo,'topo do muro'],[gI,'terreno interno'],[NAe,R.cor?'topo do pescoço':'assentamento'],[R.ytop,'topo da sapata'],[I.Nf,'apoio da sapata']].forEach(([v,l])=>lvl(xl,Y(v),sgn(v),l));
    {const y=Y(gE),xx=X(xMin)+14;o.push(`<path d="M${xx-5} ${(y-8).toFixed(1)}h10l-5 8z" fill="none" stroke="${ink}"/>`);Ln(xx-12,y,xx+12,y);T(X(xMin)+2,y-14,`${sgn(gE)} terreno vizinho`,11,'start',ink)}
-   const xr=X(F0+B)+12;dimV(xr,Y(I.NTopo),Y(gI),`${f(I.NTopo-gI)}`,1);if(gI-I.NA>0.01)dimV(xr,Y(gI),Y(I.NA),`${f(gI-I.NA)}`,1);dimV(xr,Y(I.NA),Y(R.ytop),`${f(I.NA-R.ytop)}`,1);dimV(xr,Y(R.ytop),Y(I.Nf),`${f(I.hs)}`,1);
+   const xr=X(F0+B)+12;dimV(xr,Y(I.NTopo),Y(gI),`${f(I.NTopo-gI)}`,1);if(gI-NAe>0.01)dimV(xr,Y(gI),Y(NAe),`${f(gI-NAe)}`,1);dimV(xr,Y(NAe),Y(R.ytop),`${f(NAe-R.ytop)}`,1);dimV(xr,Y(R.ytop),Y(I.Nf),`${f(I.hs)}`,1);
    dimH(X(F0),X(F0+B),Y(I.Nf)+(Dr&&Dr.bot<=I.Nf+1e-6&&!Dr.viz?70:34),`B = ${f(B)}`);dimH(X(0),X(wT),Y(I.NTopo)-10,`${f(wT,2)}`);
    T(X(wT)+8,Y((I.NTopo+gI)/2),R.arm?(R.enr?'alvenaria armada (enrijecedor tracejado)':'alvenaria armada'):(bp>t+1e-6?'pilar':'pilar / alvenaria'),11,'start',mut);
-   T(X(P0+bpe)+6,Y((I.NA+R.ytop)/2)+4,R.arm?'parede de fundação':(R.cor&&R.hEmb>0?'pescoço / embasamento':'pescoço'),11,'start',mut);
+   T(X(P0+bpe)+6,Y((NAe+R.ytop)/2)+4,R.arm?'parede de fundação':(R.cor&&R.hEmb>0?'pescoço / embasamento':'pescoço'),11,'start',mut);
    T(X(F0+B/2),Y((R.ytop+I.Nf)/2)+4,'sapata',11,'middle',mut);mainBot=Y(yMin)+80;}
   // ===== detalhe A =====
   if(Dr){const viz=Dr.viz,hD=Math.max(0.5,Dr.h),sd=Math.min(260,700/(hD+0.35)),top=170,face=viz?1070:760,sg=viz?-1:1;
@@ -1550,42 +1561,42 @@ function elevSvg(R){
   const blk=R.Bl[0][0]==='k'?LIGHT.brick:LIGHT.block, blkL=R.Bl[0][0]==='k'?LIGHT.brickline:LIGHT.blockline;
   // fundação
   if(R.arm||R.cor)s+=rect(0,len,R.ytop,I.Nf,LIGHT.conc,LIGHT.concline);
-  if(R.arm)s+=rect(0,len,I.NA,R.ytop,LIGHT.conc,LIGHT.concline);
+  if(R.arm)s+=rect(0,len,NAe,R.ytop,LIGHT.conc,LIGHT.concline);
   // alvenaria
-  s+=rect(0,len,I.NTopo-I.hcs/100,I.NA,blk,blkL);
-  for(let e=I.NA+0.2;e<I.NTopo-I.hcs/100;e+=0.2)s+=`<line x1="${X(0)}" y1="${Y(e)}" x2="${X(len)}" y2="${Y(e)}" stroke="${blkL}" stroke-opacity=".45" stroke-width=".6"/>`;
+  s+=rect(0,len,I.NTopo-I.hcs/100,NAe,blk,blkL);
+  for(let e=R.yA+0.2;e<I.NTopo-I.hcs/100;e+=0.2)s+=`<line x1="${X(0)}" y1="${Y(e)}" x2="${X(len)}" y2="${Y(e)}" stroke="${blkL}" stroke-opacity=".45" stroke-width=".6"/>`;
   s+=rect(0,len,I.NTopo,I.NTopo-I.hcs/100,LIGHT.conc,LIGHT.concline);
   if(!R.arm){
-    if(!R.cor)s+=rect(0,len,I.NA,I.NA-I.hci/100,LIGHT.conc,LIGHT.concline);
-    {const z3=(R.cInt?R.h1:R.Halv)/3;for(let z=0.4;z<=z3+1e-6;z+=0.4)s+=`<line x1="${X(0)}" y1="${Y(I.NA+z)}" x2="${X(len)}" y2="${Y(I.NA+z)}" stroke="${LIGHT.steel}" stroke-width="1" stroke-dasharray="3 3"/>`;}
-    if(R.cInt){s+=rect(0,len,I.NA+R.h1+R.hcan,I.NA+R.h1,LIGHT.conc,LIGHT.concline);s+=`<text x="${X(len)+8}" y="${Y(I.NA+R.zCi)+4}" font-size="10">cinta intermediária N15</text>`}
-    s+=`<text x="${X(len)+8}" y="${Y(I.NA+0.2)+4}" font-size="10" class="t-st">treliça N16 (terço inferior)</text>`;
+    if(!R.cor)s+=rect(0,len,NAe,NAe-I.hci/100,LIGHT.conc,LIGHT.concline);
+    {const z3=(R.cInt?R.h1:R.Halv)/3;for(let z=0.4;z<=z3+1e-6;z+=0.4)s+=`<line x1="${X(0)}" y1="${Y(R.yA+z)}" x2="${X(len)}" y2="${Y(R.yA+z)}" stroke="${LIGHT.steel}" stroke-width="1" stroke-dasharray="3 3"/>`;}
+    if(R.cInt){s+=rect(0,len,R.yA+R.h1+R.hcan,R.yA+R.h1,LIGHT.conc,LIGHT.concline);s+=`<text x="${X(len)+8}" y="${Y(R.yA+R.zCi)+4}" font-size="10">cinta intermediária N15</text>`}
+    s+=`<text x="${X(len)+8}" y="${Y(R.yA+0.2)+4}" font-size="10" class="t-st">treliça N16 (terço inferior)</text>`;
     for(let i=0;i<nP;i++){const xc=R.hp/200+i*R.s;
-      s+=rect(xc-R.hp/200,xc+R.hp/200,I.NTopo,I.NA,LIGHT.conc,LIGHT.concline);
-      s+=rect(xc-R.hpe/200,xc+R.hpe/200,I.NA,R.ytop,LIGHT.conc,LIGHT.concline);
-      if(R.cor&&R.hEmb>0&&i<nP-1)s+=rect(xc+R.hpe/200,xc+R.s-R.hpe/200,I.NA,R.ytop,blk,blkL);
+      s+=rect(xc-R.hp/200,xc+R.hp/200,I.NTopo,NAe,LIGHT.conc,LIGHT.concline);
+      s+=rect(xc-R.hpe/200,xc+R.hpe/200,NAe,R.ytop,LIGHT.conc,LIGHT.concline);
+      if(R.cor&&R.hEmb>0&&i<nP-1)s+=rect(xc+R.hpe/200,xc+R.s-R.hpe/200,NAe,R.ytop,blk,blkL);
       if(!R.cor)s+=rect(xc-I.L/2,xc+I.L/2,R.ytop,I.Nf,LIGHT.conc,LIGHT.concline);
       s+=`<line x1="${X(xc)}" y1="${Y(I.NTopo)-12}" x2="${X(xc)}" y2="${Y(I.Nf)+8}" stroke="${LIGHT.muted}" stroke-dasharray="10 3 2 3" stroke-width=".7"/>`;}
     // cota s
     const yd=Y(I.NTopo)-24;for(let i=0;i<nP-1;i++){const a=R.hp/200+i*R.s,b=a+R.s;s+=`<line x1="${X(a)}" y1="${yd}" x2="${X(b)}" y2="${yd}" stroke="${LIGHT.ink}" stroke-width=".8"/><path d="M${X(a)} ${yd-5}V${yd+5}M${X(b)} ${yd-5}V${yd+5}" stroke="${LIGHT.ink}"/><text x="${X((a+b)/2)}" y="${yd-5}" text-anchor="middle">s = ${f(R.s)} m</text>`}
-    s+=`<text x="${X(R.hp/200+R.s/2)}" y="${R.cInt?(Y(I.NTopo-I.hcs/100)+Y(I.NA+R.h1+R.hcan))/2+4:(Y(I.NTopo)+Y(I.NA))/2}" text-anchor="middle">${R.cInt?`painéis ${f(R.lp||0)} × ${f(R.h2)} m e ${f(R.lp||0)} × ${f(R.h1)} m`:`pano ${f(R.lp||0)} × ${f(R.Halv)} m`}</text>`;
-    s+=`<text x="${X(R.hp/200)+R.hp/200*sc+4}" y="${Y(I.NA)-6}" font-size="10">pilar ${f(R.bp,0)}×${f(R.hp,0)}</text>`;
+    s+=`<text x="${X(R.hp/200+R.s/2)}" y="${R.cInt?(Y(I.NTopo-I.hcs/100)+Y(R.yA+R.h1+R.hcan))/2+4:(Y(I.NTopo)+Y(R.yA))/2}" text-anchor="middle">${R.cInt?`painéis ${f(R.lp||0)} × ${f(R.h2)} m e ${f(R.lp||0)} × ${f(R.h1)} m`:`pano ${f(R.lp||0)} × ${f(R.Halv)} m`}</text>`;
+    s+=`<text x="${X(R.hp/200)+R.hp/200*sc+4}" y="${Y(NAe)-6}" font-size="10">pilar ${f(R.bp,0)}×${f(R.hp,0)}</text>`;
     s+=`<text x="${X(len/2)}" y="${Y(I.Nf)+18}" text-anchor="middle" class="t-muted">${R.cor?`sapata corrida B = ${f(I.B)} m, hs = ${f(I.hs)} m`:`sapatas ${f(I.B)} × ${f(I.L)} × ${f(I.hs)} m`}</text>`;
   }else{
     const sp=Math.max(0.2,(R.espAd||20)/100),zA=Math.min(R.hA,R.ateA),zF=I.v1Full==='toda'?R.hT:zA;
-    R.canH.forEach(z=>{s+=`<line x1="${X(0)}" y1="${Y(I.NA+z)}" x2="${X(len)}" y2="${Y(I.NA+z)}" stroke="${LIGHT.accent}" stroke-width="1.4" stroke-dasharray="8 3"/>`});
-    for(let x=sp/2;x<len;x+=sp){s+=`<line x1="${X(x)}" y1="${Y(R.ytop)-2}" x2="${X(x)}" y2="${Y(I.NA+zA)}" stroke="${LIGHT.steel}" stroke-width="1.6"/>`;if(zF>zA+1e-6)s+=`<line x1="${X(x)}" y1="${Y(I.NA+zA)}" x2="${X(x)}" y2="${Y(I.NA+zF)}" stroke="${LIGHT.steel}" stroke-width="1" stroke-dasharray="4 3"/>`}
-    s+=`<text x="${X(len)+8}" y="${Y(I.NA+R.hT*0.85)}" class="t-m" font-size="10">H1 a cada ${f(R.ehG)} m</text><text x="${X(len)+8}" y="${Y(I.NA+R.hT/6)+14}" class="t-m" font-size="10">H1 a cada ${f(R.ehI)} m (terço inferior)</text>`;
-    s+=`<text x="${X(len)+8}" y="${Y(I.NA+R.ateA/2)}" class="t-st">Ø${f(R.phiA,1)} c/${f(R.espAd,0)}</text><text x="${X(len)+8}" y="${Y(I.NA+R.ateA/2)+14}" class="t-muted">até ${sgn(I.NA+R.ateA)}</text>`;
+    R.canH.forEach(z=>{s+=`<line x1="${X(0)}" y1="${Y(NAe+z)}" x2="${X(len)}" y2="${Y(NAe+z)}" stroke="${LIGHT.accent}" stroke-width="1.4" stroke-dasharray="8 3"/>`});
+    for(let x=sp/2;x<len;x+=sp){s+=`<line x1="${X(x)}" y1="${Y(R.ytop)-2}" x2="${X(x)}" y2="${Y(NAe+zA)}" stroke="${LIGHT.steel}" stroke-width="1.6"/>`;if(zF>zA+1e-6)s+=`<line x1="${X(x)}" y1="${Y(NAe+zA)}" x2="${X(x)}" y2="${Y(NAe+zF)}" stroke="${LIGHT.steel}" stroke-width="1" stroke-dasharray="4 3"/>`}
+    s+=`<text x="${X(len)+8}" y="${Y(NAe+R.hT*0.85)}" class="t-m" font-size="10">H1 a cada ${f(R.ehG)} m</text><text x="${X(len)+8}" y="${Y(NAe+R.hT/6)+14}" class="t-m" font-size="10">H1 a cada ${f(R.ehI)} m (terço inferior)</text>`;
+    s+=`<text x="${X(len)+8}" y="${Y(NAe+R.ateA/2)}" class="t-st">Ø${f(R.phiA,1)} c/${f(R.espAd,0)}</text><text x="${X(len)+8}" y="${Y(NAe+R.ateA/2)+14}" class="t-muted">até ${sgn(NAe+R.ateA)}</text>`;
     if(R.enr){const E=R.E,ew=R.eenr/100;
-      for(let i=0;i<3;i++){const xc=ew/2+i*R.lenr;s+=rect(xc-ew/2,xc+ew/2,I.NTopo,I.NA,'#c9c2b6',blkL);s+=rect(xc-ew/2,xc+ew/2,I.NA,R.ytop,LIGHT.conc,LIGHT.concline);
+      for(let i=0;i<3;i++){const xc=ew/2+i*R.lenr;s+=rect(xc-ew/2,xc+ew/2,I.NTopo,NAe,'#c9c2b6',blkL);s+=rect(xc-ew/2,xc+ew/2,NAe,R.ytop,LIGHT.conc,LIGHT.concline);
         s+=`<line x1="${X(xc)}" y1="${Y(I.NTopo)-12}" x2="${X(xc)}" y2="${Y(I.Nf)+8}" stroke="${LIGHT.muted}" stroke-dasharray="10 3 2 3" stroke-width=".7"/>`;}
       const yd=Y(I.NTopo)-12;for(let i=0;i<2;i++){const a=ew/2+i*R.lenr,b=a+R.lenr;s+=`<line x1="${X(a)}" y1="${yd}" x2="${X(b)}" y2="${yd}" stroke="${LIGHT.ink}" stroke-width=".8"/><path d="M${X(a)} ${yd-5}V${yd+5}M${X(b)} ${yd-5}V${yd+5}" stroke="${LIGHT.ink}"/><text x="${X((a+b)/2)}" y="${yd-5}" text-anchor="middle">lenr = ${f(R.lenr)} m</text>`}
-      s+=`<text x="${X(ew)+4}" y="${Y(I.NA)-6}" font-size="10">enrijecedor ${f(R.eenr,0)}×${f(R.tenr,0)}</text>`;
+      s+=`<text x="${X(ew)+4}" y="${Y(NAe)-6}" font-size="10">enrijecedor ${f(R.eenr,0)}×${f(R.tenr,0)}</text>`;
       s+=`<text x="${X(len/2)}" y="${Y(I.Nf)+18}" text-anchor="middle" class="t-muted">vista pelo lado interno · sapata corrida B = ${f(I.B)} m · pescoço de concreto sob cada enrijecedor</text>`;}
     else s+=`<text x="${X(len/2)}" y="${Y(I.Nf)+18}" text-anchor="middle" class="t-muted">sapata corrida B = ${f(I.B)} m · trecho de 3 m</text>`;
   }
-  [[I.NTopo,'topo'],[I.NT,'terreno'],[I.NA,'NA'],[R.ytop,'topo sapata'],[I.Nf,'apoio']].forEach(([e,t])=>{const y=Y(e);s+=`<path d="M${W-60} ${y-8}h10l-5 8z" fill="none" stroke="${LIGHT.ink}"/><line x1="${W-68}" y1="${y}" x2="${W-42}" y2="${y}" stroke="${LIGHT.ink}"/><text x="${W-38}" y="${y+4}" font-size="10">${sgn(e)}</text>`});
+  [[I.NTopo,'topo'],[I.NT,'terreno'],[NAe,R.cor?'topo pescoço':'NA'],[R.ytop,'topo sapata'],[I.Nf,'apoio']].forEach(([e,t])=>{const y=Y(e);s+=`<path d="M${W-60} ${y-8}h10l-5 8z" fill="none" stroke="${LIGHT.ink}"/><line x1="${W-68}" y1="${y}" x2="${W-42}" y2="${y}" stroke="${LIGHT.ink}"/><text x="${W-38}" y="${y+4}" font-size="10">${sgn(e)}</text>`});
   s+=`<text x="20" y="22" class="t-title">VISTA FRONTAL (ESBOÇO)</text>`;
   return {svg:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="#fff"/>${SVG_STYLE}${s}</svg>`,w:W,h:H};
 }
@@ -1647,7 +1658,7 @@ function memorialXML(R,figs,state){
   b.push(H1('2. Dados de entrada'));
   b.push(TBL(inputRows(),[2.2,4.6,2.6],['l','l','r']));
   b.push(H1('3. Geometria'));
-  b.push(TXT(`Muro com topo em ${sgn(I.NTopo)} m, terreno interno em ${sgn(I.NT)} m e externo em ${sgn(I.NT2)} m. Assentamento da alvenaria em ${sgn(I.NA)} m e apoio da sapata em ${sgn(I.Nf)} m. Altura exposta ao vento Hv = ${f(R.Hv)} m. Alvenaria em ${R.Bl[1]} (t = ${f(R.t,R.t%1?1:0)} cm).`+(arm?'':` Pilares ${f(R.bp,0)} × ${f(R.hp,0)} cm a cada ${f(R.s)} m, pescoço ${f(R.bpe,0)} × ${f(R.hpe,0)} cm abaixo do NA.`)+(R.enr?` Enrijecedores de bloco ${f(R.eenr,0)} × ${f(R.tenr,0)} cm (espessura × comprimento total, incluindo o muro) a cada ${f(R.lenr)} m entre eixos, amarrados ao muro fiada a fiada e grauteados, com pescoço de concreto de mesma seção entre o assentamento e a sapata.`:'')+` Sapata com B = ${f(I.B)} m${arm?' (corrida)':R.cor?` (corrida, trecho de ${f(R.s)} m por pilar)`:` e L = ${f(I.L)} m`}, altura hs = ${f(I.hs)} m.`));
+  b.push(TXT(`Muro com topo em ${sgn(I.NTopo)} m, terreno interno em ${sgn(I.NT)} m e externo em ${sgn(I.NT2)} m. ${R.cor?`Alvenaria apoiada direto na sapata corrida (sem baldrame), pescoço com ${f(R.hPes)} m de altura até ${sgn(NAe)} m,`:`Assentamento da alvenaria em ${sgn(NAe)} m`} e apoio da sapata em ${sgn(I.Nf)} m. Altura exposta ao vento Hv = ${f(R.Hv)} m. Alvenaria em ${R.Bl[1]} (t = ${f(R.t,R.t%1?1:0)} cm).`+(arm?'':` Pilares ${f(R.bp,0)} × ${f(R.hp,0)} cm a cada ${f(R.s)} m, pescoço ${f(R.bpe,0)} × ${f(R.hpe,0)} cm abaixo do NA.`)+(R.enr?` Enrijecedores de bloco ${f(R.eenr,0)} × ${f(R.tenr,0)} cm (espessura × comprimento total, incluindo o muro) a cada ${f(R.lenr)} m entre eixos, amarrados ao muro fiada a fiada e grauteados, com pescoço de concreto de mesma seção entre o assentamento e a sapata.`:'')+` Sapata com B = ${f(I.B)} m${arm?' (corrida)':R.cor?` (corrida, trecho de ${f(R.s)} m por pilar)`:` e L = ${f(I.L)} m`}, altura hs = ${f(I.hs)} m.`));
   b.push(FIG(figs[0],'Figura 1 – Corte transversal com ações, resultante e tensões no solo (caso crítico).'));
   b.push(FIG(figs[1],'Figura 2 – Vista frontal (esboço).'));
   // ações
@@ -1666,9 +1677,9 @@ function memorialXML(R,figs,state){
   if(!arm&&R.cor)b.push(EQ('Baldrame:','dispensado: com sapata corrida a alvenaria apoia direto na sapata, que recebe todo o peso do muro e trabalha como viga contínua entre pilares'));
   if(!arm&&!R.cor)b.push(EQ('Baldrame:',`g3 = 25 × ${f(I.bwi/100)} × ${f(I.hci/100)} = ${f(R.g3,3)} kN/m`));
   b.push(EQ('Carga linear:',`q = ${f(R.qv,3)} kN/m`));
-  if(R.Nemb>0)b.push(EQ('Alvenaria de embasamento:',`do NA (${sgn(I.NA)}) ao topo da sapata corrida (${sgn(R.ytop)}), sem baldrame, h = ${f(R.hEmb)} m, sem reboco: ${f(R.Bl[3][0]*G,2)} × ${f(R.hEmb)} × ${f(Math.max(0,R.s-R.hpe/100))} = ${f(R.Nemb,2)} kN por pilar, somado ao peso do muro na fundação`));
-  if(R.enr)b.push(EQ('Enrijecedor:',`alma grauteada ${R.gGr} × ${f((R.tenr-R.t)/100)} × ${f(R.eenr/100)} × ${f(Math.max(0,I.NTopo-I.NA))} = ${f(R.WwebE,2)} kN e pescoço 25 × ${f(Math.max(0,R.tenr-I.bwi)/100)} × ${f(R.eenr/100)} × ${f(Math.max(0,I.NA-R.ytop))} = ${f(R.WpeE,2)} kN por enrijecedor → ${f(R.NenrM,3)} kN/m na fundação`));
-  if(!arm)b.push(EQ('Pilar acima do NA:',`Npil = 25 × ${f(R.bp/100)} × ${f(R.hp/100)} × ${f(Math.max(0,I.NTopo-I.NA))} = ${f(R.Npil,2)} kN`));
+  if(R.Nemb>0)b.push(EQ('Alvenaria de embasamento:',`do NA (${sgn(NAe)}) ao topo da sapata corrida (${sgn(R.ytop)}), sem baldrame, h = ${f(R.hEmb)} m, sem reboco: ${f(R.Bl[3][0]*G,2)} × ${f(R.hEmb)} × ${f(Math.max(0,R.s-R.hpe/100))} = ${f(R.Nemb,2)} kN por pilar, somado ao peso do muro na fundação`));
+  if(R.enr)b.push(EQ('Enrijecedor:',`alma grauteada ${R.gGr} × ${f((R.tenr-R.t)/100)} × ${f(R.eenr/100)} × ${f(Math.max(0,I.NTopo-NAe))} = ${f(R.WwebE,2)} kN e pescoço 25 × ${f(Math.max(0,R.tenr-I.bwi)/100)} × ${f(R.eenr/100)} × ${f(Math.max(0,NAe-R.ytop))} = ${f(R.WpeE,2)} kN por enrijecedor → ${f(R.NenrM,3)} kN/m na fundação`));
+  if(!arm)b.push(EQ('Pilar acima do NA:',`Npil = 25 × ${f(R.bp/100)} × ${f(R.hp/100)} × ${f(Math.max(0,I.NTopo-NAe))} = ${f(R.Npil,2)} kN`));
   b.push(H2('4.3 Empuxo de solo'));
   b.push(EQ('Coeficientes:',`${I.kEmp==='repouso'?`K0 = 1 − sen φ = ${f(R.K0,3)}`:`Ka = tan²(45° − φ/2) = ${f(R.Ka,3)}`}; Kp = tan²(45° + φ/2) = ${f(R.Kp,3)}; φ = ${f(I.phi,0)}°, c = ${f(I.c,0)} kPa, γ = ${f(I.gam,1)} kN/m³`));
   b.push(TXT(`O trecho entre a sapata e o ${arm||R.cor?'assentamento do muro':'baldrame'} é preenchido (alvenaria assentada sobre a sapata${arm?' e parede de fundação':' ou pescoço'}), por isso o empuxo de cada lado atua desde o apoio da sapata (${sgn(I.Nf)} m) até o terreno daquele lado. Com ${I.kEmp==='repouso'?'empuxo em repouso':'empuxo ativo'} nos dois lados, a ação no muro e na fundação é a diferença entre eles.`));
@@ -1679,7 +1690,7 @@ function memorialXML(R,figs,state){
   // esforços
   b.push(H1('5. Esforços solicitantes'));
   b.push(TXT(`Esforços característicos por metro de muro, obtidos por integração das cargas horizontais a partir do topo (vento acima do terreno e empuxo líquido abaixo dele).${arm?'':` Valores no pilar = valor por metro × s = ${f(R.s)} m.`}`));
-  const secs=[['Nível do terreno',R.Hg],['Assentamento (NA)',I.NA],['Topo da sapata',R.ytop],['Base da sapata',I.Nf]];
+  const secs=[['Nível do terreno',R.Hg],[R.cor?'Topo do pescoço':'Assentamento (NA)',NAe],['Topo da sapata',R.ytop],['Base da sapata',I.Nf]];
   b.push(TBL([['Seção','Cota (m)','V (kN/m)','M (kN·m/m)',...(arm?[]:['V pilar (kN)','M pilar (kN·m)'])],...secs.map(([n,y])=>{const v=R.at(R.D.V,y),m=R.at(R.D.M,y);return [n,sgn(y),f(v),f(m),...(arm?[]:[f(v*R.s),f(m*R.s)])]})],arm?[3,1.6,1.6,1.8]:[3,1.4,1.5,1.7,1.6,1.8]));
   b.push(FIG(figs[2],`Figura 3 – Diagramas de cortante e momento ${arm?'do muro':'do pilar'}.`));
   // fundação
@@ -1717,8 +1728,8 @@ function memorialXML(R,figs,state){
     const vg=(V,tit,qn)=>{b.push(H2(tit));b.push(EQ('Carga:',`${qn} = ${f(V.q,3)} kN/m, vão s = ${f(R.s)} m (biapoiada)`));b.push(EQ('Esforços:',`Md = 1,4·q·s²/8 = ${f(V.Md,2)} kN·m; Vd = 1,4·q·s/2 = ${f(V.Vd,2)} kN`));
       b.push(EQ('Flexão:',`b = ${f(V.bw,0)} cm, d = ${f(V.d,1)} cm, KMD = ${f(V.KMD,3)}, As = ${V.ok?f(V.As,2):'–'} cm² (mín. ${f(V.Asmin,2)}) → ${V.txt}`));b.push(EQ('Estribos:',V.semEstribo?`dispensados: Vd = ${f(V.Vd,2)} ≤ Vc = ${f(V.Vc,2)} kN; VRd2 = ${f(V.VRd2,1)} kN (${ST(V.v2ok)})`:`Ø${f(I.pht,1)} c/${V.sp} · Vd ≤ VRd2 = ${f(V.VRd2,1)} kN (${ST(V.v2ok)})`));
       if(V.u!=null)b.push(EQ('Rigidez (apoio do pano):',`flecha característica com 0,5·Ecs·I: u = 5·q·s⁴/(384·0,5·Ecs·I) = ${f(V.u,2)} cm ≤ L/500 e 1 cm = ${f(V.uLim,2)} cm (${ST(V.uOk)}; NBR 6118, Tabela 13.3)`))};
-    let nv=3;if(R.BI)vg(R.BI,`7.${nv++} Baldrame`,'q');vg(R.BS,`7.${nv++} Cinta superior (flexão no plano horizontal)`,R.cInt?'qh = pv·h2/2':'qh = pv·Halv/2');
-    if(R.CI)vg(R.CI,`7.${nv++} Cinta intermediária – canaleta a ${f(R.zCi,2)} m acima do assentamento (flexão no plano horizontal)`,'q = pv·(h1 + h2)/2');
+    let nv=3;if(R.BI)vg(R.BI,`7.${nv++} Baldrame`,'q');vg(R.BS,`7.${nv++} Cinta superior (flexão no plano horizontal)`,'qh = reação no topo do pano superior (faixa vertical biapoiada sob a pressão lateral real)');
+    if(R.CI)vg(R.CI,`7.${nv++} Cinta intermediária – canaleta a ${f(R.zCi,2)} m acima da base do pano (flexão no plano horizontal)`,`q = reação do painel inferior (${f(R.stL.Rt,2)}) + do superior (${f(R.stU.Rb,2)}) kN/m`);
   }else{pilBlock(R.P2,'7.1 Parede de fundação no topo da sapata (por metro)');
     if(R.enr){const P=R.E.PE;b.push(H2('7.2 Pescoço de concreto sob o enrijecedor'));
       b.push(EQ('Seção:',`${f(P.bw,0)} × ${f(P.h,0)} cm, d = ${f(P.d,1)} cm; momento da faixa de ${f(R.lenr)} m no topo da sapata Mk = ${f(P.Mk,2)} kN·m; γn = ${f(P.gn,2)}; Md = ${f(P.Md,2)} kN·m`));
@@ -1736,14 +1747,14 @@ function memorialXML(R,figs,state){
   b.push(H1('8. Alvenaria'));
   if(!arm){
     b.push(EQ('Esbeltez do pano:',`λ = h/t = ${f(R.lamPano*R.t/100)} / ${f(R.t/100)} = ${f(R.lamPano,1)} ≤ 24 (${ST(R.lamPanoOk)})`));
-    b.push(TXT(`O pano é tratado como placa ortotrópica sob ação lateral fora do plano, conforme a NBR 16868-1, Anexo E: ${R.topoLivre?'apoiado nos pilares e no baldrame, com o topo livre':'apoiado nos pilares, no baldrame e na cinta superior (4 lados)'}${R.cInt?`. A cinta intermediária, a ${f(R.zCi,2)} m acima do assentamento, divide o pano em dois painéis: o inferior, apoiado nos 4 lados, com h1 = ${f(R.h1)} m, e o superior, com h2 = ${f(R.h2)} m`:''}. A carga do pano se divide entre as duas direções; a parcela vertical chega à cinta superior e ao baldrame, e a cinta a leva aos pilares, que foram dimensionados com toda a faixa de ${f(R.s)} m.`.replace(/baldrame/g,R.cor?'embasamento (sem baldrame)':'baldrame')));
+    b.push(TXT(`O pano é tratado como placa ortotrópica sob ação lateral fora do plano, conforme a NBR 16868-1, Anexo E: ${R.topoLivre?'apoiado nos pilares e no baldrame, com o topo livre':'apoiado nos pilares, no baldrame e na cinta superior (4 lados)'}${R.cInt?`. A cinta intermediária, a ${f(R.zCi,2)} m acima da base do pano, divide o pano em dois painéis: o inferior, apoiado nos 4 lados, com h1 = ${f(R.h1)} m, e o superior, com h2 = ${f(R.h2)} m`:''}. A carga do pano se divide entre as duas direções; a parcela vertical chega à cinta superior e ao baldrame, e a cinta a leva aos pilares, que foram dimensionados com toda a faixa de ${f(R.s)} m.`.replace(/baldrame/g,R.cor?'embasamento (sem baldrame)':'baldrame')));
     R.panels.forEach(P=>{if(R.panels.length>1)b.push(PP(P.lab+` – h = ${f(P.h)} m`,{b:true,after:60}));
       b.push(EQ('Ortogonalidade:',`Pf/Ae = ${f(P.PfAe/1000,3)} MPa (0,9 da carga permanente acima do meio do painel, ≤ 0,15); μ = (ftd,normal + Pf/Ae)/ftd,paralela = (${f(R.ftdN/1000,3)} + ${f(P.PfAe/1000,3)})/${f(R.ftdP/1000,3)} = ${f(P.mu,3)}`));
       b.push(EQ('Coeficiente βf:',`${P.livre?'laterais e base apoiadas, topo livre':'apoiado nos 4 lados'}; ℓ = ${f(R.lp)} m, h = ${f(P.h)} m, h/ℓ = ${f(P.hl,2)} → βf = ${f(P.betaF,4)} (Tabela E.1, interpolação linear)`));
-      b.push(EQ('Flexão horizontal:',`Md,paralelo = βf·wd·ℓ² = ${f(P.MdPar,3)} kN·m/m (wd = 1,4 × ${f(R.pv,2)} = ${f(R.wd,2)} kN/m²); W = t²/6 = ${f(R.W*1e6,0)} cm³/m; σ = ${f(P.sigPar/1000,3)} MPa ≤ ftd,paralela = ${f(R.ftkP,2)}/${f(I.gm,1)} = ${f(R.ftdP/1000,3)} MPa (${ST(P.sigPar<=R.ftdP+1e-9)})`));
+      b.push(EQ('Flexão horizontal:',`Md,paralelo = βf·wd·ℓ² = ${f(P.MdPar,3)} kN·m/m (wd = 1,4 × ${f(P.pk,2)} = ${f(P.wd,2)} kN/m², maior pressão lateral no painel); W = t²/6 = ${f(R.W*1e6,0)} cm³/m; σ = ${f(P.sigPar/1000,3)} MPa ≤ ftd,paralela = ${f(R.ftkP,2)}/${f(I.gm,1)} = ${f(R.ftdP/1000,3)} MPa (${ST(P.sigPar<=R.ftdP+1e-9)})`));
       b.push(EQ('Flexão vertical:',`Md,normal = μ·Md,paralelo = ${f(P.MdNor,3)} kN·m/m; σ = ${f(P.sigNor/1000,3)} MPa ≤ ftd,normal + Pf/Ae = ${f(P.ftdNef/1000,3)} MPa (${ST(P.sigNor<=P.ftdNef+1e-9)})`));
       b.push(EQ('Dimensões-limite:',`h × ℓ = ${f(P.h*R.lp,2)} m² ≤ ${P.livre?'1 350':'2 025'}·t² = ${f(P.limA,2)} m²; h e ℓ ≤ 50t = ${f(R.lim50,2)} m (${ST(P.limE)})`));});
-    b.push(EQ('Terço inferior:',`armadura de junta (treliça ou fios Ø ≤ 6,3 mm, NBR 16868-1, 12.4) a cada 2 fiadas até ${f((R.cInt?R.h1:R.Halv)/3,2)} m acima do assentamento, ancorada nos pilares (N16): reforço construtivo contra fissuração e impacto, não considerado no cálculo do pano`));
+    b.push(EQ('Terço inferior:',`armadura de junta (treliça ou fios Ø ≤ 6,3 mm, NBR 16868-1, 12.4) a cada 2 fiadas até ${f((R.cInt?R.h1:R.Halv)/3,2)} m acima da base do pano, ancorada nos pilares (N16): reforço construtivo contra fissuração e impacto, não considerado no cálculo do pano`));
     b.push(EQ('Ligação pano–pilar:',`Vd = wd·ℓ/2 = ${f(R.LG.Vd,2)} kN/m; ferro-cabelo ou tela a cada ${f(R.LG.sl*100,0)} cm: Fd = ${f(R.LG.Fd,2)} kN e As ≥ Fd/fyd = ${f(R.LG.As,3)} cm² por ponto de ligação, em cada lado do pilar`));
     b.push(EQ('Deslocamento no topo:',`u = ${f(R.uTop,2)} cm; limite 2H/250 = ${f(R.uLim,2)} cm para balanço (${ST(R.uOk)}), pilar com 0,5·Ecs·I`));
   }else{
