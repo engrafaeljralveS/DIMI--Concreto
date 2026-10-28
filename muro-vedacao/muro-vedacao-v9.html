@@ -1846,27 +1846,14 @@ function vMem(P,est){const h=P.sh;
 function memorialXML(R,figs,state){
   IMGID=1;const b=[];const arm=R.arm,dt=new Date().toLocaleDateString('pt-BR');
   let FN=0;const FIGN=(name,t)=>{const g=figs.find(x=>x&&x.name===name);if(!g)return;b.push(FIG(g,`Figura ${++FN} – ${t}`))};
-  const sysTxt=arm?`alvenaria estrutural armada em balanço${R.enr?`, com enrijecedores do próprio bloco a cada ${f(R.lenr)} m voltados para o lado interno`:''}, com sapata corrida ${R.cen?'centrada':'de divisa'}`:`pilares de concreto com alvenaria de vedação, baldrame, cinta superior e sapata ${R.cor?'corrida':'isolada'} ${R.cen?'centrada':'de divisa'}`;
-  b.push(PP('MEMORIAL DE CÁLCULO – MURO DE VEDAÇÃO',{b:true,sz:24,align:'center',after:60}));
+  const sysTxt=arm?`alvenaria estrutural armada em balanço${R.enr?`, com enrijecedores do próprio bloco a cada ${f(R.lenr)} m voltados para o lado interno`:''}, com sapata corrida ${R.cen?'centrada':'de divisa'}`:(()=>{const p=['pilares de concreto'];if(R.CW)p.push(`parede de concreto armado no painel inferior (${f(R.CW.b,0)} cm, do topo da sapata até ${sgn(R.yA)} m)`);p.push('alvenaria de vedação');if(R.BI)p.push('baldrame');if(R.CI)p.push('cinta intermediária');p.push('cinta superior');const last=`sapata ${R.cor?'corrida':'isolada'} ${R.cen?'centrada':'de divisa'}`;return p.join(', ')+' e '+last})();
+  const cont=R.dh>0.01,tipoM=cont?'contenção e vedação':'vedação';
+  b.push(PP(`MEMORIAL DE CÁLCULO – MURO DE ${tipoM.toUpperCase()}`,{b:true,sz:24,align:'center',after:60}));
   if(I.nomeModelo)b.push(PP(String(I.nomeModelo),{b:true,sz:22,align:'center',after:60}));
   b.push(PP(`Emitido em ${dt} · Muro de vedação v9`,{sz:20,align:'center',after:240,color:'5A6774'}));
   b.push(H1('1. Objeto e critérios'));
-  b.push(TXT(`Este memorial apresenta o dimensionamento de um muro de vedação no sistema de ${sysTxt}. As ações consideradas são o peso próprio, o vento e o empuxo de solo; a fundação é verificada quanto a tensões no solo, excentricidade, tombamento e deslizamento.`));
+  b.push(TXT(`Este memorial apresenta o dimensionamento de um muro de ${tipoM} no sistema de ${sysTxt}.${cont?` O muro contém um desnível de terreno de ${f(R.dh)} m: o ${I.NT2>I.NT?'terreno do vizinho':'terreno interno'} está em ${sgn(R.Hg)} m e o ${I.NT2>I.NT?'interno':'do vizinho'} em ${sgn(R.Lg)} m${R.qE>0||R.qI>0?`, com sobrecarga de ${f(Math.max(R.qE,R.qI),1)} kN/m² no lado ${R.qE>=R.qI?'do vizinho':'interno'}`:''}; por isso trabalha também como contenção, recebendo o empuxo do solo${R.CW?', resistido na parte inferior pela parede de concreto engastada na sapata':''}.`:''} As ações consideradas são o peso próprio, o vento e o empuxo de solo; a fundação é verificada quanto a tensões no solo, excentricidade, tombamento e deslizamento.`));
   b.push(TXT('Normas de referência: ABNT NBR 6118 (estruturas de concreto), NBR 6122 (fundações), NBR 6123 (forças devidas ao vento) e NBR 16868 (alvenaria estrutural). Estabilidade e tensões no solo em valores característicos; dimensionamento no ELU com γf = 1,4, γc = 1,4 e γs = 1,15.'));
-  {const c=R.crit,row=(a,v,l,ok)=>[a,v,l,ST(ok)],L=[],QD=detGet(R),QR=detRows(R,QD);
-   const PF=/^(N1|N2|N2a|N10|N15)$/,adQ=ids=>ids.filter(id=>QD[id]&&QR.some(r=>r.id===id)).map(id=>`${id} ${detText(id,QD)}${PF.test(id)?' por face':''}`).join(' + '),okQ=ids=>ids.every(id=>{const r=QR.find(x=>x.id===id);return !r||r.ok});
-   L.push(row('Tensão no solo (com vento)',`${f(R.sigW,1)} kPa`,`≤ ${f(1.3*I.sadm,0)} kPa`,R.sigW<=1.3*I.sadm));
-   L.push(row('Contato com o solo',`${f(Math.min(...R.cW.map(q=>q.lc))/I.B*100,0)}%`,I.crit==='23'?'≥ 67%':'100%',R.cW.every(q=>q.ok)&&R.perm.ok));
-   L.push(row('Tombamento',`FS ${f(Math.min(...R.cW.map(q=>q.FSt)),2)}`,`≥ ${f(+I.FStMin||1.5,1)}`,Math.min(...R.cW.map(q=>q.FSt))>=(+I.FStMin||1.5)-1e-9));
-   L.push(row('Deslizamento',`FS ${f(Math.min(...R.cW.map(q=>q.FSd)),2)}`,`≥ ${f(+I.FSdMin||1.5,1)}`,Math.min(...R.cW.map(q=>q.FSd))>=(+I.FSdMin||1.5)-1e-9));
-   if(!arm){L.push(row(R.cor?'Pilar no topo do pescoço':'Pilar no NA',adQ(['N1']),`As nec. ${f(R.P1.Asf)} cm²/face · Md ${f(R.P1.Md)} kN·m`,R.P1.ok&&R.P1.vok&&okQ(['N1','N3'])));L.push(row('Pescoço no topo da sapata',adQ(['N2','N2a']),`As nec. ${f(Math.max(R.P1.Asf,R.P2.Asf))} cm²/face · Md ${f(R.P2.Md)} kN·m`,R.P2.ok&&R.P2.vok&&okQ(['N2','N2a','N4'])));
-     R.panels.forEach((P,j)=>L.push(row(P.lab,P.can&&j===0?`canaletas ${adQ(['N17'])} c/${f(P.can.eh)} m`:`σ ${f(P.sigPar/1000,3)} MPa (sem aço)`,P.can&&j===0?`MRd,h ${f(P.can.Mh,2)} kN·m/m`:`ftd ${f(R.ftdP/1000,3)} MPa`,P.ok&&P.limE&&(!(P.can&&j===0)||okQ(['N17'])))));
-     if(R.CW)L.push(row('Parede de concreto',adQ(['N18','N19','N20']),`Mk base ${f(R.CW.MyE,2)} kN·m/m`,R.CW.ok&&(!R.CW.no||R.CW.no.ok)&&okQ(['N18','N19','N20'])));}
-   else L.push(row('Alvenaria armada',adQ(['V1'])||'—',`x/d ${f(R.xi,3)} ≤ 0,45`,R.xiOk&&R.lamAOk));
-   L.push(row('Sapata (transversal)',adQ(['N5']),`As nec. ${f(R.SB.Asf)} cm²/m · Md ${f(R.SB.Md)} kN·m/m`,R.SB.ok&&R.SV.ok&&okQ(['N5','N6'])));
-   b.push(PP('Quadro-resumo',{b:true,before:160,after:60}));
-   b.push(TBL([['Verificação','Resultado','Limite / esforço','Situação'],...L],[3.6,3.2,2.6,1.4]));
-   b.push(TXT(state.fails?`${state.fails} verificação(ões) não atende(m); ver item 10.`:'Todas as verificações atendem com os dados informados.'));}
   b.push(H1('2. Dados de entrada'));
   b.push(TBL(inputRows(),[2.2,4.6,2.6],['l','l','r']));
   b.push(H1('3. Geometria'));
@@ -2070,7 +2057,7 @@ function docxParts(R,figs,state){
    '_rels/.rels':`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`,
    'word/_rels/document.xml.rels':`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdFooter" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>${imgs.map(g=>`<Relationship Id="${g.rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${g.name}"/>`).join('')}</Relationships>`,
    'word/styles.xml':`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="Arial" w:cs="Arial"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="pt-BR"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="100" w:line="264" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style></w:styles>`,
-   'word/footer1.xml':`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="center"/></w:pPr>${RUN('Memorial de cálculo – Muro de vedação · página ',{sz:18})}<w:fldSimple w:instr=" PAGE ">${RUN('1',{sz:18})}</w:fldSimple></w:p></w:ftr>`,
+   'word/footer1.xml':`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="center"/></w:pPr>${RUN(`Memorial de cálculo – Muro de ${R.dh>0.01?'contenção e vedação':'vedação'} · página `,{sz:18})}<w:fldSimple w:instr=" PAGE ">${RUN('1',{sz:18})}</w:fldSimple></w:p></w:ftr>`,
    'word/document.xml':memorialXML(R,figs,state)
   };
 }
