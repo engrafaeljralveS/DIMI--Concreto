@@ -210,6 +210,7 @@ td.txt{font-family:var(--body);text-align:left;color:var(--muted);font-size:12.5
       <div class="beamcol">
         <div class="panel beam"><header><h3>Baldrame</h3><small id="bISub"></small></header><div id="beamI"></div></div>
         <div class="panel beam"><header><h3>Cinta superior (verga de topo)</h3><small id="bSSub"></small></header><div id="beamS"></div></div>
+        <div class="panel beam" id="beamWPanel" hidden><header><h3>Parede de concreto (placa)</h3><small id="bWSub"></small></header><div id="beamW"></div></div>
         <div class="panel beam" id="beamCPanel" hidden><header><h3>Cinta intermediária</h3><small id="bCSub"></small></header><div id="beamC"></div></div>
       </div>
       <div class="panel"><header><h3>Ações na base da sapata</h3><small id="baseSub"></small></header><div class="scroll"><table id="tabBase"></table></div></div>
@@ -672,9 +673,13 @@ function calc(){
         const rs=[];for(let j=0;j<=ny;j++){const q=-(-3*lap(0,j)+4*lap(1,j)-lap(2,j))/(2*a);rs.push(q);if(j<ny)Qmax=Math.max(Qmax,Math.abs(q))} // canto livre fora do máximo (singularidade local)
         let Ft=0;const k=200;for(let i=0;i<k;i++)Ft+=pS(R.ytop+(i+.5)*hw/k,c)*hw/k;Ft=(Ft+(top?Rtop(c):0))*ln; // carga total no painel (kN)
         const Fs=Ft-Fb;let sr=0;rs.forEach((q,j)=>sr+=q*b*((j===0||j===ny)?.5:1));const fr=Math.abs(sr)>1e-9?Fs/(2*sr):0;
+        {const im=Math.round(nx/2);o.my=[];o.qy=[];for(let j=0;j<=ny;j++){o.my.push(wyy(im,j)+nu*wxx(im,j));
+          const dq=j===0?(-3*lap(im,0)+4*lap(im,1)-lap(im,2))/(2*b):j===ny?(3*lap(im,ny)-4*lap(im,ny-1)+lap(im,ny-2))/(2*b):(lap(im,j+1)-lap(im,j-1))/(2*b);o.qy.push(-dq)}
+         let jx=0,mxv=-1;for(let j=0;j<=ny;j++)for(let i=0;i<=nx;i++){const v=Math.abs(wxx(i,j)+nu*wyy(i,j));if(v>mxv){mxv=v;jx=j}}
+         o.jx=jx;o.mx=[];for(let i=0;i<=nx;i++)o.mx.push(wxx(i,jx)+nu*wyy(i,jx));}
         o.top=top;o.r=rs.map(q=>q*fr);o.Ft=Ft;o.Fb=Fb;o.Fs=Fs;o.base=Math.abs(Ft)>1e-9?Fb/Ft:0;o.Qmax=Qmax;return o});
       if(PLCACHE.size>8)PLCACHE.clear();PLCACHE.set(key,out);return out};
-    const all=[...solveCase(true),...solveCase(false)];P0.cases=all.filter(o=>o.top);P0.casesP=all.filter(o=>!o.top); // parede: com a reação do pano no topo; pilar: sem ela (o pano já vai inteiro para o pilar)
+    const all=[...solveCase(true),...solveCase(false)];P0.a=a;P0.b=b;P0.cases=all.filter(o=>o.top);P0.casesP=all.filter(o=>!o.top); // parede: com a reação do pano no topo; pilar: sem ela (o pano já vai inteiro para o pilar)
     P0.share=Math.min(...P0.cases.map(o=>o.base)); // menor parcela que desce pela base (a favor da segurança para os pilares)
     // pilar: acima da parede recebe a faixa inteira; na altura da parede, as reações laterais dos dois painéis vizinhos + a pressão na própria largura
     const loadP=(y,o)=>{if(y>=R.yA||y<R.ytop)return pS(y,o.c)*s;const j=Math.min(ny,Math.max(0,Math.round((y-R.ytop)/b)));return 2*o.r[j]+pS(y,o.c)*hp/100};
@@ -730,6 +735,12 @@ function calc(){
     return {lab,a:aa,Md,bw:100,d:dS,...r,Asmin,Asf:As,sp,txt:r.ok?`Ø${f(I.phs,1)} c/${sp}`:'—'}};
   R.SB=sap(arm?'Sapata corrida – transversal, face inferior':'Sapata – direção B, face inferior',MdB,aB);
   R.SBs=MdSup>0.01?sap(arm?'Sapata corrida – transversal, face superior':'Sapata – direção B, face superior',MdSup,aB):null;
+  // nó parede de concreto–sapata (sapata de divisa): o momento da base da parede continua na sapata; face do vizinho → armadura inferior, face interna → superior
+  if(R.CW){const W=R.CW,J={};W.no=J;J.MdE=1.4*W.MyE;J.MdI=1.4*Math.max(0,...W.PL.cases.map(o=>-o.my[0]));J.solo=R.SB.Md;J.soloSup=R.SBs?R.SBs.Md:0;
+    if(J.MdE>R.SB.Md){R.SB=sap(R.SB.lab+' (nó com a parede)',J.MdE,aB);J.gov='parede'}
+    if(J.MdI>0.01&&J.MdI>(R.SBs?R.SBs.Md:0))R.SBs=sap('Sapata corrida – transversal, face superior (nó com a parede)',J.MdI,aB);
+    const fyd=Math.min(I.fyk,500)/1.15/10,fcdS=I.fck/1.4/10,MR=sp=>{const As=area(I.phs)/sp*100;return As*fyd*(dS-As*fyd/(2*0.85*fcdS*100))/100};
+    J.MRdInf=MR(R.SB.sp);J.MRdSup=MR(R.SBs?R.SBs.sp:20);J.ok=R.SB.ok&&(!R.SBs||R.SBs.ok)&&J.MdE<=J.MRdInf+1e-9&&J.MdI<=J.MRdSup+1e-9;}
   if(iso){const aL=Math.max(0,(L-hpe/100)/2);R.SL=sap('Sapata – direção L',1.4*R.N/(I.B*L)*aL*aL/2,aL)}
   else if(arm)R.SL=sap('Sapata corrida – longitudinal (distribuição)',0,0);
   else{ // corrida sob pilares: viga invertida contínua entre pilares, carga do solo uniforme
@@ -1138,8 +1149,39 @@ function renderSec(R){
     $('beamS').innerHTML=`<p class="note">Verga de topo de amarração (canaleta grauteada), ${f(I.bws,0)} × ${f(I.hcs,0)} cm, com 2 Ø${f(I.phv,1)}. Sem pilares, não recebe reação concentrada.</p>`;$('bSSub').textContent='';}
   else if(R.cor){$('beamI').innerHTML=`<p class="note">Sapata corrida: não há baldrame. A alvenaria apoia direto na sapata (${R.CW?`parede de concreto de ${f(R.CW.h)} m engastada na sapata e pano de alvenaria daí à cinta superior, ${f(R.Halv)} m`:`o pano vai do topo da sapata à cinta superior, ${f(R.Halv)} m`}) e o peso do muro, ${f(R.qv,2)} kN/m, vai para a sapata corrida, dimensionada como viga contínua entre pilares.</p>`;$('beamS').innerHTML=beamSvg(R.qh,'qh',R.s);$('bISub').textContent='';$('bSSub').textContent='Reação no topo do pano (faixa vertical biapoiada)'}
   else{$('beamI').innerHTML=beamSvg(R.qv,'q',R.s);$('beamS').innerHTML=beamSvg(R.qh,'qh',R.s);$('bISub').textContent='Peso do muro, vão = espaçamento';$('bSSub').textContent='Reação no topo do pano (faixa vertical biapoiada)'}
+  $('beamWPanel').hidden=!R.CW;if(R.CW){$('beamW').innerHTML=wallSvg(R)+wallNote(R);$('bWSub').textContent='Envoltória: laterais engastadas/apoiadas, vento nos dois sentidos'}
   $('beamCPanel').hidden=!R.CI;if(R.CI){$('beamC').innerHTML=beamSvg(R.CI.q,'qci',R.s);$('bCSub').textContent='Reação do painel inferior + do superior'}
 }
+// diagramas da parede de concreto (placa): My e Qy no meio do vão ao longo da altura, Mx ao longo do vão, e o nó com a sapata
+function wallSvg(R){const W=R.CW,PL=W.PL,C=PL.cases,ny=PL.ny,b=PL.b,nx=PL.nx;
+  const myE=[],myI=[],qy=[];for(let j=0;j<=ny;j++){myE.push(Math.max(0,...C.map(o=>o.my[j])));myI.push(Math.max(0,...C.map(o=>-o.my[j])));qy.push(Math.max(...C.map(o=>Math.abs(o.qy[j]))))}
+  const oX=C.reduce((u,v)=>Math.max(...v.mx.map(Math.abs))>Math.max(...u.mx.map(Math.abs))?v:u);
+  const top=46,bot=236,H=bot-top,Yj=j=>bot-j/ny*H,T=(x,y,t,an='start',sz=13,w='normal',cl='')=>`<text x="${x}" y="${y}" text-anchor="${an}" font-size="${sz}" font-weight="${w}"${cl?` class="${cl}"`:''}>${t}</text>`;
+  let o=`<svg viewBox="0 0 640 300" role="img" aria-label="Diagramas da parede de concreto"><defs><marker id="awM" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--ink)"/></marker></defs>`;
+  // 1) My na altura, com a sapata
+  const xw=110,tw=12;o+=`<rect x="${xw}" y="${top}" width="${tw}" height="${H}" fill="var(--conc)" stroke="var(--concline)"/><rect x="${xw}" y="${bot}" width="110" height="20" fill="var(--conc)" stroke="var(--concline)"/>`;
+  const mm=Math.max(1e-6,...myE,...myI),sx=70/mm,pts=(arr,sg)=>arr.map((v,j)=>`${xw+(sg<0?0:tw)+sg*v*sx},${Yj(j)}`).join(' ');
+  o+=`<polygon points="${xw},${bot} ${pts(myE,-1)} ${xw},${top}" fill="var(--accent)" fill-opacity=".18" stroke="var(--accent)" stroke-width="1.4"/>`;
+  o+=`<polygon points="${xw+tw},${bot} ${pts(myI,1)} ${xw+tw},${top}" fill="var(--wind)" fill-opacity=".16" stroke="var(--wind)" stroke-width="1.2"/>`;
+  o+=T(xw+6,20,'My – meio do vão','middle',14,'bold')+T(xw-8,top+14,'vizinho','end',12,'normal','t-muted')+T(xw+tw+8,top+14,'interna','start',12,'normal','t-muted');
+  o+=T(xw-myE[0]*sx-4,bot-6,f(myE[0],2),'end',13,'normal','t-m');
+  {const jm=myI.indexOf(Math.max(...myI));if(myI[jm]>1e-3)o+=T(xw+tw+myI[jm]*sx+4,Yj(jm)+4,f(myI[jm],2),'start',13,'normal','t-m')}
+  o+=`<path d="M${xw+tw+34} ${bot-30} a20 20 0 1 1 -4 40" fill="none" stroke="var(--ink)" stroke-width="1.3" marker-end="url(#awM)"/>`+T(xw+70,bot+15,'sapata','middle',12,'normal','t-muted');
+  o+=T(xw+6,top-8,sgn(R.yA),'middle',12)+T(xw-6,bot+34,sgn(R.ytop),'end',12);
+  // 2) Qy na altura
+  const xq=300,qm=Math.max(1e-6,...qy),sq=60/qm;o+=`<line x1="${xq}" y1="${top}" x2="${xq}" y2="${bot}" stroke="var(--ink)" stroke-width=".9"/><polygon points="${xq},${bot} ${qy.map((v,j)=>`${xq+v*sq},${Yj(j)}`).join(' ')} ${xq},${top}" fill="var(--vcol)" fill-opacity=".16" stroke="var(--vcol)" stroke-width="1.3"/>`;
+  o+=T(xq+20,20,'Qy','middle',14,'bold')+T(xq+qy[0]*sq+4,bot-6,f(qy[0],2),'start',13,'normal','t-m');
+  // 3) Mx ao longo do vão
+  const x0=430,x1=620,ym=140,mxm=Math.max(1e-6,...oX.mx.map(Math.abs)),smx=70/mxm,px=i=>x0+(x1-x0)*i/nx,im=Math.round(nx/2);
+  o+=`<rect x="${x0-10}" y="${ym-80}" width="10" height="160" fill="var(--conc)" stroke="var(--concline)"/><rect x="${x1}" y="${ym-80}" width="10" height="160" fill="var(--conc)" stroke="var(--concline)"/>`;
+  o+=`<line x1="${x0}" y1="${ym}" x2="${x1}" y2="${ym}" stroke="var(--ink)" stroke-width=".9"/><polygon points="${x0},${ym} ${oX.mx.map((v,i)=>`${px(i)},${ym-v*smx}`).join(' ')} ${x1},${ym}" fill="var(--accent)" fill-opacity=".16" stroke="var(--accent)" stroke-width="1.4"/>`;
+  o+=T((x0+x1)/2,20,'Mx – no vão','middle',14,'bold')+T((x0+x1)/2,38,`a ${f(oX.jx*b,2)} m da base`,'middle',12,'normal','t-muted');
+  const lb=(v,x,an)=>T(x,ym-v*smx+(v>0?-6:16),f(v,2),an,13,'normal','t-m');o+=lb(oX.mx[0],x0+4,'start')+lb(oX.mx[im],(x0+x1)/2,'middle');
+  o+=T((x0+x1)/2,ym+100,'pilar ← vão livre → pilar','middle',12,'normal','t-muted');
+  return o+`</svg>`;}
+function wallNote(R){const W=R.CW,J=W.no||{};
+  return `<p class="note" style="margin-top:6px">Valores característicos em kN·m/m e kN/m; acima do eixo (ou à esquerda) tracionam a face do vizinho. Pela base descem ${f(W.share*100,0)}–${f(W.shareMax*100,0)}% da carga do painel; até ${f(W.Fs,2)} kN vão para os pilares.</p>
+   <p class="note"><b>Nó parede–sapata:</b> Md,base = 1,4 × ${f(W.MyE,2)} = ${f(J.MdE,2)} kN·m/m (armadura inferior da sapata) e ${f(J.MdI,2)} kN·m/m na face interna (superior). Pelo solo, a sapata pede ${f(J.solo,2)} kN·m/m${J.gov?'; quem governa é a parede':''}. MRd adotado: ${f(J.MRdInf,2)} (inferior) e ${f(J.MRdSup,2)} (superior) – ${J.ok?'compatível':'<b>não atende</b>: aumente hs ou a barra da sapata'}.</p>`}
 function beamSvg(q,qlab,sp){
   const x1=40,x2=400,len=x2-x1,Vm=q*sp/2,Mm=q*sp*sp/8;let o=`<svg viewBox="0 0 440 250" role="img" aria-label="Diagramas da viga">`;
   o+=`<defs><marker id="aq${qlab}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--ink)"/></marker></defs><line x1="${x1}" y1="22" x2="${x2}" y2="22" stroke="var(--ink)"/>`;
@@ -1218,7 +1260,7 @@ function renderChecks(R){
   if(R.arm)html+=`<tr><td>${R.enr?'Pano entre enrijecedores no assentamento (por m)':'Alvenaria armada no assentamento (por m)'}</td><td>100 × ${f(R.dA,1)}</td><td>${f(R.MdA,3)}</td><td>${f(R.Mu,3)}</td><td>${R.xiOk?f(R.AsCalc)+'/m':'—'}</td><td>${f(R.AsMinA)}/m</td><td>${R.espOk?`Ø${f(R.phiA,1)} c/${f(R.espAd,0)} até ${f(R.ateA)} m`:'aumentar Ø'}</td><td>${pill(R.xiOk)}</td></tr>`;
   html+=rowsAs.map(r=>{const u=r.bw===100?'/m':'';return `<tr><td>${r.lab}</td><td>${f(r.bw,0)} × ${f(r.d,1)}</td><td>${f(r.Md)}${u}</td><td>${f(r.KMD,3)}</td><td>${r.ok?f(r.As)+u:'—'}</td><td>${f(r.Asmin)}${u}</td><td>${r.txt}</td><td>${pill(r.ok)}</td></tr>`}).join('');
   if(R.CW){const W=R.CW,rw=(lab,F,pos)=>`<tr><td>${lab}</td><td>100 × ${f(W.d,1)}</td><td>${f(F.Md)}/m</td><td>${f(F.KMD,3)}</td><td>${F.ok?f(F.As)+'/m':'—'}</td><td>${f(F.Amin)}/m</td><td>${F.ok?`${phiTxt(W.phi)} c/${F.sp} ${pos}`:'—'}</td><td>${pill(F.ok&&F.sp>=5)}</td></tr>`;
-   html+=rw('Parede de concreto – vertical, face do vizinho (base)',W.ext,'')+rw('Parede de concreto – vertical, face interna (base)',W.int,'')+rw('Parede de concreto – horizontal, face do vizinho (no pilar)',W.horE,'')+rw('Parede de concreto – horizontal, face interna (vão)',W.horI,'')}
+   html+=rw('Parede de concreto – vertical, face do vizinho (base)',W.ext,'')+rw('Parede de concreto – vertical, face interna (base)',W.int,'')+rw('Parede de concreto – horizontal, face do vizinho (no pilar)',W.horE,'')+rw('Parede de concreto – horizontal, face interna (vão)',W.horI,'')+(W.no?`<tr><td>Nó parede–sapata (sapata, face inferior / superior)</td><td>100 × ${f(R.SB.d,1)}</td><td>${f(W.no.MdE)} / ${f(W.no.MdI)}</td><td>–</td><td>–</td><td>–</td><td>MRd ${f(W.no.MRdInf)} / ${f(W.no.MRdSup)}</td><td>${pill(W.no.ok)}</td></tr>`:'')}
   if(R.enr){const E=R.E;html+=`<tr><td>Enrijecedor – barras na junta (vento para o interior)</td><td>${f(R.eenr,0)} × ${f(E.d,1)}</td><td>${f(E.MdPos)}</td><td>x/d ${f(E.rP.xi,3)}</td><td>${E.rP.ok?f(E.rP.As):'—'}</td><td>${f(E.AsMinP)}</td><td>${E.rP.ok?`${E.nP} ${phiTxt(E.phi)}`:'aumentar tenr'}</td><td>${pill(E.rP.ok&&E.nP<=2)}</td></tr>
    <tr><td>Enrijecedor – barras na ponta (vento para a divisa)</td><td>${f(E.bm,0)} × ${f(E.d,1)} (T)</td><td>${f(E.MdNeg)}</td><td>x/d ${f(E.rN.xi,3)}</td><td>${E.rN.ok?f(E.rN.As):'—'}</td><td>${f(E.AsMinN)}</td><td>${E.rN.ok?`${E.nN} ${phiTxt(E.phi)}`:'aumentar tenr'}</td><td>${pill(E.rN.ok&&E.nN<=2)}</td></tr>
    <tr><td>${E.PE.lab}</td><td>${f(E.PE.bw,0)} × ${f(E.PE.d,1)}</td><td>${f(E.PE.Md)}</td><td>${f(E.PE.KMD,3)}</td><td>${E.PE.ok?f(E.PE.As):'—'}</td><td>${f(E.PE.Asmin)}</td><td>${E.PE.txt}</td><td>${pill(E.PE.ok)}</td></tr>
@@ -1288,7 +1330,7 @@ function renderChecks(R){
   if(I.cone==='sim')obs.push(`A cunha de arrancamento (${f(R.Wc,1)} kN, β = ${f(I.beta,0)}°) só entra no tombamento, porque só é mobilizada quando a sapata tende a levantar. Ela não entra nas tensões no solo nem no deslizamento.`);
   $('obs').innerHTML=obs.map(t=>`<div class="callout">${t}</div>`).join('');
   const alvFails=R.arm?[R.xiOk,R.lamAOk,R.vAok,...(R.enr?[R.E.rP.ok,R.E.rN.ok,R.E.furoOk,R.E.vOk,R.E.fit,R.E.hOk||R.E.rH.ok,R.E.PE.ok,R.E.PE.vok]:[])]:[R.panoOk,R.limE,R.lamPanoOk!==false,R.P1.lamOk!==false,R.P1.bminOk,R.P2.bminOk,R.topoLivre||R.BS.uOk,R.CI?R.CI.uOk&&R.CI.v2ok:true];
-  const fails=C.filter(c=>c.ok===false).length+rowsAs.filter(r=>!r.ok&&r.Md>0).length+alvFails.filter(x=>!x).length+(R.arm?[R.P2.vok,R.SV.ok]:[R.CW?R.CW.ok:true,R.P1.vok,R.P2.vok,R.BI?R.BI.v2ok:true,R.BS.v2ok,R.SV.ok,R.TS?R.TS.ok:true,R.PU?R.PU.ok:true]).filter(x=>!x).length;
+  const fails=C.filter(c=>c.ok===false).length+rowsAs.filter(r=>!r.ok&&r.Md>0).length+alvFails.filter(x=>!x).length+(R.arm?[R.P2.vok,R.SV.ok]:[R.CW?R.CW.ok&&(!R.CW.no||R.CW.no.ok):true,R.P1.vok,R.P2.vok,R.BI?R.BI.v2ok:true,R.BS.v2ok,R.SV.ok,R.TS?R.TS.ok:true,R.PU?R.PU.ok:true]).filter(x=>!x).length;
   LAST={fails,obs};
   $('verdict').innerHTML=`<div class="verdict ${fails?'bad':'ok'}">${fails?`${fails} verificação(ões) não atende(m). Ajuste os dados na aba Dados.`:'Todas as verificações atendem com os dados informados.'}</div>`;
 }
@@ -1860,6 +1902,7 @@ function memorialXML(R,figs,state){
       b.push(EQ('Caminho da carga:',`pela base (sapata) descem entre ${f(W.share*100,0)}% e ${f(W.shareMax*100,0)}% da carga lateral do painel; o restante, até ${f(W.Fs,2)} kN por painel, vai para os pilares (metade para cada um)`));
       b.push(EQ('Flexão vertical:',`Mk,máx = ${f(W.MyE,2)} kN·m/m tracionando a face do vizinho (base) e ${f(W.MyI,2)} kN·m/m a face interna; d = ${f(W.d,1)} cm; KMD ${f(W.ext.KMD,3)} e ${f(W.int.KMD,3)}; As = ${f(W.ext.As,2)} e ${f(W.int.As,2)} cm²/m (mín. 0,15%·b·h = ${f(W.ext.Amin,2)}) → ${phiTxt(W.phi)} c/${W.ext.sp} e c/${W.int.sp} (${ST(W.ext.ok&&W.int.ok)})`));
       b.push(EQ('Flexão horizontal:',`Mk,máx = ${f(W.MxE,2)} kN·m/m na face do vizinho (junto ao pilar) e ${f(W.MxI,2)} kN·m/m na face interna (vão); As = ${f(W.hor.As,2)} cm²/m por face (mín. ${f(W.hor.Amin,2)}) → ${phiTxt(W.phi)} c/${W.hor.sp} (${ST(W.horE.ok&&W.horI.ok)})`));
+      if(W.no)b.push(EQ('Nó parede–sapata:',`o momento da base da parede continua na sapata de divisa: face do vizinho tracionada → armadura inferior (Md = 1,4 × ${f(W.MyE,2)} = ${f(W.no.MdE,2)} kN·m/m), face interna → superior (Md = ${f(W.no.MdI,2)} kN·m/m). A armadura transversal da sapata foi dimensionada para o maior entre esse momento e o do balanço pelo solo (${f(W.no.solo,2)} kN·m/m): MRd = ${f(W.no.MRdInf,2)} e ${f(W.no.MRdSup,2)} kN·m/m (${ST(W.no.ok)})`));
       b.push(EQ('Cortante:',`maior cortante na placa (base ou apoio no pilar) Vd = 1,4 × ${f(W.Qmax,2)} = ${f(W.Vd,2)} kN/m ≤ VRd1 = ${f(W.VRd1,2)} kN/m (${ST(W.vOk)}), sem estribos`));
       b.push(EQ('Pilar:',`na altura da parede o pilar recebe só as reações laterais da placa (dos dois painéis vizinhos) e a pressão na própria largura; acima dela, a faixa inteira de ${f(R.s)} m. Assim o momento no pescoço já considera a parcela que desce direto para a sapata`));}
     if(R.BI)vg(R.BI,`7.${nv++} Baldrame`,'q');vg(R.BS,`7.${nv++} Cinta superior (flexão no plano horizontal)`,'qh = reação no topo do pano superior (faixa vertical biapoiada sob a pressão lateral real)');
