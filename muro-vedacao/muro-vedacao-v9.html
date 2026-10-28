@@ -81,7 +81,7 @@ fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column}
 .btn.ghost{background:none}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 svg{display:block}
-svg:not(.dwg) text{font-family:var(--mono);font-size:11px;fill:var(--ink)}
+svg:not(.dwg) text{font-family:var(--mono);fill:var(--ink)}svg:not(.dwg):not(.fs) text,svg.fs text:not([font-size]){font-size:11px}
 svg .t-muted{fill:var(--muted)} svg .t-title{font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.03em}
 svg .t-wind{fill:var(--wind)} svg .t-soil{fill:var(--soil)} svg .t-v{fill:var(--vcol)} svg .t-m{fill:var(--accent)} svg .t-div{fill:var(--divisa);font-weight:500}
 svg .t-ok{fill:var(--ok)} svg .t-bad{fill:var(--bad)} svg .t-st{fill:var(--steel)}
@@ -218,7 +218,7 @@ td.txt{font-family:var(--body);text-align:left;color:var(--muted);font-size:12.5
     <div class="panel" id="beamWPanel" hidden><header><h3>Parede de concreto (placa)</h3><small id="bWSub"></small></header><div id="beamW"></div></div>
     <div class="panel">
       <header><h3>Ações na base da sapata</h3><small id="baseSub"></small></header>
-      <div class="scroll"><svg id="baseDiag" viewBox="0 0 1200 330" role="img" aria-label="Resultantes e pressões no solo em cada caso"></svg></div>
+      <div class="scroll"><svg id="baseDiag" class="fs" viewBox="0 0 1200 365" role="img" aria-label="Resultantes e pressões no solo em cada caso"></svg></div>
       <div class="scroll"><table id="tabBase"></table></div>
     </div>
     <div class="nav"><button class="btn" type="button" data-go="1">← Dados</button><button class="btn primary" type="button" data-go="3">Seguinte: verificações →</button></div>
@@ -1166,7 +1166,7 @@ function wallSvg(R){const W=R.CW,PL=W.PL,C=PL.cases,ny=PL.ny,b=PL.b,nx=PL.nx;
   const myE=[],myI=[],qy=[];for(let j=0;j<=ny;j++){myE.push(Math.max(0,...C.map(o=>o.my[j])));myI.push(Math.max(0,...C.map(o=>-o.my[j])));qy.push(Math.max(...C.map(o=>Math.abs(o.qy[j]))))}
   const oX=C.reduce((u,v)=>Math.max(...v.mx.map(Math.abs))>Math.max(...u.mx.map(Math.abs))?v:u);
   const top=46,bot=236,H=bot-top,Yj=j=>bot-j/ny*H,T=(x,y,t,an='start',sz=13,w='normal',cl='')=>`<text x="${x}" y="${y}" text-anchor="${an}" font-size="${sz}" font-weight="${w}"${cl?` class="${cl}"`:''}>${t}</text>`;
-  let o=`<svg viewBox="0 0 640 300" role="img" aria-label="Diagramas da parede de concreto"><defs><marker id="awM" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--ink)"/></marker></defs>`;
+  let o=`<svg class="fs" viewBox="0 0 640 300" role="img" aria-label="Diagramas da parede de concreto"><defs><marker id="awM" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--ink)"/></marker></defs>`;
   // 1) My na altura, com a sapata
   const xw=110,tw=12;o+=`<rect x="${xw}" y="${top}" width="${tw}" height="${H}" fill="var(--conc)" stroke="var(--concline)"/><rect x="${xw}" y="${bot}" width="110" height="20" fill="var(--conc)" stroke="var(--concline)"/>`;
   const mm=Math.max(1e-6,...myE,...myI),sx=70/mm,pts=(arr,sg)=>arr.map((v,j)=>`${xw+(sg<0?0:tw)+sg*v*sx},${Yj(j)}`).join(' ');
@@ -1196,19 +1196,20 @@ function baseSvg(R){const cs=[R.perm,...R.cW],B=I.B,w=330,sc=w/B,T=(x,y,t,an='mi
   let o=`<defs><marker id="abN" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--ink)"/></marker><marker id="abH" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--wind)"/></marker></defs>`;
   const smx=Math.max(1,...cs.map(c=>isFinite(c.smax)?c.smax:0)),ps=90/smx;
   cs.forEach((c,k)=>{const x0=40+k*400,yb=150,xs=x=>x0+x*sc,xc=xs(B/2+c.e);
-    o+=T(x0+w/2,24,c.lab,'middle',15,'bold');
+    o+=T(x0+w/2,26,c.lab,'middle',20,'bold');
     o+=`<rect x="${x0}" y="${yb-26}" width="${w}" height="26" fill="var(--conc)" stroke="var(--concline)"/>`;
-    o+=`<line x1="${x0}" y1="${yb-80}" x2="${x0}" y2="${yb+10}" stroke="var(--divisa)" stroke-dasharray="8 3 2 3"/>`+T(x0+4,yb-84,'divisa','start',11,'normal','t-div');
+    o+=`<line x1="${x0}" y1="${yb-80}" x2="${x0}" y2="${yb+10}" stroke="var(--divisa)" stroke-dasharray="8 3 2 3"/>`+T(x0+4,yb-32,'divisa','start',14,'normal','t-div');
     o+=`<line x1="${xs(B/2)}" y1="${yb-30}" x2="${xs(B/2)}" y2="${yb+4}" stroke="var(--muted)" stroke-dasharray="3 3"/>`;
-    o+=`<line x1="${xc}" y1="${yb-92}" x2="${xc}" y2="${yb-30}" stroke="var(--ink)" stroke-width="2" marker-end="url(#abN)"/>`+T(xc+(c.e<0?-8:8),yb-74,`N = ${f(R.N,1)} kN`,c.e<0?'end':'start',13);
-    o+=T(xc+(c.e<0?-8:8),yb-58,`e = ${f(c.e,3)} m`,c.e<0?'end':'start',13,'normal','t-m');
-    if(Math.abs(c.Hh)>1e-6){const d=c.Hh>0?1:-1,xa=x0+w/2-d*50;o+=`<line x1="${xa}" y1="${yb+4}" x2="${xa+d*100}" y2="${yb+4}" stroke="var(--wind)" stroke-width="2" marker-end="url(#abH)"/>`+T(xa+d*50,yb+20,`H = ${f(Math.abs(c.Hh),2)} kN`,'middle',12,'normal','t-wind')}
+    o+=`<line x1="${xc}" y1="${yb-92}" x2="${xc}" y2="${yb-30}" stroke="var(--ink)" stroke-width="2" marker-end="url(#abN)"/>`+T(xc+(c.e<0?-8:8),yb-74,`N = ${f(R.N,1)} kN`,c.e<0?'end':'start',17);
+    o+=T(xc+(c.e<0?-8:8),yb-58,`e = ${f(c.e,3)} m`,c.e<0?'end':'start',17,'normal','t-m');
+    if(Math.abs(c.Hh)>1e-6){const d=c.Hh>0?1:-1,xa=x0+w/2-d*50;o+=`<line x1="${xa}" y1="${yb+4}" x2="${xa+d*100}" y2="${yb+4}" stroke="var(--wind)" stroke-width="2" marker-end="url(#abH)"/>`+T(xa+d*50,yb+22,`H = ${f(Math.abs(c.Hh),2)} kN`,'middle',16,'normal','t-wind')}
     // pressões
     const pts=[];for(let i=0;i<=60;i++){const x=B*i/60;pts.push(`${xs(x)},${yb+30+Math.min(c.sig(x),smx)*ps}`)}
     o+=`<polygon points="${xs(0)},${yb+30} ${pts.join(' ')} ${xs(B)},${yb+30}" fill="var(--soil)" fill-opacity=".22" stroke="var(--soil)" stroke-width="1.4"/><line x1="${x0}" y1="${yb+30}" x2="${x0+w}" y2="${yb+30}" stroke="var(--ink)" stroke-width=".8"/>`;
-    const s0=c.sig(0),s1=c.sig(B);o+=T(xs(0)+4,yb+30+s0*ps+16,f(s0,1),'start',13,'normal','t-soil')+T(xs(B)-4,yb+30+s1*ps+16,f(s1,1),'end',13,'normal','t-soil');
-    o+=T(x0+w/2,yb+152,`σmáx ${f(c.smax,1)} kPa · contato ${f(Math.min(1,c.lc/B)*100,0)}%`,'middle',13);
-    o+=T(x0+w/2,yb+170,`M = ${f(c.Mt,2)} kN·m${isFinite(c.FSt)?` · FS tomb. ${f(c.FSt,2)}`:''}${isFinite(c.FSd)?` · FS desl. ${f(c.FSd,2)}`:''}`,'middle',12,'normal','t-muted')});
+    const s0=c.sig(0),s1=c.sig(B);o+=T(xs(0)+4,yb+30+s0*ps+16,f(s0,1),'start',17,'normal','t-soil')+T(xs(B)-4,yb+30+s1*ps+16,f(s1,1),'end',17,'normal','t-soil');
+    o+=T(x0+w/2,yb+156,`σmáx ${f(c.smax,1)} kPa · contato ${f(Math.min(1,c.lc/B)*100,0)}%`,'middle',16);
+    o+=T(x0+w/2,yb+180,`M = ${f(c.Mt,2)} kN·m`,'middle',15,'normal','t-muted');
+    if(isFinite(c.FSt)||isFinite(c.FSd))o+=T(x0+w/2,yb+200,`FS tomb. ${isFinite(c.FSt)?f(c.FSt,2):'–'} · FS desl. ${isFinite(c.FSd)?f(c.FSd,2):'–'}`,'middle',15,'normal','t-muted')});
   return o}
 function beamSvg(q,qlab,sp){
   const x1=40,x2=400,len=x2-x1,Vm=q*sp/2,Mm=q*sp*sp/8;let o=`<svg viewBox="0 0 440 250" role="img" aria-label="Diagramas da viga">`;
@@ -1736,8 +1737,8 @@ function secaoSvg(R){
 
 /* ---------- memorial de cálculo (Word) ---------- */
 const LIGHT={paper:'#eef2f5',sheet:'#ffffff',ink:'#16212c',muted:'#5a6774',line:'#d3dbe3',line2:'#e6ebf0',accent:'#1c5ca3','accent-ink':'#ffffff',wind:'#127f98',soil:'#9a6a25',soilfill:'#ecdfc6',conc:'#cbd1d7',concline:'#5f6b77',brick:'#efd2c5',brickline:'#b0573f',block:'#dfe3e8',blockline:'#7d8994',vcol:'#6a4cb0',divisa:'#b3261e',steel:'#b3261e',ok:'#2c7a4b',okbg:'#e2f2e8',bad:'#b3261e',badbg:'#fbe4e1',warn:'#9a6200',warnbg:'#fbefd5'};
-const SVG_STYLE=`<style>text{font-family:Arial,Helvetica,sans-serif;font-size:11px;fill:${LIGHT.ink}}.t-muted{fill:${LIGHT.muted}}.t-title{font-size:14px;font-weight:bold}.t-wind{fill:${LIGHT.wind}}.t-soil{fill:${LIGHT.soil}}.t-v{fill:${LIGHT.vcol}}.t-m{fill:${LIGHT.accent}}.t-div{fill:${LIGHT.divisa};font-weight:bold}.t-ok{fill:${LIGHT.ok}}.t-bad{fill:${LIGHT.bad}}.t-st{fill:${LIGHT.steel}}</style>`;
-const lightSvg=(inner,vb)=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}"><rect x="-2000" y="-2000" width="6000" height="6000" fill="#ffffff"/>${SVG_STYLE}${inner.replace(/var\(--([\w-]+)\)/g,(m,k)=>LIGHT[k]||'#000')}</svg>`;
+const SVG_STYLE=`<style>text{font-family:Arial,Helvetica,sans-serif;fill:${LIGHT.ink}}svg:not(.fs) text,svg.fs text:not([font-size]){font-size:11px}.t-muted{fill:${LIGHT.muted}}.t-title{font-size:14px;font-weight:bold}.t-wind{fill:${LIGHT.wind}}.t-soil{fill:${LIGHT.soil}}.t-v{fill:${LIGHT.vcol}}.t-m{fill:${LIGHT.accent}}.t-div{fill:${LIGHT.divisa};font-weight:bold}.t-ok{fill:${LIGHT.ok}}.t-bad{fill:${LIGHT.bad}}.t-st{fill:${LIGHT.steel}}</style>`;
+const lightSvg=(inner,vb,cls)=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}"${cls?` class="${cls}"`:''}><rect x="-2000" y="-2000" width="6000" height="6000" fill="#ffffff"/>${SVG_STYLE}${inner.replace(/var\(--([\w-]+)\)/g,(m,k)=>LIGHT[k]||'#000')}</svg>`;
 function svgToPng(svg,w,h){return new Promise((res,rej)=>{const img=new Image();const scale=2;
   img.onload=()=>{try{const c=document.createElement('canvas');c.width=w*scale;c.height=h*scale;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(img,0,0,c.width,c.height);
     c.toBlob(b=>b?b.arrayBuffer().then(res,rej):rej(new Error('png')),'image/png')}catch(e){rej(e)}};
@@ -1844,6 +1845,7 @@ function vMem(P,est){const h=P.sh;
   return `${h.prat||P.bw>=100?'':'[espaçamento < 5 cm: aumentar a seção] '}Vd = ${f(P.Vd,2)} kN > VRd1 = ${f(P.VRd1,2)} kN → Modelo I (NBR 6118, 17.4.2.2): VRd2 = 0,27·αv2·fcd·bw·d = ${f(h.VRd2,1)} kN ${P.Vd<=h.VRd2?'≥':'<'} Vd (bielas ${h.ok?'atendem':'não atendem'}); Vc = 0,6·fctd·bw·d = ${f(h.Vc,2)} kN; Vsw = Vd − Vc = ${f(Math.max(0,P.Vd-h.Vc),2)} kN; Asw/s = Vsw/(0,9·d·fywd) = ${f(h.AswCalc,2)} cm²/m, mínimo 0,2·fctm/fywk·bw = ${f(h.AswMin,2)} cm²/m → ${f(h.Asw,2)} cm²/m; s ≤ ${f(Math.floor(h.sMax),0)} cm${est?`; ${est}`:''} (${h.ok&&(h.prat||P.bw>=100)?'Atende':'Não atende'})`}
 function memorialXML(R,figs,state){
   IMGID=1;const b=[];const arm=R.arm,dt=new Date().toLocaleDateString('pt-BR');
+  let FN=0;const FIGN=(name,t)=>{const g=figs.find(x=>x&&x.name===name);if(!g)return;b.push(FIG(g,`Figura ${++FN} – ${t}`))};
   const sysTxt=arm?`alvenaria estrutural armada em balanço${R.enr?`, com enrijecedores do próprio bloco a cada ${f(R.lenr)} m voltados para o lado interno`:''}, com sapata corrida ${R.cen?'centrada':'de divisa'}`:`pilares de concreto com alvenaria de vedação, baldrame, cinta superior e sapata ${R.cor?'corrida':'isolada'} ${R.cen?'centrada':'de divisa'}`;
   b.push(PP('MEMORIAL DE CÁLCULO – MURO DE VEDAÇÃO',{b:true,sz:24,align:'center',after:60}));
   if(I.nomeModelo)b.push(PP(String(I.nomeModelo),{b:true,sz:22,align:'center',after:60}));
@@ -1851,12 +1853,25 @@ function memorialXML(R,figs,state){
   b.push(H1('1. Objeto e critérios'));
   b.push(TXT(`Este memorial apresenta o dimensionamento de um muro de vedação no sistema de ${sysTxt}. As ações consideradas são o peso próprio, o vento e o empuxo de solo; a fundação é verificada quanto a tensões no solo, excentricidade, tombamento e deslizamento.`));
   b.push(TXT('Normas de referência: ABNT NBR 6118 (estruturas de concreto), NBR 6122 (fundações), NBR 6123 (forças devidas ao vento) e NBR 16868 (alvenaria estrutural). Estabilidade e tensões no solo em valores característicos; dimensionamento no ELU com γf = 1,4, γc = 1,4 e γs = 1,15.'));
+  {const c=R.crit,row=(a,v,l,ok)=>[a,v,l,ST(ok)],L=[];
+   L.push(row('Tensão no solo (com vento)',`${f(R.sigW,1)} kPa`,`≤ ${f(1.3*I.sadm,0)} kPa`,R.sigW<=1.3*I.sadm));
+   L.push(row('Contato com o solo',`${f(Math.min(...R.cW.map(q=>q.lc))/I.B*100,0)}%`,I.crit==='23'?'≥ 67%':'100%',R.cW.every(q=>q.ok)&&R.perm.ok));
+   L.push(row('Tombamento',`FS ${f(Math.min(...R.cW.map(q=>q.FSt)),2)}`,`≥ ${f(+I.FStMin||1.5,1)}`,Math.min(...R.cW.map(q=>q.FSt))>=(+I.FStMin||1.5)-1e-9));
+   L.push(row('Deslizamento',`FS ${f(Math.min(...R.cW.map(q=>q.FSd)),2)}`,`≥ ${f(+I.FSdMin||1.5,1)}`,Math.min(...R.cW.map(q=>q.FSd))>=(+I.FSdMin||1.5)-1e-9));
+   if(!arm){L.push(row(R.cor?'Pilar no topo do pescoço':'Pilar no NA',R.P1.txt,`Md ${f(R.P1.Md)} kN·m`,R.P1.ok&&R.P1.vok));L.push(row('Pescoço no topo da sapata',R.P2.txt,`Md ${f(R.P2.Md)} kN·m`,R.P2.ok&&R.P2.vok));
+     R.panels.forEach(P=>L.push(row(P.lab,P.can?`canaletas ${P.can.n} ${phiTxt(P.can.phi)} c/${f(P.can.eh)} m`:`σ ${f(P.sigPar/1000,3)} MPa`,P.can?`MRd,h ${f(P.can.Mh,2)} kN·m/m`:`ftd ${f(R.ftdP/1000,3)} MPa`,P.ok&&P.limE)));
+     if(R.CW)L.push(row('Parede de concreto',`${phiTxt(R.CW.phi)} c/${R.CW.ext.sp} (vertical)`,`Mk base ${f(R.CW.MyE,2)} kN·m/m`,R.CW.ok&&(!R.CW.no||R.CW.no.ok)));}
+   else L.push(row('Alvenaria armada',isFinite(R.AsA)?`Ø${f(R.phiA,1)} c/${f(R.espAd,0)}`:'—',`x/d ${f(R.xi,3)} ≤ 0,45`,R.xiOk&&R.lamAOk));
+   L.push(row('Sapata (transversal)',R.SB.txt,`Md ${f(R.SB.Md)} kN·m/m`,R.SB.ok&&R.SV.ok));
+   b.push(PP('Quadro-resumo',{b:true,before:160,after:60}));
+   b.push(TBL([['Verificação','Resultado','Limite / esforço','Situação'],...L],[3.6,3.2,2.6,1.4]));
+   b.push(TXT(state.fails?`${state.fails} verificação(ões) não atende(m); ver item 10.`:'Todas as verificações atendem com os dados informados.'));}
   b.push(H1('2. Dados de entrada'));
   b.push(TBL(inputRows(),[2.2,4.6,2.6],['l','l','r']));
   b.push(H1('3. Geometria'));
   b.push(TXT(`Muro com topo em ${sgn(I.NTopo)} m, terreno interno em ${sgn(I.NT)} m e externo em ${sgn(I.NT2)} m. ${R.cor?`Alvenaria apoiada direto na sapata corrida (sem baldrame), pescoço com ${f(R.hPes)} m de altura até ${sgn(NAe)} m,`:`Assentamento da alvenaria em ${sgn(NAe)} m`} e apoio da sapata em ${sgn(I.Nf)} m. Altura exposta ao vento Hv = ${f(R.Hv)} m. Alvenaria em ${R.Bl[1]} (t = ${f(R.t,R.t%1?1:0)} cm).`+(arm?'':` Pilares ${f(R.bp,0)} × ${f(R.hp,0)} cm a cada ${f(R.s)} m, pescoço ${f(R.bpe,0)} × ${f(R.hpe,0)} cm abaixo do NA.`)+(R.enr?` Enrijecedores de bloco ${f(R.eenr,0)} × ${f(R.tenr,0)} cm (espessura × comprimento total, incluindo o muro) a cada ${f(R.lenr)} m entre eixos, amarrados ao muro fiada a fiada e grauteados, com pescoço de concreto de mesma seção entre o assentamento e a sapata.`:'')+` Sapata com B = ${f(I.B)} m${arm?' (corrida)':R.cor?` (corrida, trecho de ${f(R.s)} m por pilar)`:` e L = ${f(I.L)} m`}, altura hs = ${f(I.hs)} m.`));
-  b.push(FIG(figs[0],'Figura 1 – Corte transversal com ações, resultante e tensões no solo (caso crítico).'));
-  b.push(FIG(figs[1],'Figura 2 – Vista frontal (esboço).'));
+  FIGN('corte.png','Corte transversal com ações, resultante e tensões no solo (caso crítico).');
+  FIGN('elevacao.png','Vista frontal (esboço).');
   // ações
   b.push(H1('4. Ações'));
   b.push(H2('4.1 Vento (NBR 6123)'));
@@ -1888,7 +1903,12 @@ function memorialXML(R,figs,state){
   b.push(TXT(`Esforços característicos por metro de muro, obtidos por integração das cargas horizontais a partir do topo (vento acima do terreno e empuxo líquido abaixo dele).${arm?'':` Valores no pilar = valor por metro × s = ${f(R.s)} m.`}`));
   const secs=[['Nível do terreno',R.Hg],[R.cor?'Topo do pescoço':'Assentamento (NA)',NAe],['Topo da sapata',R.ytop],['Base da sapata',I.Nf]];
   b.push(TBL([['Seção','Cota (m)','V (kN/m)','M (kN·m/m)',...(arm?[]:['V pilar (kN)','M pilar (kN·m)'])],...secs.map(([n,y])=>{const v=R.at(R.D.V,y),m=R.at(R.D.M,y);return [n,sgn(y),f(v),f(m),...(arm?[]:[f(v*R.s),f(m*R.s)])]})],arm?[3,1.6,1.6,1.8]:[3,1.4,1.5,1.7,1.6,1.8]));
-  b.push(FIG(figs[2],`Figura 3 – Diagramas de cortante e momento ${arm?'do muro':'do pilar'}.`));
+  FIGN('diagramas.png',`Diagramas de cortante e momento ${arm?'do muro':'do pilar'} (característicos).`);
+  if(!arm){const nm=[R.cor?'Pilar no topo do pescoço':'Pilar no NA','Pescoço no topo da sapata'];
+    b.push(PP('Momentos de dimensionamento do pilar',{b:true,before:120,after:60}));
+    b.push(TBL([['Seção','Mk (kN·m)','Vk (kN)','Md (kN·m)','γn','Armadura (cálculo)'],...[R.P1,R.P2].map((P,k)=>[nm[k],f(P.Mk),f(P.Vd/1.4/(P.gn||1)),f(P.Md),f(P.gn||1,2),P.txt])],[3.4,1.5,1.4,1.5,0.9,2.6]));
+    b.push(TXT(`O Mk do dimensionamento é o momento das ações horizontais no pilar${R.ecc?`, descontado o momento do peso fora do eixo do pescoço (${f(Math.abs(R.ecc),2)} kN·m) no sentido em que alivia`:''}${R.CW?'; na altura da parede de concreto o pilar recebe só as reações laterais da placa':''}. Por isso difere do M da tabela de esforços por seção, que traz só as ações horizontais da faixa inteira. Md inclui γf = 1,4, γn e a 2ª ordem.`));}
+  FIGN('vista_tipica.png','Seção típica: vista frontal e planta com o caminho das cargas horizontais (pano → apoios → fundação).');
   // fundação
   b.push(H1('6. Fundação'));
   b.push(TXT(`Cargas em relação ao centro da sapata (x positivo para o lado interno). ${R.cen?'Sapata centrada no eixo do pilar.':'Sapata de divisa: alinhada à face externa do muro, sem avançar sobre o vizinho.'}`));
@@ -1904,6 +1924,7 @@ function memorialXML(R,figs,state){
   b.push(EQ('Deslizamento:',`FS = (N tan δ + ca·B·L + Ep) / H ≥ ${f(+I.FSdMin||1.5,1)}, com δ = 2/3 φ = ${f(R.delta*180/Math.PI,1)}°`));
   b.push(TBL([['Caso','M (kN·m)','e (m)','Comprimido','σmáx (kPa)','σmín (kPa)','FS tomb.','FS desl.','Situação'],
     ...[R.perm,...R.cW].map(c=>[c.lab,f(c.Mt,2),f(c.e,3),`${f(Math.min(1,c.lc/I.B)*100,0)}%`,f(c.smax,1),f(c.smin,1),c.d?f(c.FSt):'–',c.d?f(c.FSd):'–',ST(c.ok)])],[2.6,1.1,1,1.2,1.1,1.1,1,1,1.3]));
+  FIGN('acoes_base.png','Ações na base da sapata: resultante N com excentricidade, força horizontal H e pressões no solo (kPa) nos três casos.');
   b.push(TBL([['Verificação','Valor','Limite','Situação'],
     ['Contato com o solo',`${f(Math.min(...R.cW.map(c=>c.lc))/I.B*100,0)}%`,I.crit==='23'?'≥ 67% com vento':'100%',ST(R.cW.every(c=>c.ok)&&R.perm.ok)],
     ['σmáx permanente ≤ σadm',`${f(R.sigPerm,1)} kPa`,`${f(I.sadm,0)} kPa`,ST(R.sigPerm<=I.sadm)],
@@ -1923,12 +1944,13 @@ function memorialXML(R,figs,state){
     b.push(EQ('Mínimo pelo cálculo:',`${P.txt} (As = ${f(P.Asf,2)} cm² por face) · ${ST(P.ok)}`));if(ids)pushA(ids);
     b.push(EQ('Cortante:',vMem(P,P.st?`estribos Ø${f(P.phiSt||I.pht,1)} c/${P.st}`:'')));};
   if(!arm){pilBlock(R.P1,R.cor?'7.1 Pilar no topo do pescoço':'7.1 Pilar no assentamento (NA)',['N1']);pilBlock(R.P2,'7.2 Pescoço no topo da sapata',['N2','N2a']);
-    const vg=(V,tit,qn,ids)=>{b.push(H2(tit));b.push(EQ('Carga:',`${qn} = ${f(V.q,3)} kN/m, vão s = ${f(R.s)} m (biapoiada)`));b.push(EQ('Esforços:',`Md = 1,4·q·s²/8 = ${f(V.Md,2)} kN·m; Vd = 1,4·q·s/2 = ${f(V.Vd,2)} kN`));
+    const vg=(V,tit,qn,ids,fg)=>{b.push(H2(tit));if(fg)FIGN(fg,`${tit.replace(/^7\.\d+ /,'')}: carga, cortante e momento (característicos).`);b.push(EQ('Carga:',`${qn} = ${f(V.q,3)} kN/m, vão s = ${f(R.s)} m (biapoiada)`));b.push(EQ('Esforços:',`Md = 1,4·q·s²/8 = ${f(V.Md,2)} kN·m; Vd = 1,4·q·s/2 = ${f(V.Vd,2)} kN`));
       b.push(EQ('Flexão:',`b = ${f(V.bw,0)} cm, d = ${f(V.d,1)} cm, KMD = ${f(V.KMD,3)}, As = ${V.ok?f(V.As,2):'–'} cm² (mín. ${f(V.Asmin,2)}) → ${V.txt}`));b.push(EQ('Estribos:',V.semEstribo?`dispensados: Vd = ${f(V.Vd,2)} ≤ Vc = ${f(V.Vc,2)} kN; VRd2 = ${f(V.VRd2,1)} kN (${ST(V.v2ok)})`:`Ø${f(I.pht,1)} c/${V.sp} · Vd ≤ VRd2 = ${f(V.VRd2,1)} kN (${ST(V.v2ok)})`));
       if(V.u!=null)b.push(EQ('Rigidez (apoio do pano):',`flecha característica com 0,5·Ecs·I: u = 5·q·s⁴/(384·0,5·Ecs·I) = ${f(V.u,2)} cm ≤ L/500 e 1 cm = ${f(V.uLim,2)} cm (${ST(V.uOk)}; NBR 6118, Tabela 13.3)`));if(ids)pushA(ids)};
     let nv=3;
     if(R.CW){const W=R.CW;b.push(H2(`7.${nv++} Parede de concreto no painel inferior`));
       b.push(TXT(`Parede de concreto armado com ${f(W.b,0)} cm, do topo da sapata corrida (${sgn(R.ytop)}) até ${sgn(R.yA)} (h = ${f(W.h)} m), engastada na sapata por esperas e ligada aos pilares; o topo é livre e recebe a base do pano de alvenaria. A parede foi calculada como placa delgada (Kirchhoff, ν = 0,2) resolvida numericamente por diferenças finitas, com malha de ${W.PL.nx} × ${W.PL.ny} divisões no vão livre ℓ = ${f(W.ln)} m e na altura: base engastada, topo livre com a reação do pano, e laterais nos pilares em dois casos (engastadas, pela continuidade com o painel vizinho, e apoiadas). A carga é a pressão lateral real em cada altura (vento acima do terreno e empuxo líquido com sobrecarga), nos dois sentidos do vento. Cada armadura usa o maior esforço entre os quatro casos (método equivalente ao das tabelas de Czerny, sem interpolação).`));
+      FIGN('parede_placa.png','Parede de concreto: momento vertical My e cortante Qy no meio do vão ao longo da altura, e momento horizontal Mx entre pilares (característicos, envoltória).');
       b.push(EQ('Caminho da carga:',`pela base (sapata) descem entre ${f(W.share*100,0)}% e ${f(W.shareMax*100,0)}% da carga lateral do painel; o restante, até ${f(W.Fs,2)} kN por painel, vai para os pilares (metade para cada um)`));
       b.push(EQ('Flexão vertical:',`Mk,máx = ${f(W.MyE,2)} kN·m/m tracionando a face do vizinho (base) e ${f(W.MyI,2)} kN·m/m a face interna; d = ${f(W.d,1)} cm; KMD ${f(W.ext.KMD,3)} e ${f(W.int.KMD,3)}; As = ${f(W.ext.As,2)} e ${f(W.int.As,2)} cm²/m (mín. 0,15%·b·h = ${f(W.ext.Amin,2)}) → ${phiTxt(W.phi)} c/${W.ext.sp} e c/${W.int.sp} (${ST(W.ext.ok&&W.int.ok)})`));
       b.push(EQ('Flexão horizontal:',`Mk,máx = ${f(W.MxE,2)} kN·m/m na face do vizinho (junto ao pilar) e ${f(W.MxI,2)} kN·m/m na face interna (vão); As = ${f(W.hor.As,2)} cm²/m por face (mín. ${f(W.hor.Amin,2)}) → ${phiTxt(W.phi)} c/${W.hor.sp} (${ST(W.horE.ok&&W.horI.ok)})`));
@@ -1936,8 +1958,8 @@ function memorialXML(R,figs,state){
       if(W.no)b.push(EQ('Nó parede–sapata:',`o momento da base da parede continua na sapata de divisa: face do vizinho tracionada → armadura inferior (Md = 1,4 × ${f(W.MyE,2)} = ${f(W.no.MdE,2)} kN·m/m), face interna → superior (Md = ${f(W.no.MdI,2)} kN·m/m). A armadura transversal da sapata foi dimensionada para o maior entre esse momento e o do balanço pelo solo (${f(W.no.solo,2)} kN·m/m): MRd = ${f(W.no.MRdInf,2)} e ${f(W.no.MRdSup,2)} kN·m/m (${ST(W.no.ok)})`));
       b.push(EQ('Cortante:',`maior cortante na placa (base ou apoio no pilar) Vd = 1,4 × ${f(W.Qmax,2)} = ${f(W.Vd,2)} kN/m ≤ VRd1 = ${f(W.VRd1,2)} kN/m (${ST(W.vOk)}), sem estribos`));
       b.push(EQ('Pilar:',`na altura da parede o pilar recebe só as reações laterais da placa (dos dois painéis vizinhos) e a pressão na própria largura; acima dela, a faixa inteira de ${f(R.s)} m. Assim o momento no pescoço já considera a parcela que desce direto para a sapata`));}
-    if(R.BI)vg(R.BI,`7.${nv++} Baldrame`,'q',['N8','N9','N11']);vg(R.BS,`7.${nv++} Cinta superior (flexão no plano horizontal)`,'qh = reação no topo do pano superior (faixa vertical biapoiada sob a pressão lateral real)',['N10','N12']);
-    if(R.CI)vg(R.CI,`7.${nv++} Cinta intermediária – canaleta a ${f(R.zCi,2)} m acima da base do pano (flexão no plano horizontal)`,`q = reação do painel inferior (${f(R.stL.Rt,2)}) + do superior (${f(R.stU.Rb,2)}) kN/m`,['N15']);
+    if(R.BI)vg(R.BI,`7.${nv++} Baldrame`,'q',['N8','N9','N11'],'baldrame.png');vg(R.BS,`7.${nv++} Cinta superior (flexão no plano horizontal)`,'qh = reação no topo do pano superior (faixa vertical biapoiada sob a pressão lateral real)',['N10','N12'],'cinta_superior.png');
+    if(R.CI)vg(R.CI,`7.${nv++} Cinta intermediária – canaleta a ${f(R.zCi,2)} m acima da base do pano (flexão no plano horizontal)`,`q = reação do painel inferior (${f(R.stL.Rt,2)}) + do superior (${f(R.stU.Rb,2)}) kN/m`,['N15'],'cinta_intermediaria.png');
   }else{pilBlock(R.P2,'7.1 Parede de fundação no topo da sapata (por metro)');
     if(R.enr){const P=R.E.PE;b.push(H2('7.2 Pescoço de concreto sob o enrijecedor'));
       b.push(EQ('Seção:',`${f(P.bw,0)} × ${f(P.h,0)} cm, d = ${f(P.d,1)} cm; momento da faixa de ${f(R.lenr)} m no topo da sapata Mk = ${f(P.Mk,2)} kN·m; γn = ${f(P.gn,2)}; Md = ${f(P.Md,2)} kN·m`));
@@ -2005,20 +2027,20 @@ function memorialXML(R,figs,state){
   b.push(H1('9. Detalhamento das armaduras'));
   {const D=detGet(R),rows=detRows(R,D);
    b.push(TXT('Armaduras adotadas no detalhamento, conferidas contra as áreas exigidas pelo cálculo. Traspasse de 1,00 m para barras com Ø menor que 16 mm; para Ø ≥ 16 mm, l0t = 2,0·lb pela NBR 6118.'));
-   b.push(FIG(figs[3],'Figura 4 – Detalhamento: corte no eixo '+(R.arm?'do muro':'do pilar')+'.'));
-   b.push(FIG(figs[4],'Figura 5 – Detalhamento: seções e planta da sapata.'));
+   FIGN('detalhamento_corte.png','Detalhamento: corte no eixo '+(R.arm?'do muro':'do pilar')+'.');
+   FIGN('detalhamento_secoes.png','Detalhamento: seções e planta da sapata.');
    b.push(TBL([['Item','Elemento','Posição','Adotado','Necessário','Traspasse','Situação'],...rows.map(r=>[r.id,r.el,r.pos,r.mode==='lock'?detText('N1',D):detText(r.id,D),r.req,r.lap?`${f(r.lap.L,2)} m`:'–',ST(r.ok)])],[0.8,1.6,3,1.6,1.6,1,1.2],['l','l','l','l','r','r','r']));
    const nf=rows.filter(r=>!r.ok).length; if(nf)b.push(TXT(`${nf} armadura(s) adotada(s) não atende(m) ao cálculo ou às regras de detalhamento. Revisar antes da emissão.`));}
    {const Dr=drenoGeo(R);b.push(H2('9.1 Seção transversal típica e drenagem'));
     if(Dr){b.push(TXT(`Dreno longitudinal no ${Dr.viz?'lado do vizinho':'lado interno'}, ao longo de todo o muro: vala retangular com ${f(Dr.dw*100,0)} cm de largura e ${f(Dr.h)} m de altura, com fundo no nível ${Dr.bot>I.Nf+1e-6?'do topo da sapata':'do apoio da sapata'} (${sgn(Dr.bot)} m). De baixo para cima: lastro de brita de ${f(Dr.las*100,0)} cm; tubo PEAD corrugado perfurado Ø ${f(Dr.dP*1000,0)} mm com declividade mínima de 1% até a saída por gravidade; brita nº 2 (19 a 38 mm) envolvida por manta geotêxtil não tecida (NBR 15224) com transpasse mínimo de 20 cm; camada de areia média de ${f(Dr.hAr*100,0)} cm; selamento de solo argiloso compactado de ${f(Dr.hSel*100,0)} cm.${Dr.imp?' A face enterrada do muro recebe impermeabilização (emulsão asfáltica ou manta).':''} Caixas de inspeção a cada 80 m no máximo.${Dr.viz&&!R.cen?' O dreno fica no terreno vizinho e depende de autorização do proprietário.':''}${Dr.ok?'':` Atenção: a altura disponível (${f(Dr.h)} m) é menor que a necessária para as camadas (${f(Dr.need)} m).`}`))}
     else b.push(TXT('Sem dreno indicado neste projeto.'));
-    b.push(FIG(figs[5],'Figura 6 – Seção transversal típica.'));if(Dr)b.push(FIG(figs[6],'Figura 7 – Detalhe A: dreno '+(Dr.viz?'no lado do vizinho':'no lado interno')+'.'));}
+    FIGN('secao_tipica.png','Seção transversal típica.');if(Dr)FIGN('detalhe_dreno.png','Detalhe A: dreno '+(Dr.viz?'no lado do vizinho':'no lado interno')+'.');}
   b.push(H1('10. Conclusão'));
   b.push(TXT(state.fails?`${state.fails} verificação(ões) não atende(m) com os dados informados. Revisar os itens indicados.`:'Todas as verificações atendem com os dados informados.'));
   state.obs.forEach(o=>b.push(PP([RUN('• '),RUN(o)],{ind:360,align:'both'})));
+  b.push(PP('Este memorial foi gerado automaticamente pela ferramenta de apoio Muro de vedação v9. Os resultados devem ser conferidos e assumidos pelo engenheiro responsável.',{sz:20,i:true,before:200,color:'5A6774'}));
   b.push(H1('11. Referências bibliográficas'));
   refList(R).forEach(t=>b.push(PP(t,{align:'both',after:80})));
-  b.push(PP('Este memorial foi gerado automaticamente pela ferramenta de apoio Muro de vedação v9. Os resultados devem ser conferidos e assumidos pelo engenheiro responsável.',{sz:20,i:true,before:200,color:'5A6774'}));
   const sect=`<w:sectPr><w:footerReference w:type="default" r:id="rIdFooter"/><w:pgSz w:w="11906" w:h="16838" w:orient="portrait"/><w:pgMar w:top="1418" w:right="1418" w:bottom="1418" w:left="1418" w:header="709" w:footer="709" w:gutter="0"/></w:sectPr>`;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body>${b.join('')}${sect}</w:body></w:document>`;
 }
@@ -2097,6 +2119,14 @@ async function gerarMemorial(){
        figs.push(await mkFig(crop(`0 90 660 ${h1}`),660,h1,'secao_tipica.png','rIdImg6',12.5));
        figs.push(await mkFig(crop(`660 90 580 ${h2}`),580,h2,'detalhe_dreno.png','rIdImg7',12));}
      else figs.push(await mkFig(crop(`0 0 ${sv.w} ${Math.min(sv.h,sv.mainBot)}`),sv.w,Math.min(sv.h,sv.mainBot),'secao_tipica.png','rIdImg6',15));}
+    const inner=x=>x.replace(/^[\s\S]*?<svg[^>]*>/,'').replace(/<\/svg>[\s\S]*$/,'');
+    figs.push(await mkFig(lightSvg($('vista').innerHTML,'0 0 760 530'),760,530,'vista_tipica.png','rIdImg8',15));
+    {const bs=baseSvg(R),cell=(k,x,y)=>`<svg class="fs" x="${x}" y="${y}" width="400" height="365" viewBox="${k*400} 0 400 365">${bs}</svg>`; // 2 colunas para ficar legível na folha
+     figs.push(await mkFig(lightSvg(cell(0,0,0)+cell(1,400,0)+cell(2,200,365),'0 0 800 730','fs'),800,730,'acoes_base.png','rIdImg9',15));}
+    if(R.CW)figs.push(await mkFig(lightSvg(inner(wallSvg(R)),'0 0 640 300','fs'),640,300,'parede_placa.png','rIdImg10',16));
+    if(!R.arm){figs.push(await mkFig(lightSvg(inner(beamSvg(R.qh,'qh',R.s)),'0 0 440 250'),440,250,'cinta_superior.png','rIdImg11',10));
+      if(R.CI)figs.push(await mkFig(lightSvg(inner(beamSvg(R.CI.q,'qci',R.s)),'0 0 440 250'),440,250,'cinta_intermediaria.png','rIdImg12',10));
+      if(R.BI)figs.push(await mkFig(lightSvg(inner(beamSvg(R.qv,'q',R.s)),'0 0 440 250'),440,250,'baldrame.png','rIdImg13',10));}
     const parts=docxParts(R,figs,LAST);
     if(typeof JSZip==='undefined'){say('Não foi possível carregar o gerador de Word. Verifique a conexão e tente de novo.');return}
     const zip=new JSZip();Object.entries(parts).forEach(([k,v])=>zip.file(k,v));figs.filter(Boolean).forEach(g=>zip.file('word/media/'+g.name,g.buf));
