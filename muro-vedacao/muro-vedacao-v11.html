@@ -709,7 +709,9 @@ function calc(){
           const far=i*a>xp+a+1e-9; // fora do nó vizinho à borda do pilar e da linha do topo (singularidade local da carga concentrada)
           if(far?j<ny:j<ny-1)o.Qmax=Math.max(o.Qmax,Math.abs(qy(i,j)));if(far&&i<nx&&j>0&&j<ny)o.Qmax=Math.max(o.Qmax,Math.abs((lap(i+1,j)-lap(i-1,j))/(2*a)))}}
         // pilar: esforços da faixa do pilar em cada altura (soma das duas metades)
-        o.Mp=[];o.Vp=[];for(let j=0;j<=ny;j++){let m=0,v=0;NP.forEach(i=>{m+=wt(i)*my(i,j);v+=wt(i)*qy(i,j)});o.Mp.push(2*m);o.Vp.push(2*v)}
+        o.Mp=[];o.Vp=[];for(let j=0;j<=ny;j++){let m=0;NP.forEach(i=>{m+=wt(i)*my(i,j)});o.Mp.push(2*m)}
+        for(let j=0;j<=ny;j++)o.Vp.push(-(j===0?(-3*o.Mp[0]+4*o.Mp[1]-o.Mp[2])/(2*b):j===ny?(3*o.Mp[ny]-4*o.Mp[ny-1]+o.Mp[ny-2])/(2*b):(o.Mp[j+1]-o.Mp[j-1])/(2*b))); // cortante do pilar como barra: V = −dM/dy
+        o.Vp[ny]=T.Vp;{const v=o.Vp.slice();for(let j=1;j<ny;j++)o.Vp[j]=(v[j-1]+2*v[j]+v[j+1])/4} // no topo, o cortante aplicado; suavização leve do pico local da carga concentrada
         let Fb=0,Mb=0;for(let i=0;i<=nx;i++){Fb+=2*wt(i)*qy(i,0);Mb+=2*wt(i)*my(i,0)}
         let Ft=0;const k=200;for(let i=0;i<k;i++)Ft+=pS(R.ytop+(i+.5)*hw/k,c,kc)*hw/k;Ft=Ft*s+T.Rw*lw+T.Vp; // carga total no vão (kN)
         {let m=0;for(let i=0;i<k;i++){const yy=(i+.5)*hw/k;m+=pS(R.ytop+yy,c,kc)*s*yy*hw/k}o.Ms=m+(T.Rw*lw+T.Vp)*hw+T.Mp} // momento estático na base (conferência)
@@ -721,6 +723,12 @@ function calc(){
       if(PLCACHE.size>8)PLCACHE.clear();PLCACHE.set(key,out)}
     P0.a=a;P0.b=b;P0.xp=xp;P0.weff=weff;P0.cases=out;
     P0.pil=[Math.min(...out.map(o=>o.pilBase)),Math.max(...out.map(o=>o.pilBase))]; // parcela do momento da base que fica na faixa do pilar
+    // diagramas do próprio pilar (kN, kN·m): acima da parede = faixa inteira; na altura da parede = sua faixa na placa (muda com a rigidez); abaixo do topo da sapata = total do trecho
+    {const D=R.D,DP={V:[],M:[],Mpos:[],Mneg:[]};D.Y.forEach((y,i)=>{let V,Mp,Mn;
+      if(y>=R.yA-1e-9||y<R.ytop-D.dy-1e-9){V=D.V[i]*s;Mp=D.Mpos[i]*s;Mn=D.Mneg[i]*s}
+      else{const t=Math.max(0,(y-R.ytop)/b),j0=Math.min(ny-1,Math.floor(t)),u=Math.min(1,t-j0);V=0;Mp=0;Mn=0;
+        out.forEach(o=>{const m=o.Mp[j0]*(1-u)+o.Mp[j0+1]*u,v=o.Vp[j0]*(1-u)+o.Vp[j0+1]*u;Mp=Math.max(Mp,m);Mn=Math.max(Mn,-m);V=Math.max(V,Math.abs(v))})}
+      DP.V.push(V);DP.Mpos.push(Mp);DP.Mneg.push(Mn);DP.M.push(Math.max(Mp,Mn))});R.DP=DP}
     // pilar: acima da parede, balanço com a faixa inteira; na altura da parede, os esforços da sua faixa na placa
     R.pilMV=(y,ecc)=>{let M=0,V=0;
       if(y>=R.yA-1e-9){R.EC.forEach((e,kk)=>[1,-1].forEach(c=>{let m=0,v=0;const k=300,dz=(I.NTopo-y)/k;for(let i=0;i<k;i++){const yy=y+(i+.5)*dz,q=pS(yy,c,kk)*s*dz;m+=q*(yy-y);v+=q}M=Math.max(M,Math.abs(m-ecc));V=Math.max(V,Math.abs(v))}))}
@@ -1076,17 +1084,17 @@ function renderLoads(R){
   $('s2lead').textContent=R.arm?'Esforços por metro de muro em balanço, com vento e empuxo no mesmo sentido, e ações na sapata corrida.':'Cortante e momento no pilar, com vento e empuxo no mesmo sentido, esforços nas cintas e na base da sapata.';
 }
 function drawDiag(R){
-  const top=48,bot=530,yMax=I.NTopo+0.2,yMin=I.Nf-0.1,sc=(bot-top)/(yMax-yMin),Y=e=>top+(yMax-e)*sc,D=R.D,s0=R.s;let s='';
+  const top=48,bot=530,yMax=I.NTopo+0.2,yMin=I.Nf-0.1,sc=(bot-top)/(yMax-yMin),Y=e=>top+(yMax-e)*sc,D=R.D,PD=R.DP,s0=PD?1:R.s;let s='';
   const keys=[[I.NTopo,'topo'],[R.Hg,'terreno'],[NAe,R.cor?'topo pescoço':'NA'],[R.ytop,'topo sapata'],[I.Nf,'base']];
   keys.forEach(([e,t])=>{s+=lvl(18,Y(e),sgn(e),t);s+=`<line x1="120" y1="${Y(e)}" x2="752" y2="${Y(e)}" stroke="var(--line)" stroke-dasharray="3 4"/>`});
   const un=R.arm?['CORTANTE (kN/m)','MOMENTO (kN·m/m)']:['CORTANTE NO PILAR (kN)','MOMENTO NO PILAR (kN·m)'];
-  [[un[0],D.V,'var(--vcol)','t-v',190,260],[un[1],D.M,'var(--accent)','t-m',480,270]].forEach(([t,arr,col,tc,x0,pw])=>{let mx=0;arr.forEach(v=>mx=Math.max(mx,Math.abs(v*s0)));mx=mx||1;const sx=(pw-80)/mx,pts=[];
+  [[un[0],PD?PD.V:D.V,'var(--vcol)','t-v',190,260],[un[1],PD?PD.M:D.M,'var(--accent)','t-m',480,270]].forEach(([t,arr,col,tc,x0,pw])=>{let mx=0;arr.forEach(v=>mx=Math.max(mx,Math.abs(v*s0)));mx=mx||1;const sx=(pw-80)/mx,pts=[];
     for(let i=0;i<=D.n;i+=2)pts.push(`${x0+arr[i]*s0*sx},${Y(D.Y[i])}`);
     s+=`<text x="${x0-10}" y="22" class="t-title">${t}</text><line x1="${x0}" y1="${Y(I.NTopo)}" x2="${x0}" y2="${Y(I.Nf)}" stroke="var(--ink)"/><polygon points="${x0},${Y(I.NTopo)} ${pts.join(' ')} ${x0},${Y(I.Nf)}" fill="${col}" fill-opacity=".16" stroke="${col}" stroke-width="1.6"/>`;
     keys.slice(1).forEach(([e])=>{const v=R.at(arr,e)*s0;s+=`<circle cx="${x0+v*sx}" cy="${Y(e)}" r="2.6" fill="${col}"/><text x="${x0+v*sx+6}" y="${Y(e)-4}" class="${tc}">${f(v)}</text>`})});
   $('diag').innerHTML=s;
   $('diagTitle').textContent=R.arm?'Diagramas do muro':'Diagramas do pilar';
-  $('diagSub').textContent=R.arm?'Valores característicos por metro de muro':'Valores característicos · pilar = valor por metro × espaçamento';
+  $('diagSub').textContent=R.arm?'Valores característicos por metro de muro':PD?`Valores característicos · acima de ${sgn(R.yA)}: faixa de ${f(R.s)} m; na altura da parede: parcela do pilar pela rigidez; na sapata: total do trecho`:'Valores característicos · pilar = valor por metro × espaçamento';
 }
 // vista frontal + planta do trecho típico: apoio (pilar ou enrijecedor) no eixo, meio vão para cada lado e os panos vizinhos
 function drawVista(R){
@@ -1173,8 +1181,8 @@ function renderSec(R){
   const rows=[['Nível do terreno',R.Hg],[R.cor?'Topo do pescoço':'Assentamento (NA)',NAe],['Topo da sapata',R.ytop],['Base da sapata',I.Nf]];
   const k=R.arm?1:R.s;
   $('tabSec').innerHTML=`<tr><th>Seção</th><th>Cota (m)</th><th>V máx (kN${R.arm?'/m':''})</th><th>M máx – face vizinho (kN·m${R.arm?'/m':''})</th><th>M máx – face interna (kN·m${R.arm?'/m':''})</th></tr>`+
-   rows.map(([n,y])=>`<tr><td>${n}</td><td>${sgn(y)}</td><td>${f(R.at(R.D.V,y)*k)}</td><td>${f(R.at(R.D.Mpos,y)*k)}</td><td>${f(R.at(R.D.Mneg,y)*k)}</td></tr>`).join('')+
-   `<tr><td colspan="5" class="note">${R.arm?'Por metro de muro':'No pilar (faixa de '+f(R.s)+' m)'}${R.CW?`; abaixo de ${sgn(R.yA)} (topo da parede de concreto) são os totais do trecho, divididos entre parede e pilar pela rigidez (ver dimensionamento do pilar e diagramas da parede)`:''}; envoltória do empuxo ativo cheio de cada lado com o vento nos dois sentidos, sem descontar um lado do outro. Face do vizinho: tracionada quando o muro é empurrado para o lote.</td></tr>`;
+   rows.map(([n,y])=>{const DD=R.DP&&y>=R.ytop-1e-9?R.DP:R.D,kk=DD===R.DP?1:k;return `<tr><td>${n}</td><td>${sgn(y)}</td><td>${f(R.at(DD.V,y)*kk)}</td><td>${f(R.at(DD.Mpos,y)*kk)}</td><td>${f(R.at(DD.Mneg,y)*kk)}</td></tr>`}).join('')+
+   `<tr><td colspan="5" class="note">${R.arm?'Por metro de muro':'No pilar (faixa de '+f(R.s)+' m)'}${R.CW?`; abaixo de ${sgn(R.yA)} (topo da parede de concreto), só a parcela do pilar, pela rigidez (o restante fica na parede); na base da sapata, o total do trecho`:''}; envoltória do empuxo ativo cheio de cada lado com o vento nos dois sentidos, sem descontar um lado do outro. Face do vizinho: tracionada quando o muro é empurrado para o lote.</td></tr>`;
   $('baseSub').textContent=R.arm?'Por metro de sapata corrida, em relação ao centro':R.cor?`Por pilar: trecho de ${f(R.s)} m de sapata corrida`:'Por pilar, em relação ao centro da sapata';
   $('tabBase').innerHTML=`<tr><th>Parcela</th><th>N (kN)</th><th>braço (m)</th></tr>
    <tr><td>${R.arm?'Muro e cinta':'Muro, cintas e pilar'}</td><td>${f(R.Nwall,1)}</td><td>${f(R.xw,3)}</td></tr>
@@ -1931,8 +1939,8 @@ function memorialXML(R,figs,state){
   b.push(H1('5. Esforços solicitantes'));
   b.push(TXT(`Esforços característicos por metro de muro, obtidos por integração das cargas horizontais a partir do topo (vento acima do terreno e, abaixo dele, o empuxo ativo cheio de cada lado; a envoltória traz, em cada seção, o maior valor entre os dois lados com o vento nos dois sentidos).${arm?'':` Valores no pilar = valor por metro × s = ${f(R.s)} m.`}`));
   const secs=[['Nível do terreno',R.Hg],[R.cor?'Topo do pescoço':'Assentamento (NA)',NAe],['Topo da sapata',R.ytop],['Base da sapata',I.Nf]];
-  {const k=arm?1:R.s;b.push(TBL([['Seção','Cota (m)',`V máx (kN${arm?'/m':''})`,`M máx face vizinho (kN·m${arm?'/m':''})`,`M máx face interna (kN·m${arm?'/m':''})`],...secs.map(([n,y])=>[n,sgn(y),f(R.at(R.D.V,y)*k),f(R.at(R.D.Mpos,y)*k),f(R.at(R.D.Mneg,y)*k)])],[3,1.3,1.5,2,2]));
-   b.push(TXT(`${arm?'Valores por metro de muro':`Valores no pilar (faixa de ${f(R.s)} m)`}${R.CW?`; abaixo de ${sgn(R.yA)} (topo da parede de concreto) são os totais do trecho, divididos entre parede e pilar pela rigidez (item 7)`:''}; envoltória do empuxo ativo cheio de cada lado, com o vento nos dois sentidos, sem descontar um lado do outro. Cada face é dimensionada pelo seu maior momento.`));}
+  {const k=arm?1:R.s;b.push(TBL([['Seção','Cota (m)',`V máx (kN${arm?'/m':''})`,`M máx face vizinho (kN·m${arm?'/m':''})`,`M máx face interna (kN·m${arm?'/m':''})`],...secs.map(([n,y])=>{const DD=R.DP&&y>=R.ytop-1e-9?R.DP:R.D,kk=DD===R.DP?1:k;return [n,sgn(y),f(R.at(DD.V,y)*kk),f(R.at(DD.Mpos,y)*kk),f(R.at(DD.Mneg,y)*kk)]})],[3,1.3,1.5,2,2]));
+   b.push(TXT(`${arm?'Valores por metro de muro':`Valores no pilar (faixa de ${f(R.s)} m)`}${R.CW?`; abaixo de ${sgn(R.yA)} (topo da parede de concreto), só a parcela do pilar, pela rigidez (o restante fica na parede, item 7); na base da sapata, o total do trecho`:''}; envoltória do empuxo ativo cheio de cada lado, com o vento nos dois sentidos, sem descontar um lado do outro. Cada face é dimensionada pelo seu maior momento.`));}
   FIGN('diagramas.png',`Diagramas de cortante e momento ${arm?'do muro':'do pilar'} (característicos).`);
   if(!arm){const nm=[R.cor?'Pilar no topo do pescoço':'Pilar no NA','Pescoço no topo da sapata'];
     b.push(PP('Momentos de dimensionamento do pilar',{b:true,before:120,after:60}));
