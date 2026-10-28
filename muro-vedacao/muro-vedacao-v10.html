@@ -1838,6 +1838,10 @@ function inputRows(){
   DEF.forEach(([g,desc,fs])=>{const gl=Array.isArray(g)?g[I.sys==='pil'?0:1]:g;
     fs.forEach(([id,lab,u,v,opts,sys])=>{
       if(sys&&sys!==I.sys)return;
+      // no memorial só entra o que é usado no cálculo ou no desenho: campos ocultos na tela e diâmetros repetidos no detalhamento ficam de fora
+      {const el=$(id),fl=el&&el.closest&&el.closest('.field');if(fl&&fl.hidden)return;}
+      if(['phl','phv','pht','phs'].includes(id))return;
+      if(id==='canPI'&&I.canPI!=='sim')return;
       if(id==='S2m'&&I.s2mode!=='man')return;
       if((id==='L'||id==='p3d')&&I.tipoSap==='cor')return;
       if(I.enr!=='sim'&&['lenr','tenr','eenrOut','phE'].includes(id))return;
@@ -1894,10 +1898,9 @@ function memorialXML(R,figs,state){
   if(!arm)b.push(EQ('Pilar acima do NA:',`Npil = 25 × ${f(R.bp/100)} × ${f(R.hp/100)} × ${f(Math.max(0,I.NTopo-NAe))} = ${f(R.Npil,2)} kN`));
   b.push(H2('4.3 Empuxo de solo'));
   b.push(EQ('Coeficientes:',`${I.kEmp==='repouso'?`K0 = 1 − sen φ = ${f(R.K0,3)}`:`Ka = tan²(45° − φ/2) = ${f(R.Ka,3)}`}; Kp = tan²(45° + φ/2) = ${f(R.Kp,3)}; φ = ${f(I.phi,0)}°, c = ${f(I.c,0)} kPa, γ = ${f(I.gam,1)} kN/m³`));
-  b.push(TXT(`O trecho entre a sapata e o ${arm||R.cor?'assentamento do muro':'baldrame'} é preenchido (alvenaria assentada sobre a sapata${arm?' e parede de fundação':' ou pescoço'}), por isso o empuxo de cada lado atua desde o apoio da sapata (${sgn(I.Nf)} m) até o terreno daquele lado. O empuxo de um lado não é descontado pelo do outro: as peças são dimensionadas pela envoltória do ${I.kEmp==='repouso'?'empuxo em repouso':'empuxo ativo'} cheio de cada lado (com o vento nos dois sentidos), cada face pelo seu maior momento; na estabilidade, o ${I.kEmp==='repouso'?'empuxo':'empuxo ativo'} do lado que empurra é a ação, e o solo do lado oposto só resiste, pelo empuxo passivo multiplicado pelo fator adotado (${f(+I.fp||0,2)}).`));
   if(R.qE>0||R.qI>0)b.push(EQ('Sobrecarga no terreno:',`NBR 6120: vizinho q = ${f(R.qE,1)} kN/m² e interno q = ${f(R.qI,1)} kN/m². Pressão horizontal σh = K·(γ·z + q) − 2c√K em toda a altura enterrada de cada lado; acréscimo constante K·q = ${f(R.Kemp*R.qE,2)} e ${f(R.Kemp*R.qI,2)} kN/m². Sobre a sapata, ${f(R.Pq,1)} kN entram só nas tensões no solo (variável e favorável à estabilidade).`));
   b.push(EQ('Empuxo atuante:',`lado interno, h = ${f(R.EAi.h)} m: ${f(R.EAi.E,2)} kN/m a ${f(R.EAi.y,2)} m do apoio; lado externo, h = ${f(R.EAe.h)} m: ${f(R.EAe.E,2)} kN/m a ${f(R.EAe.y,2)} m do apoio; total ${f(R.EaInt,2)} e ${f(R.EaExt,2)} kN (por ${arm?'metro':'pilar'}). ${R.dh>1e-6?`Desnível Δh = ${f(R.dh)} m.`:''}`));
-  b.push(EQ('Empuxo passivo:',`${+I.fp>0?`considerado com fator ${f(+I.fp,2)}, do lado para onde o muro se desloca: ${f(R.pInt.E,2)} kN (interno) e ${f(R.pExt.E,2)} kN (externo).`:'desprezado (a favor da segurança).'}`));
+  b.push(EQ('Empuxo passivo:',`${+I.fp>0?`fator ${f(+I.fp,2)}: ${f(R.pInt.E,2)} kN (lado interno) e ${f(R.pExt.E,2)} kN (lado do vizinho).`:'desprezado (fator 0).'}`));
   b.push(EQ('Cunha de arrancamento:',I.cone==='sim'?`β = ${f(I.beta,0)}°, peso ${f(R.Wc,2)} kN, considerada apenas no tombamento.`:'desprezada.'));
   // esforços
   b.push(H1('5. Esforços solicitantes'));
@@ -1951,7 +1954,7 @@ function memorialXML(R,figs,state){
       if(V.u!=null)b.push(EQ('Rigidez (apoio do pano):',`flecha característica com 0,5·Ecs·I: u = 5·q·s⁴/(384·0,5·Ecs·I) = ${f(V.u,2)} cm ≤ L/500 e 1 cm = ${f(V.uLim,2)} cm (${ST(V.uOk)}; NBR 6118, Tabela 13.3)`));if(ids)pushA(ids)};
     let nv=3;
     if(R.CW){const W=R.CW;b.push(H2(`7.${nv++} Parede de concreto no painel inferior`));
-      b.push(TXT(`Parede de concreto armado com ${f(W.b,0)} cm, do topo da sapata corrida (${sgn(R.ytop)}) até ${sgn(R.yA)} (h = ${f(W.h)} m), engastada na sapata por esperas e ligada aos pilares; o topo é livre e recebe a base do pano de alvenaria. A parede foi calculada como placa delgada (Kirchhoff, ν = 0,2) resolvida numericamente por diferenças finitas, com malha de ${W.PL.nx} × ${W.PL.ny} divisões no vão livre ℓ = ${f(W.ln)} m e na altura: base engastada, topo livre com a reação do pano, e laterais nos pilares em dois casos (engastadas, pela continuidade com o painel vizinho, e apoiadas). A carga é a pressão lateral real em cada altura (vento acima do terreno e empuxo líquido com sobrecarga), nos dois sentidos do vento. Cada armadura usa o maior esforço entre os quatro casos (método equivalente ao das tabelas de Czerny, sem interpolação).`));
+      b.push(TXT(`Parede de concreto armado com ${f(W.b,0)} cm, do topo da sapata corrida (${sgn(R.ytop)}) até ${sgn(R.yA)} (h = ${f(W.h)} m), engastada na sapata por esperas e ligada aos pilares; o topo é livre e recebe a base do pano de alvenaria. A parede foi calculada como placa delgada (Kirchhoff, ν = 0,2) resolvida numericamente por diferenças finitas, com malha de ${W.PL.nx} × ${W.PL.ny} divisões no vão livre ℓ = ${f(W.ln)} m e na altura: base engastada, topo livre com a reação do pano, e laterais nos pilares em dois casos (engastadas, pela continuidade com o painel vizinho, e apoiadas). A carga é a pressão lateral real em cada altura (vento acima do terreno e empuxo ativo cheio de cada lado, com sobrecarga, sem descontar um lado do outro), com o vento nos dois sentidos. Cada armadura usa o maior esforço entre os casos (método equivalente ao das tabelas de Czerny, sem interpolação).`));
       FIGN('parede_placa.png','Parede de concreto: momento vertical My e cortante Qy no meio do vão ao longo da altura, e momento horizontal Mx entre pilares (característicos, envoltória).');
       b.push(EQ('Caminho da carga:',`pela base (sapata) descem entre ${f(W.share*100,0)}% e ${f(W.shareMax*100,0)}% da carga lateral do painel; o restante, até ${f(W.Fs,2)} kN por painel, vai para os pilares (metade para cada um)`));
       b.push(EQ('Flexão vertical:',`Mk,máx = ${f(W.MyE,2)} kN·m/m tracionando a face do vizinho (base) e ${f(W.MyI,2)} kN·m/m a face interna; d = ${f(W.d,1)} cm; KMD ${f(W.ext.KMD,3)} e ${f(W.int.KMD,3)}; As = ${f(W.ext.As,2)} e ${f(W.int.As,2)} cm²/m (mín. 0,15%·b·h = ${f(W.ext.Amin,2)}) (${ST(W.ext.ok&&W.int.ok)})`));
