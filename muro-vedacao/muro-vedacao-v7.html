@@ -313,6 +313,9 @@ const DEF=[
   ['topoP','Topo do pano (NBR 16868-1, Anexo E)','sel','apoiado',[['apoiado','Apoiado na cinta superior (4 lados apoiados)'],['livre','Livre (laterais e base apoiadas)']],'pil'],
   ['cintaInt','Cinta intermediária (canaleta armada ancorada nos pilares)','sel','nao',[['nao','Sem cinta intermediária'],['sim','Com cinta intermediária – divide o pano em dois']],'pil'],
   ['zCi','Cinta intermediária – altura acima da base do pano (0 = meia altura)','m',0,null,'pil'],
+  ['canPI','Canaletas armadas horizontais no painel inferior','sel','nao',[['nao','Não – pano não armado'],['sim','Sim – canaletas grauteadas e armadas, ancoradas nos pilares']],'pil'],
+  ['ehPI','Canaletas do painel inferior – a cada','m',0.40,null,'pil'],
+  ['phPI','Canaletas do painel inferior – vergalhão','sel','8',BARRAS.map(b=>[String(b[0]),`Ø ${String(b[0]).replace('.',',')} mm`]),'pil'],
   ['bpw','Pilar – espessura (sentido do vento, ≥ bloco)','cm',19,null,'pil'],
   ['hp','Pilar – comprimento ao longo do muro','cm',30,null,'pil'],
   ['bpe','Pescoço abaixo de NA – sentido do vento','cm',30,null,'pil'],
@@ -415,7 +418,8 @@ function applySys(){
   document.querySelectorAll('#form [data-sys]').forEach(el=>el.hidden=el.dataset.sys!==I.sys);
   document.querySelectorAll('#form [data-only]').forEach(el=>el.hidden=el.dataset.only!==I.sys);
   const hideIf=(id,cond)=>{const el=$(id),fl=el&&el.closest&&el.closest('.field');if(fl&&cond)fl.hidden=true};
-  hideIf('S2m',I.s2mode!=='man');{const ce=(I.bloco||'')[0]==='k';hideIf('fpkM',!ce);hideIf('fpkCM',!ce);}hideIf('L',I.tipoSap==='cor');['NA','bwi'].forEach(k=>{const fl=$(k).closest('.field');if(fl)fl.hidden=I.sys==='pil'&&I.tipoSap==='cor'});if(I.sys==='pil'){hideIf('bwi',I.tipoSap==='cor');hideIf('hci',I.tipoSap==='cor');hideIf('hPes',I.tipoSap!=='cor')}else hideIf('hPes',true);hideIf('zCi',I.cintaInt!=='sim');['drB','drPhi','drLas','drAr','drSel','drImp'].forEach(k=>{const el=$(k),fl=el&&el.closest&&el.closest('.field');if(fl)fl.hidden=I.drLado==='nao'});['lenr','tenr','eenrOut','phE'].forEach(k=>hideIf(k,I.enr!=='sim'));hideIf('p3d',I.tipoSap==='cor');
+  hideIf('S2m',I.s2mode!=='man');{const ce=(I.bloco||'')[0]==='k';hideIf('fpkM',!ce);hideIf('fpkCM',!ce);}hideIf('L',I.tipoSap==='cor');['NA','bwi'].forEach(k=>{const fl=$(k).closest('.field');if(fl)fl.hidden=I.sys==='pil'&&I.tipoSap==='cor'});if(I.sys==='pil'){hideIf('bwi',I.tipoSap==='cor');hideIf('hci',I.tipoSap==='cor');hideIf('hPes',I.tipoSap!=='cor');hideIf('ehPI',I.canPI!=='sim');hideIf('phPI',I.canPI!=='sim')}else hideIf('hPes',true);
+  {const can=I.sys==='pil'&&I.canPI==='sim',ce=(I.bloco||'')[0]==='k';[['fbk',1],['fpkOut',1],['fpkM',ce],['fpkCM',ce]].forEach(([k,c])=>{const fl=$(k)&&$(k).closest('.field');if(fl&&can)fl.hidden=!c})}hideIf('zCi',I.cintaInt!=='sim');['drB','drPhi','drLas','drAr','drSel','drImp'].forEach(k=>{const el=$(k),fl=el&&el.closest&&el.closest('.field');if(fl)fl.hidden=I.drLado==='nao'});['lenr','tenr','eenrOut','phE'].forEach(k=>hideIf(k,I.enr!=='sim'));hideIf('p3d',I.tipoSap==='cor');
 }
 
 /* ---------- cálculo ---------- */
@@ -702,6 +706,24 @@ function calc(){
     R.wd=Math.max(...R.panels.map(P=>P.wd));
     const PW=R.panels.reduce((a,b)=>b.taxa>a.taxa?b:a);
     Object.assign(R,{hl:PW.hl,PfAe:PW.PfAe,mu:PW.mu,betaF:PW.betaF,hlFora:PW.hlFora,MdPar:PW.MdPar,MdNor:PW.MdNor,sigPar:PW.sigPar,sigNor:PW.sigNor,ftdNef:PW.ftdNef,limA:PW.limA});
+    // canaletas armadas no painel inferior (NBR 16868-1, Anexo E, Tabela E.2 – alvenaria armada; estádio III):
+    // MRd,h = momento resistente da canaleta por metro de altura; μ = Mr,v/MRd,h (vertical sem armadura); βf(μ, h/ℓ) da Tabela E.2
+    // (laterais e base apoiadas, topo livre: a favor da segurança para o painel apoiado nos 4 lados); atende se βf·wd·ℓ² ≤ MRd,h
+    R.canPI=I.canPI==='sim';
+    if(R.canPI){const P=R.panels[0],md=R.hcan,eh=Math.max(md,Math.round((+I.ehPI||0.4)/md)*md),bar=BARRAS.find(x=>String(x[0])===String(I.phPI))||BARRAS[1];
+      const fs=I.fsMode==='elu'?Math.min(I.fyk,500)/1.15/10:bar[1]*0.3077*G,fd=0.7*R.fpk/I.gm/10,b=Math.min(eh*100,6*R.t),d=R.t/2,lp=R.lp;
+      const C={eh,phi:bar[0],b,d,fd,fs};C.Mrv=P.ftdNef*R.W; // kN·m/m, flexão vertical sem armadura (ftd,normal + Pf/Ae)
+      C.AsMin=0.0010*eh*100*R.t;C.MRdMax=0.3*fd*b*d*d/100;
+      const res=nb=>{const As=nb*area(C.phi),x0=As*fs/(0.8*fd*b),lim=x0>0.45*d,x=Math.min(x0,0.45*d),xi=x/d,z=Math.min(d-0.4*x,0.95*d),M=Math.min(lim?0.8*fd*b*x*z/100:As*fs*z/100,C.MRdMax);return {nb,As,x,xi,xLim:lim,z,M,Mh:M/eh}}; // x limitado a 0,45d: acima disso o aço não é todo aproveitado
+      const evalN=nb=>{const r=res(nb),mu=Math.min(1,C.Mrv/Math.max(1e-9,r.Mh)),bf=betaF(E2A,E2_MU,E2_HL,mu,P.hl),Mpar=bf*P.wd*lp*lp;return {...r,mu,bf,Mpar,okM:Mpar<=r.Mh+1e-9}};
+      let e=null;for(let nb=1;nb<=2;nb++){e=evalN(nb);if(e.okM&&e.As>=C.AsMin-1e-9)break}
+      Object.assign(C,e);C.n=e.nb;C.Md=e.Mpar*eh;C.MRd=e.M;C.hlFora=P.hl<0.3||P.hl>2;
+      C.Acan=Math.max(1,(R.t-5)*(R.Bl[6]-5));C.ok8=2*C.n*area(C.phi)<=0.08*C.Acan+1e-9;C.minOk=C.As>=C.AsMin-1e-9;
+      C.Vd=P.wd*eh*lp/2;const rho=C.As/(b*d);C.fvk=Math.min(0.35+17.5*rho,0.7);C.Va=C.fvk*1000/I.gm*(b/100)*(d/100);C.vOk=C.Vd<=C.Va+1e-9;
+      C.zs=[];for(let z=md/2;z<P.h-md/2+1e-6;z+=eh)C.zs.push(z);C.nc=C.zs.length; // centros das canaletas acima da base do painel (a primeira na 1ª fiada)
+      C.MdV=P.wd*eh*eh/8;C.sigV=C.MdV/R.W;C.vertOk=C.sigV<=P.ftdNef+1e-9; // alvenaria entre duas canaletas, vão vertical = espaçamento
+      C.ok=C.okM&&C.minOk&&C.ok8&&C.vOk&&C.vertOk;
+      P.can=C;P.okSemAco=P.ok;P.ok=C.ok&&P.limE;R.CPI=C;}
     R.panoOk=R.panels.every(P=>P.ok);R.lim50=50*t;R.limE=R.panels.every(P=>P.limE);
     // ligação pano–pilar: reação horizontal do pano (a favor da segurança, faixa horizontal biapoiada) por ferro-cabelo/tela a cada 2 fiadas
     {const Vd=R.wd*lp/2,sl=2*(R.Bl[6]+1)/100,fyd=Math.min(I.fyk,600)/1.15/10,fvd=(FVK0[I.fa]||0.15)*1000/I.gm;
@@ -848,6 +870,7 @@ function drawCorte(R){
     s+=`<path d="M${xe0} ${Y(I.NTopo)}H${xe1}V${Y(NAe)}M${xp0} ${Y(NAe)}H${xe1}V${Y(R.ytop)}" fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-dasharray="6 3"/>`;
 }
   if(R.cInt)s+=rect(0,R.t/100,R.yA+R.h1+R.hcan,R.yA+R.h1,'var(--conc)','var(--concline)');
+  if(R.canPI)R.CPI.zs.forEach(z=>{s+=rect(0,R.t/100,R.yA+z+R.hcan/2,R.yA+z-R.hcan/2,'var(--conc)','var(--concline)')+`<circle cx="${X(R.t/200)}" cy="${Y(R.yA+z)}" r="2.6" fill="var(--steel)"/>`});
   if(R.arm){const zA=Math.min(R.hA,R.ateA),zF=I.v1Full==='toda'?R.hT:zA;
     if(zF>zA+1e-6)s+=`<line x1="${X(wa)}" y1="${Y(NAe+zA)}" x2="${X(wa)}" y2="${Y(NAe+zF)}" stroke="var(--steel)" stroke-width="1.4" stroke-dasharray="5 3"/>`;
     s+=`<line x1="${X(wa)}" y1="${Y(R.ytop)-4}" x2="${X(wa)}" y2="${Y(NAe+zA)}" stroke="var(--steel)" stroke-width="2.4"/>`;
@@ -960,6 +983,7 @@ function drawVista(R){
   // alvenaria e cintas
   const hc=I.hcs/100;s+=rect(-half,half,yTop-hc,NAe,blk,blkL);s+=rect(-half,half,yTop,yTop-hc,'var(--conc)','var(--concline)');
   if(R.cInt)s+=rect(-half,half,R.yA+R.h1+R.hcan,R.yA+R.h1,'var(--conc)','var(--concline)');
+  if(R.canPI)R.CPI.zs.forEach(z=>{s+=rect(-half,half,R.yA+z+R.hcan/2,R.yA+z-R.hcan/2,'var(--conc)','var(--concline)',' fill-opacity=".55"')});
   if(!R.arm&&!R.cor)s+=rect(-half,half,NAe,NAe-I.hci/100,'var(--conc)','var(--concline)');
   // fiadas do pano
   {const md=R.hcan;for(let e=NAe+md;e<yTop-hc-1e-6;e+=md)s+=`<line x1="${X(-half)}" y1="${Y(e)}" x2="${X(half)}" y2="${Y(e)}" stroke="${blkL}" stroke-opacity=".35" stroke-width=".6"/>`}
@@ -1077,8 +1101,11 @@ function renderChecks(R){
     $('tabAlv').innerHTML=`<tr><th>Verificação</th><th>Valor</th><th>Limite</th><th>Critério</th><th></th></tr>
      <tr><td>Esbeltez do pano h/t</td><td>${f(R.lamPano,1)}</td><td>24</td><td class="txt">${R.cInt?`maior painel entre ${R.cor?'sapata':'baldrame'}, cinta intermediária e cinta superior`:`altura livre entre ${R.cor?'sapata':'baldrame'} e cinta`} / espessura do bloco</td><td>${pill(R.lamPanoOk)}</td></tr>
      ${R.panels.map(P=>`<tr><td>${P.lab}: coeficientes (Anexo E)</td><td>βf ${f(P.betaF,4)}</td><td>–</td><td class="txt">${P.livre?'laterais e base apoiadas, topo livre':'apoiado nos 4 lados'}; ℓ = ${f(R.lp)} m, h = ${f(P.h)} m, h/ℓ = ${f(P.hl,2)}${P.hlFora?' (fora da tabela: valor do extremo)':''}; μ = (${f(R.ftdN/1000,3)} + ${f(P.PfAe/1000,3)})/${f(R.ftdP/1000,3)} = ${f(P.mu,3)} (Tabela E.1, interpolada)</td><td></td></tr>
-     <tr><td>${P.lab}: flexão horizontal (paralela à fiada)</td><td>${f(P.sigPar/1000,3)} MPa</td><td>${f(R.ftdP/1000,3)} MPa</td><td class="txt">Md,paralelo = βf·wd·ℓ² = ${f(P.MdPar,3)} kN·m/m; wd = 1,4·p,máx = ${f(P.wd,2)} kN/m²</td><td>${pill(P.sigPar<=R.ftdP+1e-9)}</td></tr>
-     <tr><td>${P.lab}: flexão vertical (normal à fiada)</td><td>${f(P.sigNor/1000,3)} MPa</td><td>${f(P.ftdNef/1000,3)} MPa</td><td class="txt">Md,normal = μ·Md,paralelo = ${f(P.MdNor,3)} kN·m/m; limite ftd,normal + Pf/Ae</td><td>${pill(P.sigNor<=P.ftdNef+1e-9)}</td></tr>
+     <tr><td>${P.lab}: flexão horizontal (paralela à fiada)</td><td>${f(P.sigPar/1000,3)} MPa</td><td>${f(R.ftdP/1000,3)} MPa</td><td class="txt">Md,paralelo = βf·wd·ℓ² = ${f(P.MdPar,3)} kN·m/m; wd = 1,4·p,máx = ${f(P.wd,2)} kN/m²</td><td>${P.can?(P.okSemAco?pill(true,'Sem aço já atende'):pill('warn','Ver canaletas')):pill(P.sigPar<=R.ftdP+1e-9)}</td></tr>
+     <tr><td>${P.lab}: flexão vertical (normal à fiada)</td><td>${f(P.sigNor/1000,3)} MPa</td><td>${f(P.ftdNef/1000,3)} MPa</td><td class="txt">Md,normal = μ·Md,paralelo = ${f(P.MdNor,3)} kN·m/m; limite ftd,normal + Pf/Ae</td><td>${P.can?(P.okSemAco?pill(true,'Sem aço já atende'):pill('warn','Ver canaletas')):pill(P.sigNor<=P.ftdNef+1e-9)}</td></tr>
+     ${P.can?`<tr><td>${P.lab}: canaletas armadas a cada ${f(P.can.eh)} m (Anexo E, Tabela E.2)</td><td>${f(P.can.Mpar,3)} kN·m/m</td><td>${f(P.can.Mh,3)} kN·m/m</td><td class="txt">${P.can.nc} canaletas com ${P.can.n} ${phiTxt(P.can.phi)}: MRd,h = As·fyd·z/e (b = ${f(P.can.b,0)} cm, d = t/2, fd = 0,7·fpk/γm = ${f(P.can.fd*10,2)} MPa, x/d = ${f(P.can.xi,3)}${P.can.xLim?', limitado a 0,45 – a compressão na alvenaria governa':''}); μ = Mr,vertical/MRd,h = ${f(P.can.Mrv,3)}/${f(P.can.Mh,3)} = ${f(P.can.mu,3)}; βf = ${f(P.can.bf,4)}${P.can.hlFora?' (h/ℓ fora da tabela)':''}; Md,paralelo = βf·wd·ℓ²${P.can.minOk?'':'; abaixo de 0,10%'}${P.can.ok8?'':'; aço acima de 8% do graute'}</td><td>${pill(P.can.okM&&P.can.minOk&&P.can.ok8)}</td></tr>
+     <tr><td>${P.lab}: canaletas – cortante no apoio</td><td>${f(P.can.Vd,2)} kN</td><td>${f(P.can.Va,2)} kN</td><td class="txt">Vd = wd·e·ℓ/2 (a favor da segurança); Va = fvk/γm·b·d, fvk = 0,35 + 17,5ρ = ${f(P.can.fvk,2)} MPa</td><td>${pill(P.can.vOk)}</td></tr>
+     <tr><td>${P.lab}: alvenaria entre canaletas (vertical)</td><td>${f(P.can.sigV/1000,3)} MPa</td><td>${f(P.ftdNef/1000,3)} MPa</td><td class="txt">vão vertical = espaçamento das canaletas: Md = wd·e²/8 = ${f(P.can.MdV,3)} kN·m/m; σ = Md/W</td><td>${pill(P.can.vertOk)}</td></tr>`:''}
      <tr><td>${P.lab}: dimensões-limite</td><td>${f(P.h*R.lp,2)} m²</td><td>${f(P.limA,2)} m²</td><td class="txt">h × ℓ ≤ ${P.livre?'1 350':'2 025'}·t² e h, ℓ ≤ 50t = ${f(R.lim50,2)} m (Anexo E, E.4.1)</td><td>${pill(P.limE)}</td></tr>`).join('')}
      ${!R.topoLivre?`<tr><td>Rigidez da cinta superior</td><td>${f(R.BS.u,2)} cm</td><td>${f(R.BS.uLim,2)} cm</td><td class="txt">flecha característica deitada (vão s = ${f(R.s)} m, qh = ${f(R.BS.q,2)} kN/m, 0,5·Ecs·I); limite L/500 e 1 cm para servir de apoio ao pano (NBR 6118, Tabela 13.3)</td><td>${pill(R.BS.uOk)}</td></tr>`:''}
      ${R.cInt?`<tr><td>Rigidez da cinta intermediária</td><td>${f(R.CI.u,2)} cm</td><td>${f(R.CI.uLim,2)} cm</td><td class="txt">canaleta ${f(R.Bl[6],0)} × ${f(R.t,0)} cm a ${f(R.zCi,2)} m acima da base do pano; q = reação do painel inferior + do superior = ${f(R.qci,2)} kN/m</td><td>${pill(R.CI.uOk)}</td></tr>`:''}
@@ -1152,10 +1179,11 @@ function renderChecks(R){
     if(!R.P2.ok)obs.push('Pescoço não resiste: aumente a dimensão no sentido do vento.');
     if(!R.limE)obs.push('Pano fora das dimensões-limite do Anexo E da NBR 16868-1: reduza o espaçamento entre pilares ou use bloco mais espesso.');
     obs.push(`Ligação pano–pilar: a junta entre bloco e concreto não tem amarração. Prever ferro-cabelo ou tela (N14) a cada ${f(R.LG.sl*100,0)} cm, ancorado no pilar e na junta de assentamento, em cada lado do pilar.`);
-    if(!R.panoOk)obs.push(`Pano de alvenaria com tração acima de ftd: ${R.cInt?'':'use a cinta intermediária (divide o pano em dois), '}reduza o espaçamento entre pilares (vão livre ${f(R.lp)} m) ou use bloco mais espesso.`);
+    if(!R.panoOk)obs.push(`Pano de alvenaria com tração acima de ftd: ${R.cInt?'':'use a cinta intermediária (divide o pano em dois), '}${R.canPI?'reduza o espaçamento ou aumente a barra das canaletas, ':'use canaletas armadas no painel inferior, '}reduza o espaçamento entre pilares (vão livre ${f(R.lp)} m) ou use bloco mais espesso.`);
     obs.push(`Terço inferior do pano: armadura de junta (treliça ou fios, Ø ≤ 6,3 mm – NBR 16868-1, 12.4) a cada 2 fiadas, ancorada nos pilares (N16). É reforço construtivo contra fissuração e impacto onde os esforços são maiores; não entra no cálculo do pano.`);
     if(!R.topoLivre&&!R.BS.uOk)obs.push('Cinta superior flexível demais para servir de apoio ao pano: aumente a altura da cinta, reduza o espaçamento entre pilares ou calcule com o topo livre.');
     if(R.CI&&!R.CI.uOk)obs.push('Cinta intermediária flexível demais: reduza o espaçamento entre pilares ou use bloco mais espesso.');
+    if(R.canPI)obs.push(`Canaletas armadas no ${R.cInt?'painel inferior':'pano'} (N17): a cada ${f(R.CPI.eh)} m a partir da 1ª fiada, ${R.CPI.nc} canaletas grauteadas com ${R.CPI.n} ${phiTxt(R.CPI.phi)}, ancoradas nos pilares (dobra dentro do pilar ou traspasse ${f(lapLen(R.CPI.phi).L,2)} m). O graute das canaletas deve ter fgk ≥ 15 MPa e o bloco fbk = ${I.fbk} MPa.`);
     if(R.cInt)obs.push(`Cinta intermediária: canaleta na fiada a ${f(R.zCi,2)} m acima da base do pano, grauteada com o mesmo concreto dos pilares e com as barras N15 ancoradas nos pilares (traspasse ou dobra dentro do pilar).`);
   }else{
     if(!R.espOk&&isFinite(R.xi))obs.push(`Espaçamento calculado (${f(R.espA,1)} cm) menor que o módulo dos furos: use vergalhão de diâmetro maior.`);
@@ -1211,7 +1239,8 @@ function detDefaults(R){
     D.N10={n:R.BS.nb,phi:I.phv}; D.N12={phi:I.pht,s:R.BS.sp};
     D.N14={n:Math.max(1,Math.ceil(R.LG.As/area(5)-1e-9)),phi:5};
     if(R.CI)D.N15={n:R.CI.nb,phi:I.phv};
-    D.N16={phi:5,s:40};
+    if(!R.canPI)D.N16={phi:5,s:40};
+    if(R.canPI)D.N17={n:R.CPI.n,phi:R.CPI.phi};
   }else{
     D.V1={phi:R.phiA,s:R.espAd>0?R.espAd:R.mod}; D.N2={phi:I.phv,s:stw(R.P2.Asf)}; D.N13={n:2,phi:I.phv};
     D.V2={n:2,phi:R.phiA}; D.H1={n:R.nH1,phi:R.phH};
@@ -1251,8 +1280,10 @@ function detRows(R,D){
     rows.push({id:'N12',el:'Cinta superior',pos:'Estribos',mode:'s',req:`s ≤ ${R.BS.sp} cm`,ad:`${phiTxt(D.N12.phi)} c/${D.N12.s}`,ok:D.N12.s<=R.BS.sp&&D.N12.phi>=5});
     if(R.CI){const a15=D.N15.n*area(D.N15.phi),o8=R.ok8(2*D.N15.n,D.N15.phi,R.Acan);
       rows.push({id:'N15',el:'Cinta intermediária',pos:`Canaleta grauteada a ${f(R.zCi,2)} m acima da base do pano, por face, ancorada nos pilares`,mode:'n',req:`${f(R.CI.Asf)} cm²`,ad:`${f(a15)} cm²`,ok:R.CI.ok&&a15>=R.CI.Asf-1e-6&&o8,note:o8?'':'aço acima de 8% do graute da canaleta (NBR 16868-1, 12.3)',lap:lapLen(D.N15.phi)})}
-    {const ok16=D.N16.phi<=6.3+1e-9&&D.N16.s%20===0&&D.N16.s<=60;
+    if(D.N16){const ok16=D.N16.phi<=6.3+1e-9&&D.N16.s%20===0&&D.N16.s<=60;
      rows.push({id:'N16',el:'Pano – terço inferior',pos:`Armadura de junta (treliça ou 2 fios) a cada ${D.N16.s} cm, até ${f((R.cInt?R.h1:R.Halv)/3,2)} m acima ${R.cor?'do topo da sapata':'do NA'}, ancorada nos pilares`,mode:'s',req:'construtiva · Ø ≤ 6,3 mm',ad:`${phiTxt(D.N16.phi)} c/${D.N16.s}`,ok:ok16,note:ok16?'':'em junta de assentamento Ø ≤ 6,3 mm (NBR 16868-1, 12.4), a cada 1 a 3 fiadas'})}
+    if(R.canPI){const C=R.CPI,a17=D.N17.n*area(D.N17.phi),o8=2*D.N17.n*area(D.N17.phi)<=0.08*C.Acan+1e-9;
+     rows.push({id:'N17',el:R.cInt?'Painel inferior':'Pano',pos:`Canaletas armadas horizontais a cada ${f(C.eh)} m (${C.nc} canaletas, 1ª fiada), ancoradas nos pilares`,mode:'n',req:`${f(Math.max(C.As,C.AsMin))} cm² por canaleta (mín. 0,10%: ${f(C.AsMin)})`,ad:`${f(a17)} cm²`,ok:C.okM&&a17>=Math.max(C.As,C.AsMin)-1e-6&&D.N17.n<=2&&o8,note:[D.N17.n>2?'mais de 2 barras na canaleta':'',o8?'':'aço acima de 8% do graute da canaleta (NBR 16868-1, 12.3)'].filter(Boolean).join('; '),lap:lapLen(D.N17.phi)})}
   }else{
     const asv=AsS(D.V1.phi,D.V1.s),modOk=D.V1.s%R.mod===0&&D.V1.s<=6*R.t;
     const o8v=R.ok8(1,D.V1.phi,R.Agr);
@@ -1327,7 +1358,10 @@ function detSvg(R,D){
     T(X(bp)+14,Y(I.NTopo)+48,`estribos N3 – ${detText('N3',D)}`,13,'start',stir);
     if(R.CI){const yc=Y(R.yA+R.zCi);o.push(`<rect x="${X(0).toFixed(1)}" y="${Y(R.yA+R.h1+R.hcan).toFixed(1)}" width="${(t*sc).toFixed(1)}" height="${(R.hcan*sc).toFixed(1)}" fill="none" stroke="${ink}" stroke-width="1" stroke-dasharray="5 3"/>`);
       T(X(bp)+14,yc+4,`N15 – cinta intermediária ${detText('N15',D)} por face, ancorada no pilar (tracejado: canaleta fora do corte)`,12,'start',steel,'bold');}
-    T(X(bp)+14,Y(R.yA+Math.min(0.4,(R.cInt?R.h1:R.Halv)/3))+4,`N16 – treliça ${detText('N16',D)} no terço inferior do pano, ancorada no pilar`,12,'start',steel);
+    if(R.canPI){R.CPI.zs.forEach(z=>{o.push(`<rect x="${X(0).toFixed(1)}" y="${Y(R.yA+z+R.hcan/2).toFixed(1)}" width="${(t*sc).toFixed(1)}" height="${(R.hcan*sc).toFixed(1)}" fill="none" stroke="${ink}" stroke-width="1" stroke-dasharray="5 3"/>`);Cc(X(t/2),Y(R.yA+z),3.4,steel)});
+      const avoid=[[Y(NAe)-12,Y(NAe)+80],...(R.CI?[[Y(R.yA+R.zCi)-14,Y(R.yA+R.zCi)+14]]:[]),[Y(ytop)-20,Y(ytop)+10]],dist=y=>Math.min(...avoid.map(([a,b])=>y<a?a-y:y>b?y-b:-1)),yN=R.CPI.zs.map(z=>Y(R.yA+z)).reduce((u,v)=>dist(v)>dist(u)?v:u);
+      T(X(bp)+14,yN+4,`N17 – canaletas armadas ${detText('N17',D)} a cada ${f(R.CPI.eh)} m, ancoradas no pilar (tracejado: fora do corte)`,12,'start',steel,'bold');}
+    else T(X(bp)+14,Y(R.yA+Math.min(0.4,(R.cInt?R.h1:R.Halv)/3))+4,`N16 – treliça ${detText('N16',D)} no terço inferior do pano, ancorada no pilar`,12,'start',steel);
     T(X(Math.max(bp,P0+bpe))+14,Y(NAe)-6,R.cor?'sem baldrame: alvenaria apoiada na sapata corrida':'baldrame (ver seção C), cruza o pescoço',11,'start',mut);
     T(X(Math.max(bp,P0+bpe))+14,Y(NAe)+18,`N2 – pescoço/esperas, ${detText('N2',D)} por face`,13,'start',st2,'bold');
     T(X(Math.max(bp,P0+bpe))+14,Y(NAe)+36,`traspasse com N1: ${f(lp,2)} m acima ${R.cor?'do topo do pescoço':'do NA'}${lpO.calc?' (calculado, Ø ≥ 16)':''}`,12,'start',mut);
@@ -1568,9 +1602,10 @@ function elevSvg(R){
   s+=rect(0,len,I.NTopo,I.NTopo-I.hcs/100,LIGHT.conc,LIGHT.concline);
   if(!R.arm){
     if(!R.cor)s+=rect(0,len,NAe,NAe-I.hci/100,LIGHT.conc,LIGHT.concline);
-    {const z3=(R.cInt?R.h1:R.Halv)/3;for(let z=0.4;z<=z3+1e-6;z+=0.4)s+=`<line x1="${X(0)}" y1="${Y(R.yA+z)}" x2="${X(len)}" y2="${Y(R.yA+z)}" stroke="${LIGHT.steel}" stroke-width="1" stroke-dasharray="3 3"/>`;}
+    if(!R.canPI){const z3=(R.cInt?R.h1:R.Halv)/3;for(let z=0.4;z<=z3+1e-6;z+=0.4)s+=`<line x1="${X(0)}" y1="${Y(R.yA+z)}" x2="${X(len)}" y2="${Y(R.yA+z)}" stroke="${LIGHT.steel}" stroke-width="1" stroke-dasharray="3 3"/>`;}
     if(R.cInt){s+=rect(0,len,R.yA+R.h1+R.hcan,R.yA+R.h1,LIGHT.conc,LIGHT.concline);s+=`<text x="${X(len)+8}" y="${Y(R.yA+R.zCi)+4}" font-size="10">cinta intermediária N15</text>`}
-    s+=`<text x="${X(len)+8}" y="${Y(R.yA+0.2)+4}" font-size="10" class="t-st">treliça N16 (terço inferior)</text>`;
+    if(R.canPI){R.CPI.zs.forEach(z=>{s+=rect(0,len,R.yA+z+R.hcan/2,R.yA+z-R.hcan/2,LIGHT.conc,LIGHT.concline)});s+=`<text x="${X(len)+8}" y="${Y(R.yA+R.CPI.zs[0])+4}" font-size="10" class="t-st">canaletas armadas N17</text>`}
+    else s+=`<text x="${X(len)+8}" y="${Y(R.yA+0.2)+4}" font-size="10" class="t-st">treliça N16 (terço inferior)</text>`;
     for(let i=0;i<nP;i++){const xc=R.hp/200+i*R.s;
       s+=rect(xc-R.hp/200,xc+R.hp/200,I.NTopo,NAe,LIGHT.conc,LIGHT.concline);
       s+=rect(xc-R.hpe/200,xc+R.hpe/200,NAe,R.ytop,LIGHT.conc,LIGHT.concline);
@@ -1753,8 +1788,14 @@ function memorialXML(R,figs,state){
       b.push(EQ('Coeficiente βf:',`${P.livre?'laterais e base apoiadas, topo livre':'apoiado nos 4 lados'}; ℓ = ${f(R.lp)} m, h = ${f(P.h)} m, h/ℓ = ${f(P.hl,2)} → βf = ${f(P.betaF,4)} (Tabela E.1, interpolação linear)`));
       b.push(EQ('Flexão horizontal:',`Md,paralelo = βf·wd·ℓ² = ${f(P.MdPar,3)} kN·m/m (wd = 1,4 × ${f(P.pk,2)} = ${f(P.wd,2)} kN/m², maior pressão lateral no painel); W = t²/6 = ${f(R.W*1e6,0)} cm³/m; σ = ${f(P.sigPar/1000,3)} MPa ≤ ftd,paralela = ${f(R.ftkP,2)}/${f(I.gm,1)} = ${f(R.ftdP/1000,3)} MPa (${ST(P.sigPar<=R.ftdP+1e-9)})`));
       b.push(EQ('Flexão vertical:',`Md,normal = μ·Md,paralelo = ${f(P.MdNor,3)} kN·m/m; σ = ${f(P.sigNor/1000,3)} MPa ≤ ftd,normal + Pf/Ae = ${f(P.ftdNef/1000,3)} MPa (${ST(P.sigNor<=P.ftdNef+1e-9)})`));
-      b.push(EQ('Dimensões-limite:',`h × ℓ = ${f(P.h*R.lp,2)} m² ≤ ${P.livre?'1 350':'2 025'}·t² = ${f(P.limA,2)} m²; h e ℓ ≤ 50t = ${f(R.lim50,2)} m (${ST(P.limE)})`));});
-    b.push(EQ('Terço inferior:',`armadura de junta (treliça ou fios Ø ≤ 6,3 mm, NBR 16868-1, 12.4) a cada 2 fiadas até ${f((R.cInt?R.h1:R.Halv)/3,2)} m acima da base do pano, ancorada nos pilares (N16): reforço construtivo contra fissuração e impacto, não considerado no cálculo do pano`));
+      b.push(EQ('Dimensões-limite:',`h × ℓ = ${f(P.h*R.lp,2)} m² ≤ ${P.livre?'1 350':'2 025'}·t² = ${f(P.limA,2)} m²; h e ℓ ≤ 50t = ${f(R.lim50,2)} m (${ST(P.limE)})`));
+      if(P.can){const C=P.can;
+        b.push(EQ('Canaletas armadas:',`${P.okSemAco?'o painel já atende sem aço; as canaletas ficam como reforço':'sem aço o painel não atende; adotadas canaletas grauteadas e armadas'} a cada e = ${f(C.eh)} m (${C.nc} canaletas, a primeira na 1ª fiada), ancoradas nos pilares, com ${C.n} ${phiTxt(C.phi)} cada`));
+        b.push(EQ('Resistência horizontal:',`estádio III: b = ${f(C.b,0)} cm (≤ e e ≤ 6t), d = t/2 = ${f(C.d,1)} cm, fd = 0,7·fpk/γm = 0,7 × ${f(R.fpk,1)}/${f(I.gm,1)} = ${f(C.fd*10,2)} MPa (bloco fbk = ${I.fbk} MPa); As = ${f(C.As,2)} cm², x/d = ${f(C.xi,3)}${C.xLim?' (limitado a 0,45: a compressão na alvenaria governa)':' ≤ 0,45'}, MRd = As·fyd·z = ${f(C.MRd,3)} kN·m → MRd,h = ${f(C.Mh,3)} kN·m/m (As,mín = 0,10%·e·t = ${f(C.AsMin,2)} cm²)`));
+        b.push(EQ('Placa armada:',`NBR 16868-1, Anexo E, Tabela E.2 (alvenaria armada; laterais e base apoiadas, topo livre, a favor da segurança): μ = Mr,vertical/MRd,h = (ftd,normal + Pf/Ae)·W/MRd,h = ${f(C.Mrv,3)}/${f(C.Mh,3)} = ${f(C.mu,3)}; h/ℓ = ${f(P.hl,2)} → βf = ${f(C.bf,4)}; Md,paralelo = βf·wd·ℓ² = ${f(C.Mpar,3)} ≤ MRd,h = ${f(C.Mh,3)} kN·m/m (${ST(C.okM)}); a flexão vertical fica limitada a μ·Md,paralelo ≤ Mr,vertical`));
+        b.push(EQ('Cortante na canaleta:',`Vd = wd·e·ℓ/2 = ${f(C.Vd,2)} kN ≤ Va = fvk/γm·b·d = ${f(C.Va,2)} kN, fvk = 0,35 + 17,5ρ = ${f(C.fvk,2)} MPa (${ST(C.vOk)})`));
+        b.push(EQ('Alvenaria entre canaletas:',`vão vertical igual ao espaçamento: Md = wd·e²/8 = ${f(C.MdV,3)} kN·m/m; σ = ${f(C.sigV/1000,3)} MPa ≤ ftd,normal + Pf/Ae = ${f(P.ftdNef/1000,3)} MPa (${ST(C.vertOk)})`));}});
+    if(!R.canPI)b.push(EQ('Terço inferior:',`armadura de junta (treliça ou fios Ø ≤ 6,3 mm, NBR 16868-1, 12.4) a cada 2 fiadas até ${f((R.cInt?R.h1:R.Halv)/3,2)} m acima da base do pano, ancorada nos pilares (N16): reforço construtivo contra fissuração e impacto, não considerado no cálculo do pano`));
     b.push(EQ('Ligação pano–pilar:',`Vd = wd·ℓ/2 = ${f(R.LG.Vd,2)} kN/m; ferro-cabelo ou tela a cada ${f(R.LG.sl*100,0)} cm: Fd = ${f(R.LG.Fd,2)} kN e As ≥ Fd/fyd = ${f(R.LG.As,3)} cm² por ponto de ligação, em cada lado do pilar`));
     b.push(EQ('Deslocamento no topo:',`u = ${f(R.uTop,2)} cm; limite 2H/250 = ${f(R.uLim,2)} cm para balanço (${ST(R.uOk)}), pilar com 0,5·Ecs·I`));
   }else{
