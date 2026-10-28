@@ -89,9 +89,12 @@ svg .t-ok{fill:var(--ok)} svg .t-bad{fill:var(--bad)} svg .t-st{fill:var(--steel
 #diag{min-width:440px;width:100%;height:auto}
 #vista{min-width:560px;width:100%;height:auto}
 .baserow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.7fr);gap:20px;align-items:start}
+.beamrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;align-items:start}
+#s2>.panel,#s2>.beamrow,#s2>.diagrow{margin-top:20px}
+#vista,#beamW svg{display:block;max-width:960px;margin:0 auto}
 .beamcol{display:grid;gap:20px}
 @media (max-width:900px){.baserow{grid-template-columns:1fr}}
-.diagrow{display:grid;grid-template-columns:minmax(0,0.8fr) minmax(0,1.2fr);gap:20px;align-items:start}
+.diagrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
 @media (max-width:980px){.diagrow{grid-template-columns:1fr}}
 .beam svg{width:100%;height:auto}
 .chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:10px}
@@ -198,22 +201,25 @@ td.txt{font-family:var(--body);text-align:left;color:var(--muted);font-size:12.5
         <div class="scroll"><svg id="diag" viewBox="0 0 760 560" role="img" aria-label="Diagramas de cortante e momento ao longo da altura"></svg></div>
       </div>
       <div class="panel">
-        <header><h3 id="vistaTitle">Seção típica: vista frontal e planta</h3><small id="vistaSub"></small></header>
-        <div class="scroll"><svg id="vista" viewBox="0 0 760 600" role="img" aria-label="Vista frontal e planta do trecho típico com o caminho das cargas horizontais"></svg></div>
+        <header><h3>Esforços por seção</h3><small>Característicos (sem majoração)</small></header>
+        <div class="scroll"><table id="tabSec"></table></div>
+        <div id="pilDim"></div>
       </div>
     </div>
     <div class="panel">
-      <header><h3>Esforços por seção</h3><small>Característicos (sem majoração)</small></header>
-      <div class="scroll"><table id="tabSec"></table></div>
+      <header><h3 id="vistaTitle">Seção típica: vista frontal e planta</h3><small id="vistaSub"></small></header>
+      <div class="scroll"><svg id="vista" viewBox="0 0 760 600" role="img" aria-label="Vista frontal e planta do trecho típico com o caminho das cargas horizontais"></svg></div>
     </div>
-    <div class="baserow">
-      <div class="beamcol">
-        <div class="panel beam"><header><h3>Baldrame</h3><small id="bISub"></small></header><div id="beamI"></div></div>
-        <div class="panel beam"><header><h3>Cinta superior (verga de topo)</h3><small id="bSSub"></small></header><div id="beamS"></div></div>
-        <div class="panel beam" id="beamWPanel" hidden><header><h3>Parede de concreto (placa)</h3><small id="bWSub"></small></header><div id="beamW"></div></div>
-        <div class="panel beam" id="beamCPanel" hidden><header><h3>Cinta intermediária</h3><small id="bCSub"></small></header><div id="beamC"></div></div>
-      </div>
-      <div class="panel"><header><h3>Ações na base da sapata</h3><small id="baseSub"></small></header><div class="scroll"><table id="tabBase"></table></div></div>
+    <div class="beamrow">
+      <div class="panel beam"><header><h3>Baldrame</h3><small id="bISub"></small></header><div id="beamI"></div></div>
+      <div class="panel beam"><header><h3>Cinta superior (verga de topo)</h3><small id="bSSub"></small></header><div id="beamS"></div></div>
+      <div class="panel beam" id="beamCPanel" hidden><header><h3>Cinta intermediária</h3><small id="bCSub"></small></header><div id="beamC"></div></div>
+    </div>
+    <div class="panel" id="beamWPanel" hidden><header><h3>Parede de concreto (placa)</h3><small id="bWSub"></small></header><div id="beamW"></div></div>
+    <div class="panel">
+      <header><h3>Ações na base da sapata</h3><small id="baseSub"></small></header>
+      <div class="scroll"><svg id="baseDiag" viewBox="0 0 1200 330" role="img" aria-label="Resultantes e pressões no solo em cada caso"></svg></div>
+      <div class="scroll"><table id="tabBase"></table></div>
     </div>
     <div class="nav"><button class="btn" type="button" data-go="1">← Dados</button><button class="btn primary" type="button" data-go="3">Seguinte: verificações →</button></div>
   </section>
@@ -1069,7 +1075,7 @@ function drawVista(R){
   // fiadas do pano
   {const md=R.hcan;for(let e=NAe+md;e<yTop-hc-1e-6;e+=md)s+=`<line x1="${X(-half)}" y1="${Y(e)}" x2="${X(half)}" y2="${Y(e)}" stroke="${blkL}" stroke-opacity=".35" stroke-width=".6"/>`}
   // alvenaria de embasamento: do fundo do baldrame ao topo da sapata corrida (altura varia com a altura do baldrame)
-  if(R.cor&&R.hEmb>0){const eT=R.ytop+R.hEmb,eB=R.ytop,md=R.hcan;s+=rect(-half,half,eT,eB,blk,blkL);
+  if(R.cor&&R.hEmb>0&&!R.CW){const eT=R.ytop+R.hEmb,eB=R.ytop,md=R.hcan;s+=rect(-half,half,eT,eB,blk,blkL);
     for(let e=eB+md;e<eT-1e-6;e+=md)s+=`<line x1="${X(-half)}" y1="${Y(e)}" x2="${X(half)}" y2="${Y(e)}" stroke="${blkL}" stroke-opacity=".6" stroke-width=".7"/>`;
     for(let k=0,e=eB;e<eT-1e-6;e+=md,k++){const cl=R.Bl[5]/100;for(let x=-half+(k%2?cl/2:0);x<half;x+=cl)s+=`<line x1="${X(x)}" y1="${Y(Math.min(eT,e+md))}" x2="${X(x)}" y2="${Y(e)}" stroke="${blkL}" stroke-opacity=".45" stroke-width=".6"/>`}
     s+=`<text x="${X(half)+6}" y="${Y((eT+eB)/2)+4}" font-size="10" text-anchor="start" class="t-muted">embasamento</text><text x="${X(half)+6}" y="${Y((eT+eB)/2)+16}" font-size="10" class="t-muted">h = ${f(R.hEmb)} m</text>`;}
@@ -1125,6 +1131,9 @@ function drawVista(R){
   $('vistaSub').textContent=sup?`Panos vizinhos inteiros (${R.arm?'enrijecedores':'pilares'} a cada ${f(sp)} m) · caminho das cargas horizontais: pano → apoios → fundação`:'Por metro de muro';
 }
 function renderSec(R){
+  if(!R.arm){const P=[R.P1,R.P2],nm=[R.cor?'Pilar no topo do pescoço':'Pilar no NA','Pescoço no topo da sapata'];
+    $('pilDim').innerHTML=`<h4 style="margin:16px 0 6px">Dimensionamento do pilar</h4><table><tr><th>Seção</th><th>Mk (kN·m)</th><th>Vk (kN)</th><th>Md (kN·m)</th><th>Armadura</th></tr>${P.map((p,k)=>`<tr><td>${nm[k]}</td><td>${f(p.Mk)}</td><td>${f(p.Vd/1.4/(p.gn||1))}</td><td>${f(p.Md)}</td><td>${p.txt}</td></tr>`).join('')}</table>
+     <p class="note">Mk do dimensionamento = momento das ações horizontais no pilar${R.ecc?` menos o do peso fora do eixo do pescoço (${f(Math.abs(R.ecc))} kN·m) no sentido em que alivia`:''}${R.CW?'; na altura da parede de concreto o pilar recebe só as reações laterais da placa':''}. Md inclui γf = 1,4, γn e 2ª ordem.</p>`}else $('pilDim').innerHTML='';
   const rows=[['Nível do terreno',R.Hg],[R.cor?'Topo do pescoço':'Assentamento (NA)',NAe],['Topo da sapata',R.ytop],['Base da sapata',I.Nf]];
   $('tabSec').innerHTML=`<tr><th>Seção</th><th>Cota (m)</th><th>V (kN/m)</th><th>M (kN·m/m)</th>${R.arm?'':'<th>V pilar (kN)</th><th>M pilar (kN·m)</th>'}</tr>`+
    rows.map(([n,y])=>{const v=R.at(R.D.V,y),m=R.at(R.D.M,y);return `<tr><td>${n}</td><td>${sgn(y)}</td><td>${f(v)}</td><td>${f(m)}</td>${R.arm?'':`<td>${f(v*R.s)}</td><td>${f(m*R.s)}</td>`}</tr>`}).join('');
@@ -1182,6 +1191,25 @@ function wallSvg(R){const W=R.CW,PL=W.PL,C=PL.cases,ny=PL.ny,b=PL.b,nx=PL.nx;
 function wallNote(R){const W=R.CW,J=W.no||{};
   return `<p class="note" style="margin-top:6px">Valores característicos em kN·m/m e kN/m; acima do eixo (ou à esquerda) tracionam a face do vizinho. Pela base descem ${f(W.share*100,0)}–${f(W.shareMax*100,0)}% da carga do painel; até ${f(W.Fs,2)} kN vão para os pilares.</p>
    <p class="note"><b>Nó parede–sapata:</b> Md,base = 1,4 × ${f(W.MyE,2)} = ${f(J.MdE,2)} kN·m/m (armadura inferior da sapata) e ${f(J.MdI,2)} kN·m/m na face interna (superior). Pelo solo, a sapata pede ${f(J.solo,2)} kN·m/m${J.gov?'; quem governa é a parede':''}. MRd adotado: ${f(J.MRdInf,2)} (inferior) e ${f(J.MRdSup,2)} (superior) – ${J.ok?'compatível':'<b>não atende</b>: aumente hs ou a barra da sapata'}.</p>`}
+// ações na base da sapata: resultantes e pressão no solo nos três casos
+function baseSvg(R){const cs=[R.perm,...R.cW],B=I.B,w=330,sc=w/B,T=(x,y,t,an='middle',sz=14,wt='normal',cl='')=>`<text x="${x}" y="${y}" text-anchor="${an}" font-size="${sz}" font-weight="${wt}"${cl?` class="${cl}"`:''}>${t}</text>`;
+  let o=`<defs><marker id="abN" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--ink)"/></marker><marker id="abH" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--wind)"/></marker></defs>`;
+  const smx=Math.max(1,...cs.map(c=>isFinite(c.smax)?c.smax:0)),ps=90/smx;
+  cs.forEach((c,k)=>{const x0=40+k*400,yb=150,xs=x=>x0+x*sc,xc=xs(B/2+c.e);
+    o+=T(x0+w/2,24,c.lab,'middle',15,'bold');
+    o+=`<rect x="${x0}" y="${yb-26}" width="${w}" height="26" fill="var(--conc)" stroke="var(--concline)"/>`;
+    o+=`<line x1="${x0}" y1="${yb-80}" x2="${x0}" y2="${yb+10}" stroke="var(--divisa)" stroke-dasharray="8 3 2 3"/>`+T(x0+4,yb-84,'divisa','start',11,'normal','t-div');
+    o+=`<line x1="${xs(B/2)}" y1="${yb-30}" x2="${xs(B/2)}" y2="${yb+4}" stroke="var(--muted)" stroke-dasharray="3 3"/>`;
+    o+=`<line x1="${xc}" y1="${yb-92}" x2="${xc}" y2="${yb-30}" stroke="var(--ink)" stroke-width="2" marker-end="url(#abN)"/>`+T(xc+(c.e<0?-8:8),yb-74,`N = ${f(R.N,1)} kN`,c.e<0?'end':'start',13);
+    o+=T(xc+(c.e<0?-8:8),yb-58,`e = ${f(c.e,3)} m`,c.e<0?'end':'start',13,'normal','t-m');
+    if(Math.abs(c.Hh)>1e-6){const d=c.Hh>0?1:-1,xa=x0+w/2-d*50;o+=`<line x1="${xa}" y1="${yb+4}" x2="${xa+d*100}" y2="${yb+4}" stroke="var(--wind)" stroke-width="2" marker-end="url(#abH)"/>`+T(xa+d*50,yb+20,`H = ${f(Math.abs(c.Hh),2)} kN`,'middle',12,'normal','t-wind')}
+    // pressões
+    const pts=[];for(let i=0;i<=60;i++){const x=B*i/60;pts.push(`${xs(x)},${yb+30+Math.min(c.sig(x),smx)*ps}`)}
+    o+=`<polygon points="${xs(0)},${yb+30} ${pts.join(' ')} ${xs(B)},${yb+30}" fill="var(--soil)" fill-opacity=".22" stroke="var(--soil)" stroke-width="1.4"/><line x1="${x0}" y1="${yb+30}" x2="${x0+w}" y2="${yb+30}" stroke="var(--ink)" stroke-width=".8"/>`;
+    const s0=c.sig(0),s1=c.sig(B);o+=T(xs(0)+4,yb+30+s0*ps+16,f(s0,1),'start',13,'normal','t-soil')+T(xs(B)-4,yb+30+s1*ps+16,f(s1,1),'end',13,'normal','t-soil');
+    o+=T(x0+w/2,yb+152,`σmáx ${f(c.smax,1)} kPa · contato ${f(Math.min(1,c.lc/B)*100,0)}%`,'middle',13);
+    o+=T(x0+w/2,yb+170,`M = ${f(c.Mt,2)} kN·m${isFinite(c.FSt)?` · FS tomb. ${f(c.FSt,2)}`:''}${isFinite(c.FSd)?` · FS desl. ${f(c.FSd,2)}`:''}`,'middle',12,'normal','t-muted')});
+  return o}
 function beamSvg(q,qlab,sp){
   const x1=40,x2=400,len=x2-x1,Vm=q*sp/2,Mm=q*sp*sp/8;let o=`<svg viewBox="0 0 440 250" role="img" aria-label="Diagramas da viga">`;
   o+=`<defs><marker id="aq${qlab}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--ink)"/></marker></defs><line x1="${x1}" y1="22" x2="${x2}" y2="22" stroke="var(--ink)"/>`;
@@ -2131,7 +2159,7 @@ function update(){
   const R=calc();
   $('tAlv').value=`${f(R.t,R.t%1?1:0)} cm`;$('gaAlv').value=`${f(R.ga)} kN/m² · γ ≈ ${f(R.gEsp,1)} kN/m³`;$('EAlvOut').value=`${f(R.Ealv/1000,0)} MPa (${R.Ecoef}·fpk)`;$('fpkOut').value=`${f(R.fpk,1)} / ${f(R.fpkC,1)} MPa${R.cer?' (informado)':' (Tabela 3.2)'}`;$('ftkOut').value=`${f(R.ftkN,2)} / ${f(R.ftkP,2)} MPa`;$('modOut').value=`${f(R.mod,0)} cm`;if(R.enr)$('eenrOut').value=`${f(R.eenr,0)} cm · δ = ${f(R.dEnr,2)} · tef = ${f(R.tef,1)} cm`;$('CfOut').value=`${f(R.Cf,1)} (L/h = ${f(I.Lm/Math.max(R.Hv,0.1),1)})`;
   {const ol=$('refsAuto');if(ol)ol.innerHTML=refList(R,true).map(x=>`<li>${x.replace(/</g,'&lt;')}</li>`).join('');const ta=$('refsExtra');if(ta&&ta.value!==(I.refsExtra||''))ta.value=I.refsExtra||''}
-  drawCorte(R);renderChips(R);renderLoads(R);drawDiag(R);drawVista(R);renderSec(R);renderChecks(R);renderDet(R);
+  drawCorte(R);renderChips(R);renderLoads(R);drawDiag(R);drawVista(R);renderSec(R);$('baseDiag').innerHTML=baseSvg(R);renderChecks(R);renderDet(R);
 }
 buildForm();update();
 try{const t=+localStorage.getItem(KEY+'-tab');if(t>=1&&t<=4)go(t)}catch(e){}
