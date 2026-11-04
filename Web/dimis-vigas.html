@@ -247,6 +247,20 @@ details .body{padding:0 16px 12px}
             <label class="onlyviga"><span class="lt">Pele Φ <span class="u">mm</span></span>
               <select id="phiPele" data-k="phiPele"><option>5</option><option>6.3</option><option>8</option><option>10</option><option>12.5</option><option>16</option></select></label>
           </div>
+          <div class="ctl onlyviga" style="margin-top:10px">
+            <label><span class="lt">Tração · quantidade</span><input id="nTr" data-k="nTr" inputmode="numeric" placeholder="automático"></label>
+            <label><span class="lt">Tração · camadas</span>
+              <select id="camTr" data-k="camTr"><option value="">automático</option><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+            <label><span class="lt">Compressão · quantidade</span><input id="nCo" data-k="nCo" inputmode="numeric" placeholder="automático"></label>
+            <label><span class="lt">Compressão · camadas</span>
+              <select id="camCo" data-k="camCo"><option value="">automático</option><option>1</option><option>2</option><option>3</option></select></label>
+            <label><span class="lt">Pele · barras por face</span><input id="nPele" data-k="nPele" inputmode="numeric" placeholder="automático"></label>
+          </div>
+          <div class="ctl onlylaje" style="margin-top:10px">
+            <label><span class="lt">Tração · espaçamento <span class="u">cm</span></span><input id="sTr" data-k="sTr" inputmode="decimal" placeholder="automático"></label>
+            <label><span class="lt">Compressão · espaçamento <span class="u">cm</span></span><input id="sCo" data-k="sCo" inputmode="decimal" placeholder="vazio = sem armadura"></label>
+          </div>
+          <p class="hint">Deixe vazio para o cálculo escolher. Em laje, informe o diâmetro e o espaçamento (por exemplo Φ10 c/ 15).</p>
         </div>
         <div id="out-flexao" class="main"></div>
       </section>
@@ -448,16 +462,23 @@ var Motor = (function () {
     var dmax = BRITA[i.brita] || 19;
     var out = {};
     var Ab = area(i.phiTr);
-    var n = Math.max(2, Math.ceil(r.AsBase / Ab - EPS));
+    var nAuto = Math.max(2, Math.ceil(r.AsBase / Ab - EPS));
+    var n = i.nTr > 0 ? Math.round(i.nTr) : nAuto;
     var cam = camadas(n, i.phiTr, i.bw, i.cob, i.phiT, dmax);
-    out.tracao = { phi: i.phiTr, n: n, As: n * Ab, camadas: cam.camadas, porCamada: cam.porCamada, ah: cam.ah, av: cam.av };
-    out.avisoCG = cam.camadas > 1;
+    var nCam = i.camTr > 0 ? Math.round(i.camTr) : cam.camadas;
+    var porCam = i.camTr > 0 ? Math.ceil(n / nCam - EPS) : cam.porCamada;
+    out.tracao = { phi: i.phiTr, n: n, nAuto: nAuto, As: n * Ab, camadas: nCam, porCamada: porCam, maxPorCamada: cam.porCamada,
+      excede: porCam > cam.porCamada, ah: cam.ah, av: cam.av, manual: i.nTr > 0 || i.camTr > 0 };
+    out.avisoCG = nCam > 1;
 
     var Ac = area(i.phiCo);
-    var nc = r.dupla ? Math.max(2, Math.ceil(r.Asc / Ac - EPS)) : 2;
+    var ncAuto = r.dupla ? Math.max(2, Math.ceil(r.Asc / Ac - EPS)) : 2;
+    var nc = i.nCo > 0 ? Math.round(i.nCo) : ncAuto;
     var camc = camadas(nc, i.phiCo, i.bw, i.cob, i.phiT, dmax);
-    out.compressao = { phi: i.phiCo, n: nc, As: nc * Ac, camadas: r.dupla ? camc.camadas : 1, porCamada: camc.porCamada,
-      portaEstribo: !r.dupla, ah: camc.ah, av: camc.av };
+    var ncCam = i.camCo > 0 ? Math.round(i.camCo) : (r.dupla || nc > 2 ? camc.camadas : 1);
+    var porCamC = i.camCo > 0 ? Math.ceil(nc / ncCam - EPS) : camc.porCamada;
+    out.compressao = { phi: i.phiCo, n: nc, nAuto: ncAuto, As: nc * Ac, camadas: ncCam, porCamada: porCamC, maxPorCamada: camc.porCamada,
+      excede: porCamC > camc.porCamada, portaEstribo: !r.dupla && !(i.nCo > 0 && nc > 2), ah: camc.ah, av: camc.av, manual: i.nCo > 0 || i.camCo > 0 };
 
     if (i.h >= 60) {
       var Asp = 0.001 * i.bw * i.h;          // por face
@@ -466,7 +487,10 @@ var Motor = (function () {
       var tmax = Math.min(20, 1.5 * i.phiPele, i.d / 3);
       var sp = Math.min(tmax, Math.round(0.65 * i.h / np));
       var nf = Math.max(np, Math.round(0.65 * i.h / sp));
-      out.pele = { necessaria: true, Asp: Asp, phi: i.phiPele, n: nf, s: sp, tmax: tmax };
+      var manualP = i.nPele > 0;
+      if (manualP) { nf = Math.round(i.nPele); sp = 0.65 * i.h / nf; }
+      out.pele = { necessaria: true, Asp: Asp, phi: i.phiPele, n: nf, nAuto: Math.max(np, Math.round(0.65 * i.h / Math.min(tmax, Math.round(0.65 * i.h / np)))), s: sp, tmax: tmax,
+        As: nf * Ap, manual: manualP, espacado: sp > tmax + 1e-9 };
     } else {
       out.pele = { necessaria: false };
     }
@@ -535,15 +559,17 @@ var Motor = (function () {
   function barrasLaje(r, i) {
     var smax = Math.min(20, 2 * i.h);
     var esc = 100 / i.bw;                    // As por metro
-    function faixa(phi, Asn) {
+    function faixa(phi, Asn, sUser) {
       var Ab = area(phi);
       var sCalc = Math.floor(100 * Ab / Asn + EPS);
-      var s = Math.min(smax, sCalc);
-      return { phi: phi, s: s, sCalc: sCalc, As: 100 * Ab / s, n: Math.floor(100 / s) + 1, curto: s < 7, limitadoSmax: sCalc > smax };
+      var man = sUser > 0;
+      var s = man ? sUser : Math.min(smax, sCalc);
+      return { phi: phi, s: s, sCalc: sCalc, As: 100 * Ab / s, n: Math.floor(100 / s + EPS) + 1, curto: s < 7, limitadoSmax: !man && sCalc > smax,
+        acimaSmax: man && s > smax, manual: man };
     }
     var out = { smax: smax };
-    out.tracao = faixa(i.phiTr, r.AsBase * esc);
-    out.compressao = r.dupla ? faixa(i.phiCo, r.Asc * esc) : null;
+    out.tracao = faixa(i.phiTr, r.AsBase * esc, i.sTr);
+    out.compressao = (r.dupla || i.sCo > 0) ? faixa(i.phiCo, Math.max(r.Asc * esc, 0.0001), i.sCo) : null;
     out.AsDist = Math.max(0.2 * out.tracao.As, 0.9, 0.5 * r.Asmin * esc);
     return out;
   }
@@ -652,7 +678,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
     bw: '175', h: '100', bf: '', hf: '', cob: '5', d: '93', phiT: '8', ramos: '6',
     Mk: '368', Vk: '973', Tk: '580',
     phiTr: '20', phiCo: '16', phiPele: '16',
-    modoMin: 'parcela', tipo: 'viga', apoio: 'chega', asInfF: '', asSupF: '', c1: ''
+    modoMin: 'parcela', tipo: 'viga', apoio: 'chega', nTr: '', camTr: '', nCo: '', camCo: '', nPele: '', sTr: '', sCo: '', asInfF: '', asSupF: '', c1: ''
   };
   var state = {};
   var tab = 'resumo';
@@ -720,7 +746,8 @@ if (typeof module !== 'undefined') module.exports = Motor;
     out.flexao = { errs: fe };
     if (!fe.length) {
       var inp = { bw: g.bw, h: g.h, bf: g.bf, hf: g.hf, cob: g.cob, d: g.d, phiT: g.phiT, fck: g.fck, fyk: g.fyk,
-        Md: 1.4 * Mk * kM(), brita: g.brita, phiTr: num(state.phiTr), phiCo: num(state.phiCo), phiPele: num(state.phiPele) };
+        Md: 1.4 * Mk * kM(), brita: g.brita, phiTr: num(state.phiTr), phiCo: num(state.phiCo), phiPele: num(state.phiPele),
+        nTr: num(state.nTr), camTr: num(state.camTr), nCo: num(state.nCo), camCo: num(state.camCo), nPele: num(state.nPele), sTr: num(state.sTr), sCo: num(state.sCo) };
       var r = M.flexao(inp);
       out.flexao.inp = inp; out.flexao.r = r;
       if (!r.esmagamento) out.flexao.b = isLaje() ? M.barrasLaje(r, inp) : M.barrasFlexao(r, inp);
@@ -920,6 +947,11 @@ if (typeof module !== 'undefined') module.exports = Motor;
     return '<div class="arow"><span class="n">' + name + '</span><span class="t">Φ' + phiTxt(bar.phi) + ' c/ ' + bar.s + ' cm' +
       '<small>As,ef = ' + f(bar.As, 2) + ' cm²/m · necessária ' + f(Asnec, 2) + ' cm²/m' + extra + '</small></span>' + okPill + '</div>';
   }
+  function lajePill(ef, nec, alto) {
+    if (ef + 1e-9 < nec) return pill('bad', 'Insuficiente · faltam ' + f(nec - ef, 2) + ' cm²/m');
+    if (alto) return pill('warn', 'Suficiente · s acima do máximo');
+    return pill('ok', 'Suficiente · folga ' + f((ef / nec - 1) * 100, 1) + ' %');
+  }
   function renderFlexaoLaje(c) {
     var box = $('out-flexao'), fx = c.flexao, r = fx.r, g = c.geo.g, b = fx.b, html = elemTag();
     var avisos = [];
@@ -935,8 +967,8 @@ if (typeof module !== 'undefined') module.exports = Motor;
       kpi('Md', f(toM(r.Md), 1), uM() + '/m', 'domínio ' + r.dominio) + '</div>';
     var t = b.tracao, co = b.compressao;
     html += '<div class="card"><h2>Armadura adotada</h2><div class="adopt">' +
-      slabRow('Tração', t, r.AsBase, ' · ' + t.n + ' barras por metro', pill('ok', 'Suficiente · folga ' + f((t.As / r.AsBase - 1) * 100, 1) + ' %')) +
-      (co ? slabRow('Compressão', co, r.Asc, '', pill('ok', 'Suficiente · folga ' + f((co.As / r.Asc - 1) * 100, 1) + ' %'))
+      slabRow('Tração', t, r.AsBase, ' · ' + t.n + ' barras por metro' + (t.acimaSmax ? ' · espaçamento acima de ' + b.smax + ' cm' : '') + (t.curto ? ' · espaçamento menor que 7 cm' : ''), lajePill(t.As, r.AsBase, t.acimaSmax)) +
+      (co ? slabRow('Compressão', co, r.dupla ? r.Asc : 0, '', r.dupla ? lajePill(co.As, r.Asc, co.acimaSmax) : pill('info', 'Armadura construtiva'))
           : '<div class="arow"><span class="n">Compressão</span><span class="t">Não necessária<small>laje com armadura simples</small></span>' + pill('ok', 'Dispensada') + '</div>') +
       '<div class="arow"><span class="n">Distribuição</span><span class="t">As,dist ≥ ' + f(b.AsDist, 2) + ' cm²/m<small>maior entre 20 % da armadura principal, 0,9 cm²/m e 50 % de As,mín</small></span>' + pill('info', 'Secundária') + '</div>' +
       '</div></div>';
@@ -1030,16 +1062,18 @@ if (typeof module !== 'undefined') module.exports = Motor;
 
     var t = b.tracao, co = b.compressao;
     var tFolga = (t.As / r.AsBase - 1) * 100;
+    function sufPill(ef, nec) { return ef + 1e-9 >= nec ? pill('ok', 'Suficiente · folga ' + f((ef / nec - 1) * 100, 1) + ' %') : pill('bad', 'Insuficiente · faltam ' + f(nec - ef, 2) + ' cm²'); }
+    var cExc = function (x) { return x.excede ? ' · ' + x.porCamada + ' barras por camada excedem o máximo de ' + x.maxPorCamada : ''; };
     html += '<div class="card"><h2>Armadura adotada</h2><div class="adopt">' +
       '<div class="arow"><span class="n">Tração</span><span class="t">' + t.n + ' Φ' + phiTxt(t.phi) + ' em ' + t.camadas + (t.camadas === 1 ? ' camada' : ' camadas') +
-      '<small>As,ef = ' + f(t.As, 2) + ' cm² · necessária ' + f(r.AsBase, 2) + ' cm² · máx. ' + t.porCamada + ' barras por camada · ah = ' + f(t.ah, 2) + ' cm · av = ' + f(t.av, 2) + ' cm</small></span>' +
-      pill('ok', 'Suficiente · folga ' + f(tFolga, 1) + ' %') + '</div>' +
+      '<small>As,ef = ' + f(t.As, 2) + ' cm² · necessária ' + f(r.AsBase, 2) + ' cm² (' + t.nAuto + ' Φ' + phiTxt(t.phi) + ') · máx. ' + t.maxPorCamada + ' barras por camada · ah = ' + f(t.ah, 2) + ' cm · av = ' + f(t.av, 2) + ' cm' + cExc(t) + '</small></span>' +
+      sufPill(t.As, r.AsBase) + '</div>' +
       '<div class="arow"><span class="n">Compressão</span><span class="t">' + co.n + ' Φ' + phiTxt(co.phi) + (co.portaEstribo ? ' · porta-estribo' : ' em ' + co.camadas + (co.camadas === 1 ? ' camada' : ' camadas')) +
-      '<small>As′,ef = ' + f(co.As, 2) + ' cm²' + (r.dupla ? ' · necessária ' + f(r.Asc, 2) + ' cm²' : '') + '</small></span>' +
-      (r.dupla ? pill('ok', 'Suficiente · folga ' + f((co.As / r.Asc - 1) * 100, 1) + ' %') : pill('info', 'Armadura construtiva')) + '</div>' +
+      '<small>As′,ef = ' + f(co.As, 2) + ' cm²' + (r.dupla ? ' · necessária ' + f(r.Asc, 2) + ' cm² (' + co.nAuto + ' Φ' + phiTxt(co.phi) + ')' : '') + cExc(co) + '</small></span>' +
+      (r.dupla ? sufPill(co.As, r.Asc) : pill('info', 'Armadura construtiva')) + '</div>' +
       '<div class="arow"><span class="n">Pele</span><span class="t">' + (b.pele.necessaria ? '2 faces × ' + b.pele.n + ' Φ' + phiTxt(b.pele.phi) + ' c/ ' + f(b.pele.s, 0) + ' cm' +
-        '<small>As,pele = ' + f(b.pele.Asp, 2) + ' cm² por face (0,10 % bw·h) · s máx. ' + f(b.pele.tmax, 1) + ' cm</small>' : 'Não necessária<small>h menor que 60 cm</small>') + '</span>' +
-      (b.pele.necessaria ? pill('info', 'h ≥ 60 cm') : pill('ok', 'Dispensada')) + '</div>' +
+        '<small>As,pele = ' + f(b.pele.As, 2) + ' cm² por face · necessária ' + f(b.pele.Asp, 2) + ' cm² (0,10 % bw·h) · s máx. ' + f(b.pele.tmax, 1) + ' cm' + (b.pele.espacado ? ' · espaçamento acima do máximo' : '') + '</small>' : 'Não necessária<small>h menor que 60 cm</small>') + '</span>' +
+      (b.pele.necessaria ? (b.pele.As + 1e-9 >= b.pele.Asp && !b.pele.espacado ? pill('ok', 'Suficiente') : pill('bad', 'Insuficiente')) : pill('ok', 'Dispensada')) + '</div>' +
       '</div></div>';
 
     html += '<div class="card sec"><h2>Seção transversal</h2>' + secao({
@@ -1252,8 +1286,8 @@ if (typeof module !== 'undefined') module.exports = Motor;
   }
 
   var bak = {};
-  var TIPO_KEYS = ['bw', 'h', 'bf', 'hf', 'cob', 'd', 'phiT', 'ramos', 'Mk', 'Vk', 'Tk', 'phiTr', 'phiCo'];
-  var LAJE_DEF = { bw: '100', h: '12', bf: '', hf: '', cob: '2.5', d: '9', phiT: '5', ramos: '2', Mk: '10', Vk: '20', Tk: '0', phiTr: '8', phiCo: '5' };
+  var TIPO_KEYS = ['bw', 'h', 'bf', 'hf', 'cob', 'd', 'phiT', 'ramos', 'Mk', 'Vk', 'Tk', 'phiTr', 'phiCo', 'nTr', 'camTr', 'nCo', 'camCo', 'nPele', 'sTr', 'sCo'];
+  var LAJE_DEF = { bw: '100', h: '12', bf: '', hf: '', cob: '2.5', d: '9', phiT: '5', ramos: '2', Mk: '10', Vk: '20', Tk: '0', phiTr: '8', phiCo: '5', nTr: '', camTr: '', nCo: '', camCo: '', nPele: '', sTr: '', sCo: '' };
   function setTipo(t) {
     if (t === state.tipo) return;
     bak[state.tipo] = {}; TIPO_KEYS.forEach(function (k) { bak[state.tipo][k] = state[k]; });
@@ -1273,6 +1307,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
     $('t-viga').setAttribute('aria-pressed', l ? 'false' : 'true');
     $('t-laje').setAttribute('aria-pressed', l ? 'true' : 'false');
     Array.prototype.forEach.call(document.querySelectorAll('.onlyviga'), function (el) { el.hidden = l; });
+    Array.prototype.forEach.call(document.querySelectorAll('.onlylaje'), function (el) { el.hidden = !l; });
     $('lphiT').hidden = l;
     $('bw').disabled = l; if (l) { state.bw = '100'; $('bw').value = '100'; }
     $('lbw').firstChild.nodeValue = l ? 'Largura da faixa ' : 'bw ';
