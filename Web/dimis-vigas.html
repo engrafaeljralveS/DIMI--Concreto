@@ -590,7 +590,7 @@ var Motor = (function () {
     r.phiMax = phiMaxEstribo(bw);
     r.smax = Math.trunc(r.razao > 0.67 ? Math.min(0.3 * d, 20) : Math.min(30, 0.6 * d));
     r.stmax = Math.trunc(r.razao > 0.2 ? Math.min(0.6 * d, 35) : Math.min(80, d));
-    r.nMin = i.norma ? Math.max(2, Math.ceil((bw - 2 * (i.cob + 0.1 * i.phiT)) / r.stmax - EPS) + 1) : Math.max(2, Math.trunc(2 * (bw / Math.trunc(r.stmax))));
+    r.nMin = i.norma ? Math.max(2, Math.ceil((bw - 2 * (i.cob + 0.05 * i.phiT)) / r.stmax - EPS) + 1) : Math.max(2, Math.trunc(2 * (bw / Math.trunc(r.stmax))));
     r.ramos = Math.max(r.nMin, i.ramos);
     r.aswPerna = r.Asw / r.ramos;
     r.opcoes = opcoesEstribos(r.aswPerna, r.smax, r.phiMax);
@@ -778,7 +778,7 @@ var Motor = (function () {
     r.phiMin = 5; r.phiMax = phiMaxEstribo(bw);
     r.smax = Math.trunc(inter > 0.67 ? Math.min(0.3 * d, 20) : Math.min(30, 0.6 * d));
     r.stmax = Math.trunc(inter > 0.2 ? Math.min(0.6 * d, 35) : Math.min(80, d));
-    r.nMin = i.norma ? Math.max(2, Math.ceil((bw - 2 * (cob + 0.1 * (i.phiT || 0))) / r.stmax - EPS) + 1) : Math.max(2, Math.trunc((bw - 2 * cob) / Math.trunc(r.stmax)));
+    r.nMin = i.norma ? Math.max(2, Math.ceil((bw - 2 * (cob + 0.05 * (i.phiT || 0))) / r.stmax - EPS) + 1) : Math.max(2, Math.trunc((bw - 2 * cob) / Math.trunc(r.stmax)));
     r.ramos = Math.max(r.nMin, i.ramos);
     var AswTot = Math.max(Aswt + AswcFinal / r.ramos, Aswmin);
     r.AswTot = AswTot;                       // cm²/m por perna
