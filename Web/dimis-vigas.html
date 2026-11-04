@@ -85,26 +85,26 @@ input.auto{color:var(--muted);font-style:italic}
 .main{display:flex;flex-direction:column;gap:14px;min-width:0}
 .panel{display:flex;flex-direction:column;gap:14px;min-width:0}
 .panel[hidden]{display:none}
-.banner{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;border-left:4px solid var(--accent);background:var(--panel);border-radius:0 6px 6px 0;padding:10px 14px}
+.banner{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:center;border-left:4px solid var(--accent);background:var(--panel);border-radius:0 6px 6px 0;padding:6px 12px}
 .banner.ok{border-left-color:var(--ok)}.banner.warn{border-left-color:var(--warn)}.banner.bad{border-left-color:var(--bad)}
-.banner b{font-family:var(--f-display);font-weight:600;font-size:19px;letter-spacing:.04em;text-transform:uppercase}
-.banner p{margin:0;flex-basis:100%;font-size:14px;color:var(--muted)}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
-.kpi{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 14px;border-top:3px solid var(--ink)}
+.banner b{font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.04em;text-transform:uppercase}
+.banner p{margin:0;flex-basis:100%;font-size:12.5px;color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px;border-top:2px solid var(--ink)}
 .kpi.main{border-top-color:var(--rebar)}
-.kpi .l{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.kpi .v{font-family:var(--f-display);font-weight:600;font-size:34px;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi .l{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.kpi .v{font-family:var(--f-display);font-weight:600;font-size:22px;line-height:1.15;font-variant-numeric:tabular-nums}
 .kpi .v small{font-family:var(--f-mono);font-size:11.5px;font-weight:400;color:var(--muted);margin-left:4px}
-.kpi .s{font-size:12px;color:var(--muted)}
+.kpi .s{font-size:10.5px;color:var(--muted);line-height:1.25}
 .pill{display:inline-block;font-family:var(--f-mono);font-size:11.5px;padding:1px 8px;border:1px solid currentColor;border-radius:3px;white-space:nowrap}
 .pill.ok{color:var(--ok)}.pill.warn{color:var(--warn)}.pill.bad{color:var(--bad)}.pill.info{color:var(--accent)}
 .pills{display:flex;flex-wrap:wrap;gap:6px}
 .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
 @media (max-width:760px){.two{grid-template-columns:minmax(0,1fr)}}
 .adopt{display:grid;grid-template-columns:minmax(0,1fr);gap:0}
-.arow{display:grid;grid-template-columns:132px minmax(0,1fr) auto;gap:4px 12px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.arow{display:grid;grid-template-columns:104px minmax(0,1fr) auto;gap:4px 12px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
 .arow:first-child{border-top:0}
-.arow .n{font-family:var(--f-display);font-weight:600;font-size:17px;letter-spacing:.05em;text-transform:uppercase}
+.arow .n{font-family:var(--f-display);font-weight:600;font-size:14px;letter-spacing:.05em;text-transform:uppercase}
 .arow .t{font-family:var(--f-mono);font-size:13.5px;min-width:0}
 .arow .t small{display:block;color:var(--muted);font-size:11.5px}
 @media (max-width:560px){.arow{grid-template-columns:minmax(0,1fr)}}
@@ -143,6 +143,12 @@ details .body{padding:0 16px 12px}
 .sumcard dt{color:var(--muted)}
 .sumcard dd{margin:0;text-align:right;font-family:var(--f-mono)}
 .sec svg{display:block;width:100%;height:auto;max-height:360px}
+.fgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,340px);gap:14px;align-items:start}
+.fleft{display:flex;flex-direction:column;gap:14px;min-width:0}
+.fright{min-width:0}
+.fright .card{padding:10px 12px}.fright h2{font-size:13px;margin:0 0 6px}
+.sdet{font:11.5px var(--f-mono);color:var(--muted);margin:6px 0 0;line-height:1.5}.sdet b{color:var(--ink);font-weight:600}
+@media (max-width:1100px){.fgrid{grid-template-columns:minmax(0,1fr)}.fright{order:-1}}
 .s-conc{fill:var(--conc);stroke:var(--ink);stroke-width:1.4}
 .s-hi{fill:var(--conc-hi)}
 .s-wall{fill:var(--accent);opacity:.22}
@@ -249,6 +255,7 @@ details .body{padding:0 16px 12px}
       <section class="panel" id="p-resumo"></section>
 
       <section class="panel" id="p-flexao" hidden>
+        <div class="fgrid">
         <div class="card">
           <h2>Barras da armadura longitudinal</h2>
           <div class="onlyviga">
@@ -278,6 +285,8 @@ details .body{padding:0 16px 12px}
             </div>
           </div>
           <p class="hint">Deixe a quantidade ou o espaçamento vazio para o cálculo escolher. Mk⁺ traciona a armadura inferior e Mk⁻ a superior; cada face é verificada para o que o momento pede dela.</p>
+        </div>
+        <aside class="fright" aria-label="Corte da seção"><div id="sec-flexao"></div></aside>
         </div>
         <div id="out-flexao" class="main"></div>
       </section>
@@ -572,7 +581,7 @@ var Motor = (function () {
   function armaduraFace(o) {
     var dmax = BRITA[o.brita] || 19;
     var L = o.layers || [];
-    var auto = L.length === 1 && !(L[0].n > 0);
+    var auto = L.length >= 1 && !L.some(function (l) { return l.n > 0; });
     var rows = [], nAuto = null;
     if (auto) {
       var Ab0 = area(L[0].phi);
@@ -1117,12 +1126,14 @@ if (typeof module !== 'undefined') module.exports = Motor;
       '<div class="arow"><span class="n">Distribuição</span><span class="t">As,dist ≥ ' + f(Math.max(0.2 * Math.max(I.face ? I.face.As : 0, S.face ? S.face.As : 0), 0.9, 0.5 * (fx.pos || fx.neg).Asmin), 2) + ' cm²/m<small>maior entre 20 % da armadura principal, 0,9 cm²/m e 50 % de As,mín</small></span>' + pill('info', 'Secundária') + '</div>' +
       '</div></div>';
     var bar = function (fc) { return fc ? [{ phi: fc.phi, n: fc.n, y: g.cob + fc.phi / 20 }] : []; };
-    html += '<div class="card sec"><h2>Seção transversal · faixa de 1 m</h2>' + secao({
+    $('sec-flexao').innerHTML = '<div class="card sec"><h2>Corte da laje · faixa de 1 m</h2>' + secao({
       laje: true, semEstribo: true, bw: g.bw, h: g.h, bf: 0, hf: 0, cob: g.cob, phiT: 0, ramos: 2, d: g.d,
       inf: bar(I.face), sup: bar(S.face), infExt: I.face ? g.cob + I.face.phi / 10 : 0, supExt: S.face ? g.cob + S.face.phi / 10 : 0,
       nl: fx.pos ? { x: fx.pos.x, blk: 0.8 * fx.pos.x } : null, nlNeg: fx.neg ? { x: fx.neg.x, blk: 0.8 * fx.neg.x } : null
     }) + legend([['var(--rebar)', 'Armadura' + (I.face ? ' inferior Φ' + phiTxt(I.face.phi) + ' c/ ' + I.face.s + ' cm' : '') + (S.face ? ' · superior Φ' + phiTxt(S.face.phi) + ' c/ ' + S.face.s + ' cm' : '')], ['var(--conc-hi)', 'Zona comprimida (0,8·x)']]) +
-      '<p class="hint">Laje sem estribos. Se Vsd > VRd1, a aba Cisalhamento indica a armadura transversal.</p></div>';
+      '<p class="sdet">' + (I.face ? '<b>Inferior</b> Φ' + phiTxt(I.face.phi) + ' c/ ' + I.face.s + ' cm · ' + f(Math.max(I.face.s - I.face.phi / 10, 0), 1) + ' cm livres entre barras<br>' : '') +
+      (S.face ? '<b>Superior</b> Φ' + phiTxt(S.face.phi) + ' c/ ' + S.face.s + ' cm · ' + f(Math.max(S.face.s - S.face.phi / 10, 0), 1) + ' cm livres entre barras<br>' : '') +
+      'Laje sem estribos. Se Vsd > VRd1, a aba Cisalhamento indica a armadura transversal.</p></div>';
     var rows = [];
     if (fx.pos) rows = rows.concat(memFlex('Momento positivo (Mk⁺)', fx.pos));
     if (fx.neg) rows = rows.concat(memFlex('Momento negativo (Mk⁻)', fx.neg));
@@ -1188,6 +1199,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
   function renderFlexao(c) {
     var box = $('out-flexao');
     var fx = c.flexao;
+    $('sec-flexao').innerHTML = '';
     if (fx.errs.length) { box.innerHTML = errBox(fx.errs); return; }
     if (fx.esm) { box.innerHTML = flexEsmag(fx); return; }
     if (isLaje()) { renderFlexaoLaje(c); return; }
@@ -1205,13 +1217,25 @@ if (typeof module !== 'undefined') module.exports = Motor;
         '<small>As,pele = ' + f(pele.As, 2) + ' cm² por face · necessária ' + f(pele.Asp, 2) + ' cm² (0,10 % bw·h) · s máx. ' + f(pele.tmax, 1) + ' cm' + (pele.espacado ? ' · espaçamento acima do máximo' : '') + '</small>' : 'Não necessária<small>h menor que 60 cm</small>') + '</span>' +
       (pele.necessaria ? (pele.As + 1e-9 >= pele.Asp && !pele.espacado ? pill('ok', 'Suficiente') : pill('bad', 'Insuficiente')) : pill('ok', 'Dispensada')) + '</div>' +
       '</div></div>';
-    html += '<div class="card sec"><h2>Seção transversal</h2>' + secao({
-      bw: g.bw, h: g.h, bf: g.bf, hf: g.hf, cob: g.cob, phiT: g.phiT, ramos: num(state.ramos), d: g.d,
+    var cr = c.cis && !c.cis.errs.length && c.cis.r && !c.cis.r.esmagamento ? c.cis.r : null;
+    var ramosD = cr ? cr.ramos : num(state.ramos);
+    var sEst = cr && cr.aswPerna > 0 ? Math.min(cr.smax, Math.trunc(Math.PI * g.phiT * g.phiT / 4 / cr.aswPerna)) : null;
+    var estTxt = 'Estribo Φ' + phiTxt(g.phiT) + ' mm' + (sEst ? ' c/ ' + sEst + ' cm' : '') + ' · ' + ramosD + ' ramos' + (sEst ? '' : ' · espaçamento na aba Cisalhamento');
+    function detFace(nome, face) {
+      return face.layers.map(function (l, k) {
+        var n = l.n, livre = n > 1 ? (g.bw - 2 * (g.cob + 0.1 * g.phiT) - n * l.phi / 10) / (n - 1) : NaN;
+        var av = k > 0 ? l.y - face.layers[k - 1].y - (l.phi + face.layers[k - 1].phi) / 20 : NaN;
+        return '<b>' + nome + ' · camada ' + (k + 1) + '</b> ' + n + ' Φ' + phiTxt(l.phi) + (isFinite(livre) ? ' · espaço livre ' + f(livre, 1) + ' cm' : '') + (isFinite(av) ? ' · av ' + f(av, 1) + ' cm' : '');
+      }).join('<br>');
+    }
+    $('sec-flexao').innerHTML = '<div class="card sec"><h2>Corte da viga</h2>' + secao({
+      bw: g.bw, h: g.h, bf: g.bf, hf: g.hf, cob: g.cob, phiT: g.phiT, ramos: ramosD, d: g.d,
       inf: I.face.layers, sup: S.face.layers, infCls: I.req > 0 ? 's-bar' : 's-barc', supCls: S.req > 0 ? 's-bar' : 's-barc',
       infExt: I.face.ext, supExt: S.face.ext,
       pele: pele.necessaria ? { n: pele.n, phi: pele.phi } : null,
       nl: fx.pos ? { x: fx.pos.x, blk: 0.8 * fx.pos.x } : null, nlNeg: fx.neg ? { x: fx.neg.x, blk: 0.8 * fx.neg.x } : null
-    }) + legend([['var(--rebar)', 'Armadura de cálculo'], ['var(--ink)', 'Porta-estribo (construtiva)'], ['var(--conc-hi)', 'Zona comprimida (0,8·x)']]) + '</div>';
+    }) + legend([['var(--rebar)', 'Armadura de cálculo'], ['var(--ink)', 'Estribo e porta-estribo'], ['var(--conc-hi)', 'Zona comprimida (0,8·x)']]) +
+      '<p class="sdet"><b>' + estTxt + '</b><br>' + detFace('Superior', S.face) + '<br>' + detFace('Inferior', I.face) + '<br>Cobrimento ' + f(g.cob, 1) + ' cm</p></div>';
     var rows = [];
     if (fx.pos) { fx.pos.d = g.d; rows = rows.concat(memFlex('Momento positivo (Mk⁺)', fx.pos)); }
     if (fx.neg) { fx.neg.d = fx.dSup; rows = rows.concat(memFlex('Momento negativo (Mk⁻)', fx.neg)); }
@@ -1417,7 +1441,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
     arr.forEach(function (l, k) {
       h += '<div class="lrow"><span class="n">Camada ' + (k + 1) + '</span><select class="lphi" aria-label="Diâmetro da camada ' + (k + 1) + '">' +
         PHIS.map(function (p) { return '<option' + (num(p) === l.phi ? ' selected' : '') + '>' + p + '</option>'; }).join('') + '</select>' +
-        '<input class="ln" inputmode="numeric" aria-label="Quantidade de barras da camada ' + (k + 1) + '" value="' + esc(l.n) + '" placeholder="' + (arr.length === 1 ? 'automático' : 'quantidade') + '">' +
+        '<input class="ln" inputmode="numeric" aria-label="Quantidade de barras da camada ' + (k + 1) + '" value="' + esc(l.n) + '" placeholder="' + (k === 0 ? 'automático' : 'quantidade') + '">' +
         '<span class="las" id="las-' + face + '-' + k + '"></span>' +
         (k > 0 ? '<button type="button" class="lx" aria-label="Remover camada ' + (k + 1) + '">×</button>' : '<span></span>') + '</div>';
     });
