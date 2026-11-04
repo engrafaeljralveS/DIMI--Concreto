@@ -577,7 +577,11 @@ var Motor = (function () {
     if (isT && !i.tracaoInf) yt = yc;
     out.Mr = alfa * fctInf * Ic / yt; out.alfa = alfa; out.Ic = Ic; out.yt = yt;
     out.fissurado = i.Mk > out.Mr;
-    if (!out.fissurado) { out.wk = 0; out.ok = true; return out; }
+    if (!out.fissurado) {   // estádio I: tensão no aço da seção íntegra (informativa)
+      var arm = i.tracaoInf ? (h - i.y1) - yc : yc - i.y1;
+      out.sigma = 10 * aE * i.Mk * arm / Ic; out.estadio = 'I'; out.wk = 0; out.ok = true; return out;
+    }
+    out.estadio = 'II';
     // estádio II
     var As = i.As, d = i.d, flange = isT && i.tracaoInf, x, III;
     var aA = aE * As;
@@ -1424,7 +1428,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
     rows.push([it.titulo], ['Mk (momento de serviço)', f(toM(it.Mk), 2), uM() + pm],
       ['Ecs = αi · 5600 · √fck', f(r.Ecs, 0), 'MPa'], ['αe = Es / Ecs', f(r.alphaE, 2), ''], ['fct,inf = 0,7 · fctm', f(r.fctInf, 2), 'MPa'],
       ['Mr = α · fct,inf · Ic / yt (α = ' + f(r.alfa, 1) + ')', f(toM(r.Mr), 2), uM() + pm]);
-    if (!r.fissurado) { rows.push(['Mk ≤ Mr: seção não fissurada', '', '']); return rows; }
+    if (!r.fissurado) { rows.push(['Mk ≤ Mr: seção não fissurada'], ['σs no estádio I = αe · Mk · (distância à LN) / Ic', f(r.sigma, 1), 'MPa']); return rows; }
     rows.push(['Estádio II'], ['x (linha neutra)', f(r.x, 2), 'cm'], ['III', f(r.III, 0), 'cm⁴'], ['σs = αe · Mk · (d − x) / III', f(r.sigma, 1), 'MPa'],
       ['Região de envolvimento'], ['Φ da barra mais externa', phiTxt(r.phi), 'mm'], ['Acri (≤ 7,5Φ do eixo da barra)', f(r.Acri, 1), 'cm²'], ['ρri = Asi / Acri', f(r.rho * 100, 3), '%'],
       ['ηi (barra nervurada)', f(r.eta, 2), ''],
@@ -1437,14 +1441,20 @@ if (typeof module !== 'undefined') module.exports = Motor;
     if (!box) return;
     if (!its) { box.innerHTML = '<p class="hint">Disponível quando a flexão estiver calculada.</p>'; return; }
     if (!its.length) { box.innerHTML = '<p class="hint">Informe Mk⁺ ou Mk⁻ para verificar a fissuração.</p>'; return; }
-    var html = '<div class="adopt">', rows = [];
+    var html = '', rows = [];
     its.forEach(function (it) {
-      if (it.erro) { html += chk(it.titulo, it.erro, false, 'Sem armadura'); return; }
+      html += '<h3 class="fh" style="margin-top:10px">' + it.titulo + '</h3>';
+      if (it.erro) { html += '<div class="adopt">' + chk('Fissuração', it.erro, false, 'Sem armadura') + '</div>'; return; }
       var r = it.r;
-      html += chk(it.titulo, r.fissurado ? 'wk = ' + f(r.wk, 3) + ' mm · limite ' + f(r.wlim, 2) + ' mm · σs = ' + f(r.sigma, 0) + ' MPa · x = ' + f(r.x, 1) + ' cm' : 'Mk ≤ Mr = ' + f(toM(r.Mr), 1) + ' ' + uM() + ': seção não fissurada', r.ok, r.fissurado ? (r.ok ? 'Atende' : 'wk acima do limite') : 'Não fissura');
+      html += '<div class="kpis">' +
+        kpi('Tensão no aço σs', f(r.sigma, 1), 'MPa', r.fissurado ? 'estádio II · seção fissurada' : 'estádio I · seção não fissurada', true) +
+        kpi('Abertura wk', r.fissurado ? f(r.wk, 3) : '0', 'mm', r.fissurado ? 'w1 = ' + f(r.w1, 3) + ' · w2 = ' + f(r.w2, 3) + ' mm' : 'não há fissuras', true) +
+        kpi('Limite wlim', f(r.wlim, 2), 'mm', 'CAA ' + ['I', 'II', 'III', 'IV'][r.caa - 1]) +
+        kpi('Mk / Mr', f(toM(it.Mk), 1) + ' / ' + f(toM(r.Mr), 1), uM() + (isLaje() ? '/m' : ''), r.fissurado ? 'Mk > Mr: fissurada' : 'Mk ≤ Mr: não fissura') + '</div>' +
+        '<div class="adopt">' + chk('Abertura de fissuras', r.fissurado ? 'wk = ' + f(r.wk, 3) + ' mm ' + (r.ok ? '≤' : '>') + ' ' + f(r.wlim, 2) + ' mm · σs = ' + f(r.sigma, 1) + ' MPa' : 'σs = ' + f(r.sigma, 1) + ' MPa (estádio I)', r.ok, r.fissurado ? (r.ok ? 'Atende' : 'wk acima do limite') : 'Não fissura') + '</div>';
       rows = rows.concat(fisRows(it));
     });
-    box.innerHTML = html + '</div>' + (rows.length ? memoria(rows) : '');
+    box.innerHTML = html + (rows.length ? memoria(rows) : '');
   }
 
   /* ---------- Estribos adotados ---------- */
@@ -1843,7 +1853,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
         b += D.h2('Fissuração (ELS-W)') + D.p('Verificação da abertura de fissuras (NBR 6118, 17.3.3.2) com o Mk como momento de serviço, sem minoração. Classe de agressividade ' + ['I', 'II', 'III', 'IV'][(parseInt(state.caa, 10) || 2) - 1] + '.');
         fis.forEach(function (it) {
           if (it.erro) b += D.p(it.titulo + ': ' + it.erro);
-          else b += D.tabelaMem(fisRows(it)) + D.p(it.r.fissurado ? 'wk = ' + f(it.r.wk, 3) + ' mm ' + (it.r.ok ? '≤' : '>') + ' ' + f(it.r.wlim, 2) + ' mm: ' + okTxt(it.r.ok) + '.' : 'Seção não fissurada: atende.', { b: true });
+          else b += D.tabelaMem(fisRows(it)) + D.p(it.r.fissurado ? 'Tensão no aço σs = ' + f(it.r.sigma, 1) + ' MPa; abertura wk = ' + f(it.r.wk, 3) + ' mm ' + (it.r.ok ? '≤' : '>') + ' ' + f(it.r.wlim, 2) + ' mm: ' + okTxt(it.r.ok) + '.' : 'Seção não fissurada (σs = ' + f(it.r.sigma, 1) + ' MPa no estádio I): atende.', { b: true });
         });
       }
       var asT = (I.face ? I.face.As : 0) + (S.face ? S.face.As : 0), Ac = lj ? 100 * g.h : g.bw * g.h + (tf ? (g.bf - g.bw) * g.hf : 0);
