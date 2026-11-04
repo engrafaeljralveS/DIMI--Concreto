@@ -295,6 +295,15 @@ details .body{padding:0 16px 12px}
         <aside class="fright" aria-label="Corte da seção"><div id="sec-flexao"></div></aside>
         </div>
         <div id="out-flexao" class="main"></div>
+        <div class="card" id="fis-card">
+          <h2>Fissuração · abertura de fissuras (ELS-W)</h2>
+          <div class="ctl">
+            <label><span class="lt">Classe de agressividade ambiental</span>
+              <select id="caa" data-k="caa"><option value="1">I · fraca (wk ≤ 0,4 mm)</option><option value="2">II · moderada (wk ≤ 0,3 mm)</option><option value="3">III · forte (wk ≤ 0,3 mm)</option><option value="4">IV · muito forte (wk ≤ 0,2 mm)</option></select></label>
+          </div>
+          <p class="hint">Verificação da NBR 6118 (17.3.3.2) com o Mk informado como momento de serviço, sem minoração nem fatores de combinação. Vale para viga e laje de concreto armado.</p>
+          <div id="fis-out"></div>
+        </div>
       </section>
 
       <section class="panel" id="p-cisalhamento" hidden>
@@ -543,6 +552,63 @@ var Motor = (function () {
     } else {
       out.pele = { necessaria: false };
     }
+    return out;
+  }
+
+
+  /* ---------- FISSURAÇÃO (ELS-W) — NBR 6118, 17.3.3.2 ----------
+     Estádio II com αe = Es/Ecs; wk = mín(w1, w2); Acri limitada a 7,5·Φ do eixo da barra.
+     Momento de serviço = Mk informado (sem minoração/combinação). Unidades: kN, cm (σ em MPa no cálculo de w). */
+  var WLIM = { 1: 0.4, 2: 0.3, 3: 0.3, 4: 0.2 };
+  function fissuracao(i) {
+    var m = materiais(i.fck, i.fyk), Es = 210000;
+    var Eci = 5600 * Math.sqrt(i.fck), alI = Math.min(1, 0.8 + 0.2 * i.fck / 80), Ecs = alI * Eci, aE = Es / Ecs;
+    var bw = i.bw, h = i.h, bf = i.bf || 0, hf = i.hf || 0, isT = !i.laje && bf > bw && hf > 0;
+    var fctInf = 0.7 * m.fctm, fctmMPa = 10 * m.fctm;
+    var out = { Ecs: Ecs, alphaE: aE, wlim: WLIM[i.caa] || 0.3, eta: i.fyk >= 500 ? 2.25 : 1.0, fctm: fctmMPa, fctInf: fctInf * 10, caa: i.caa };
+    // seção bruta (Mr)
+    var bT = i.laje ? 100 : bw, A, yc, Ic, alfa;
+    if (isT) {
+      A = bw * h + (bf - bw) * hf; yc = (bw * h * h / 2 + (bf - bw) * hf * hf / 2) / A;
+      Ic = bw * h * h * h / 12 + bw * h * Math.pow(h / 2 - yc, 2) + (bf - bw) * Math.pow(hf, 3) / 12 + (bf - bw) * hf * Math.pow(yc - hf / 2, 2);
+      alfa = 1.2;
+    } else { A = bT * h; yc = h / 2; Ic = bT * h * h * h / 12; alfa = 1.5; }
+    var yt = i.tracaoInf ? h - yc : yc;
+    if (isT && !i.tracaoInf) yt = yc;
+    out.Mr = alfa * fctInf * Ic / yt; out.alfa = alfa; out.Ic = Ic; out.yt = yt;
+    out.fissurado = i.Mk > out.Mr;
+    if (!out.fissurado) { out.wk = 0; out.ok = true; return out; }
+    // estádio II
+    var As = i.As, d = i.d, flange = isT && i.tracaoInf, x, III;
+    var aA = aE * As;
+    if (flange) {
+      x = (-aA + Math.sqrt(aA * aA + 2 * bf * aA * d)) / bf;
+      if (x > hf) {
+        var a = bw / 2, b = (bf - bw) * hf + aA, c = -((bf - bw) * hf * hf / 2 + aA * d);
+        x = (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a);
+        III = bw * Math.pow(x, 3) / 3 + (bf - bw) * (Math.pow(x, 3) - Math.pow(x - hf, 3)) / 3 + aA * Math.pow(d - x, 2);
+      } else III = bf * Math.pow(x, 3) / 3 + aA * Math.pow(d - x, 2);
+    } else {
+      var bb = i.laje ? 100 : bw;
+      x = (-aA + Math.sqrt(aA * aA + 2 * bb * aA * d)) / bb;
+      III = bb * Math.pow(x, 3) / 3 + aA * Math.pow(d - x, 2);
+    }
+    out.x = x; out.III = III;
+    var d1 = h - i.y1;                       // altura até o eixo da barra mais afastada
+    out.sigma = 10 * aE * i.Mk * (d1 - x) / III;   // MPa
+    // Acri
+    var phi = i.phi, r75 = 7.5 * phi / 10;   // cm
+    var alt = Math.min(i.y1 + r75, h - x), larg, nb;
+    if (i.laje) { larg = Math.min(i.s, 2 * r75); nb = 1; out.AsReg = area(phi); }
+    else {
+      var cl = i.cob + i.phiT / 10 + phi / 20, n = i.n1, e = n > 1 ? (bw - 2 * cl) / (n - 1) : 0;
+      larg = n > 1 ? (n - 1) * Math.min(e, 2 * r75) + 2 * Math.min(r75, cl) : 2 * Math.min(r75, cl);
+      if (n > 1) larg = Math.min(larg, bw); nb = n; out.AsReg = n * area(phi);
+    }
+    out.Acri = larg * alt; out.rho = out.AsReg / out.Acri; out.phi = phi; out.alt = alt; out.larg = larg;
+    var k = phi / (12.5 * out.eta) * out.sigma / Es;
+    out.w1 = k * 3 * out.sigma / fctmMPa; out.w2 = k * (4 / out.rho + 45);
+    out.wk = Math.min(out.w1, out.w2); out.ok = out.wk <= out.wlim + 1e-9;
     return out;
   }
 
@@ -800,7 +866,7 @@ var Motor = (function () {
   }
 
   return { BARS: BARS, BRITA: BRITA, area: area, materiais: materiais, flexao: flexao, barrasFlexao: barrasFlexao,
-    estriboCis: estriboCis, estribosTorcao: estribosTorcao, armaduraFace: armaduraFace, faixaLaje: faixaLaje, cisalhamento: cisalhamento, cisalhamentoLaje: cisalhamentoLaje, barrasLaje: barrasLaje, fywdLaje: fywdLaje, torcao: torcao, phiMaxEstribo: phiMaxEstribo };
+    fissuracao: fissuracao, estriboCis: estriboCis, estribosTorcao: estribosTorcao, armaduraFace: armaduraFace, faixaLaje: faixaLaje, cisalhamento: cisalhamento, cisalhamentoLaje: cisalhamentoLaje, barrasLaje: barrasLaje, fywdLaje: fywdLaje, torcao: torcao, phiMaxEstribo: phiMaxEstribo };
 })();
 if (typeof module !== 'undefined') module.exports = Motor;
 
@@ -812,7 +878,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
   var M = Motor;
 
   var DEFAULTS = {
-    unid: 'kN', fck: '40', fyk: '500', brita: 'Brita 1',
+    unid: 'kN', caa: '2', fck: '40', fyk: '500', brita: 'Brita 1',
     bw: '175', h: '100', bf: '', hf: '', cob: '5', d: '93', phiT: '8', ramos: '6',
     Mk: '368', Vk: '973', Tk: '580',
     phiTr: '20', phiCo: '16', phiPele: '16',
@@ -1335,6 +1401,52 @@ if (typeof module !== 'undefined') module.exports = Motor;
     box.innerHTML = html;
   }
 
+
+  /* ---------- Fissuração (ELS-W) ---------- */
+  function calcFis(c) {
+    var fx = c.flexao, g = c.geo.g, lj = isLaje();
+    if (fx.errs.length || fx.esm) return null;
+    var caa = parseInt(state.caa, 10) || 2, itens = [];
+    [['Momento positivo · Mk⁺ (tração embaixo)', true, state.Mk, fx.inf, fx.dSup], ['Momento negativo · Mk⁻ (tração em cima)', false, state.Mkn, fx.sup, fx.dSup]].forEach(function (q) {
+      var Mx = q[2] === '' ? 0 : num(q[2]);
+      if (!(Mx > 0)) return;
+      var face = q[3].face, it = { titulo: q[0], pos: q[1], Mk: Mx * kM() };
+      if (!face || !(face.As > 0)) { it.erro = 'Sem armadura adotada nesta face.'; itens.push(it); return; }
+      var inp = { laje: lj, bw: g.bw, h: g.h, bf: g.bf, hf: g.hf, fck: g.fck, fyk: g.fyk, cob: g.cob, phiT: g.phiT, Mk: it.Mk, tracaoInf: q[1], As: face.As, caa: caa };
+      if (lj) { inp.d = q[1] ? g.d : fx.dSup; inp.y1 = g.h - inp.d; inp.phi = face.phi; inp.s = face.s; }
+      else { inp.d = g.h - face.cg; inp.y1 = face.layers[0].y; inp.phi = face.layers[0].phi; inp.n1 = face.layers[0].n; }
+      it.r = M.fissuracao(inp); itens.push(it);
+    });
+    return itens;
+  }
+  function fisRows(it) {
+    var r = it.r, lj = isLaje(), pm = lj ? '/m' : '', rows = [];
+    rows.push([it.titulo], ['Mk (momento de serviço)', f(toM(it.Mk), 2), uM() + pm],
+      ['Ecs = αi · 5600 · √fck', f(r.Ecs, 0), 'MPa'], ['αe = Es / Ecs', f(r.alphaE, 2), ''], ['fct,inf = 0,7 · fctm', f(r.fctInf, 2), 'MPa'],
+      ['Mr = α · fct,inf · Ic / yt (α = ' + f(r.alfa, 1) + ')', f(toM(r.Mr), 2), uM() + pm]);
+    if (!r.fissurado) { rows.push(['Mk ≤ Mr: seção não fissurada', '', '']); return rows; }
+    rows.push(['Estádio II'], ['x (linha neutra)', f(r.x, 2), 'cm'], ['III', f(r.III, 0), 'cm⁴'], ['σs = αe · Mk · (d − x) / III', f(r.sigma, 1), 'MPa'],
+      ['Região de envolvimento'], ['Φ da barra mais externa', phiTxt(r.phi), 'mm'], ['Acri (≤ 7,5Φ do eixo da barra)', f(r.Acri, 1), 'cm²'], ['ρri = Asi / Acri', f(r.rho * 100, 3), '%'],
+      ['ηi (barra nervurada)', f(r.eta, 2), ''],
+      ['Abertura de fissuras'], ['w1 = Φ/(12,5·ηi) · σs/Es · 3σs/fctm', f(r.w1, 3), 'mm'], ['w2 = Φ/(12,5·ηi) · σs/Es · (4/ρri + 45)', f(r.w2, 3), 'mm'],
+      ['wk = mín(w1; w2)', f(r.wk, 3), 'mm'], ['Limite (CAA ' + ['I', 'II', 'III', 'IV'][r.caa - 1] + ')', f(r.wlim, 2), 'mm']);
+    return rows;
+  }
+  function renderFis(c) {
+    var box = $('fis-out'), its = calcFis(c);
+    if (!box) return;
+    if (!its) { box.innerHTML = '<p class="hint">Disponível quando a flexão estiver calculada.</p>'; return; }
+    if (!its.length) { box.innerHTML = '<p class="hint">Informe Mk⁺ ou Mk⁻ para verificar a fissuração.</p>'; return; }
+    var html = '<div class="adopt">', rows = [];
+    its.forEach(function (it) {
+      if (it.erro) { html += chk(it.titulo, it.erro, false, 'Sem armadura'); return; }
+      var r = it.r;
+      html += chk(it.titulo, r.fissurado ? 'wk = ' + f(r.wk, 3) + ' mm · limite ' + f(r.wlim, 2) + ' mm · σs = ' + f(r.sigma, 0) + ' MPa · x = ' + f(r.x, 1) + ' cm' : 'Mk ≤ Mr = ' + f(toM(r.Mr), 1) + ' ' + uM() + ': seção não fissurada', r.ok, r.fissurado ? (r.ok ? 'Atende' : 'wk acima do limite') : 'Não fissura');
+      rows = rows.concat(fisRows(it));
+    });
+    box.innerHTML = html + '</div>' + (rows.length ? memoria(rows) : '');
+  }
+
   /* ---------- Estribos adotados ---------- */
   function chk(titulo, detalhe, ok, textoPill) {
     return '<div class="chk"><span>' + titulo + (detalhe ? '<small>' + detalhe + '</small>' : '') + '</span>' + pill(ok === null ? 'info' : (ok ? 'ok' : 'bad'), textoPill) + '</div>';
@@ -1726,6 +1838,14 @@ if (typeof module !== 'undefined') module.exports = Motor;
         var pe = fx.pele;
         if (pe) b += D.p(pe.necessaria ? 'Armadura de pele: 2 faces × ' + pe.n + ' Φ' + phiTxt(pe.phi) + ' c/ ' + f(pe.s, 0) + ' cm (As,pele = ' + f(pe.As, 2) + ' cm² por face; necessária ' + f(pe.Asp, 2) + ' cm², 0,10 % de bw·h).' : 'Armadura de pele dispensada (h menor que 60 cm).');
       }
+      var fis = calcFis(c);
+      if (fis && fis.length) {
+        b += D.h2('Fissuração (ELS-W)') + D.p('Verificação da abertura de fissuras (NBR 6118, 17.3.3.2) com o Mk como momento de serviço, sem minoração. Classe de agressividade ' + ['I', 'II', 'III', 'IV'][(parseInt(state.caa, 10) || 2) - 1] + '.');
+        fis.forEach(function (it) {
+          if (it.erro) b += D.p(it.titulo + ': ' + it.erro);
+          else b += D.tabelaMem(fisRows(it)) + D.p(it.r.fissurado ? 'wk = ' + f(it.r.wk, 3) + ' mm ' + (it.r.ok ? '≤' : '>') + ' ' + f(it.r.wlim, 2) + ' mm: ' + okTxt(it.r.ok) + '.' : 'Seção não fissurada: atende.', { b: true });
+        });
+      }
       var asT = (I.face ? I.face.As : 0) + (S.face ? S.face.As : 0), Ac = lj ? 100 * g.h : g.bw * g.h + (tf ? (g.bf - g.bw) * g.hf : 0);
       var lm = limite4(asT, Ac);
       b += D.p('Armadura máxima (NBR 6118, 17.3.5.2.4): As + As′ = ' + f(asT, 2) + ' cm²' + porM + ' = ' + f(lm.pct, 2) + ' % de Ac, limite de 4 %. ' + okTxt(!lm.excede) + '.');
@@ -1879,7 +1999,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
     syncTipo();
     var c = compute();
     $('phiT').value = state.phiT; $('phiT2').value = state.phiT;
-    secLog = []; secTag = 'flex'; renderFlexao(c); secTag = 'cis'; renderCis(c); secTag = 'tor'; renderTor(c); secTag = '';
+    secLog = []; secTag = 'flex'; renderFlexao(c); renderFis(c); secTag = 'cis'; renderCis(c); secTag = 'tor'; renderTor(c); secTag = '';
     renderResumo(c); setLayerInfo(c); adotCis(c); adotTor(c); setGroupInfo(c);
     setStatus('flexao', c.flexao.errs.length ? 'warn' : statusOf([], c.flexao.r, false));
     setStatus('cisalhamento', c.cis.errs.length ? 'warn' : statusOf([], c.cis.r, false));
