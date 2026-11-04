@@ -195,7 +195,8 @@ details .body{padding:0 16px 12px}
           <button type="button" id="u-kn" aria-pressed="true">kN · kN·m</button>
           <button type="button" id="u-tf" aria-pressed="false">tf · tf·m</button>
         </div>
-        <button type="button" class="btn" id="reset">Exemplo da planilha</button>
+        <span class="fixed" id="memMsg" role="status" aria-live="polite"></span>
+        <button type="button" class="btn" id="memorial">Gerar memorial de cálculo</button>
       </div>
     </div>
     <nav class="tabs" role="tablist" aria-label="Módulos">
@@ -1184,7 +1185,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
       ['Md = 1,4·M', f(toM(r.Md), 2), uM()], ['Md,mín = 0,8·W0·fctk,sup', f(toM(r.Mdmin), 2), uM()], ['W0', f(r.W0, 0), 'cm³'],
       ['d usado', f(r.d !== undefined ? r.d : NaN, 1), 'cm'],
       ['fcd', f(r.mat.fcd * 10, 2), 'MPa'], ['fyd', f(r.mat.fyd * 10, 1), 'MPa'], ['εyd', f(r.mat.eyd, 3), '‰'], ['fctk,sup', f(r.mat.fctkSup * 10, 2), 'MPa'],
-      ["d′ = cob + 1,5", f(r.dl, 1), 'cm'], ['KMD', f(r.KMD, 4), ''], ['Md,lim', f(toM(r.Mlim), 2), uM()], ['ΔMd,lim = Md − Md,lim', f(toM(r.dM), 2), uM()],
+      ['d′ (CG da armadura comprimida)', f(r.dl, 1), 'cm'], ['KMD', f(r.KMD, 4), ''], ['Md,lim', f(toM(r.Mlim), 2), uM()], ['ΔMd,lim = Md − Md,lim', f(toM(r.dM), 2), uM()],
       ['KX', f(r.kx, 4), ''], ['x', f(r.x, 3), 'cm'], ['εs', f(r.epsTracao, 2), '‰'],
       ['Rcd1', f(toF(r.Rcd1), 1), uF()], ['Rcd2', f(toF(r.Rcd2), 1), uF()], ['Rscd (compressão, aço)', f(toF(r.Cs), 1), uF()], ['Rstd (tração)', f(toF(r.Rtd), 1), uF()],
       ['As', f(r.As, 3), 'cm²'], ['As,mín', f(r.Asmin, 3), 'cm²'], ['As′', f(r.Asc, 3), 'cm²']];
@@ -1565,6 +1566,255 @@ if (typeof module !== 'undefined') module.exports = Motor;
     $('p-resumo').innerHTML = html;
   }
 
+  /* ---------- Memorial de cálculo (.docx, gerado no navegador) ---------- */
+  var Docx = (function () {
+    var enc = new TextEncoder();
+    var CRC = (function () { var t = [], n, k, c; for (n = 0; n < 256; n++) { c = n; for (k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+    function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+    function zip(files) { // armazenamento sem compressão
+      var parts = [], cen = [], off = 0;
+      function u16(v) { return [v & 255, (v >>> 8) & 255]; }
+      function u32(v) { return [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255]; }
+      files.forEach(function (fl) {
+        var nm = enc.encode(fl.name), data = enc.encode(fl.data), crc = crc32(data);
+        var hdr = [0x50, 0x4b, 3, 4].concat(u16(20), u16(0x0800), u16(0), u16(0), u16(0x21), u32(crc), u32(data.length), u32(data.length), u16(nm.length), u16(0));
+        parts.push(new Uint8Array(hdr), nm, data);
+        cen.push({ nm: nm, crc: crc, len: data.length, off: off });
+        off += hdr.length + nm.length + data.length;
+      });
+      var cs = off, cparts = [];
+      cen.forEach(function (e) {
+        var h = [0x50, 0x4b, 1, 2].concat(u16(20), u16(20), u16(0x0800), u16(0), u16(0), u16(0x21), u32(e.crc), u32(e.len), u32(e.len), u16(e.nm.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(e.off));
+        cparts.push(new Uint8Array(h), e.nm); off += h.length + e.nm.length;
+      });
+      var end = new Uint8Array([0x50, 0x4b, 5, 6].concat(u16(0), u16(0), u16(files.length), u16(files.length), u32(off - cs), u32(cs), u16(0)));
+      return new Blob(parts.concat(cparts, [end]), { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    }
+    function x(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+    function run(t, o) {
+      o = o || {};
+      return '<w:r><w:rPr>' + (o.b ? '<w:b/>' : '') + (o.i ? '<w:i/>' : '') + (o.sz ? '<w:sz w:val="' + o.sz + '"/>' : '') + (o.color ? '<w:color w:val="' + o.color + '"/>' : '') +
+        '</w:rPr><w:t xml:space="preserve">' + x(t) + '</w:t></w:r>';
+    }
+    function p(t, o) {
+      o = o || {};
+      return '<w:p><w:pPr>' + (o.style ? '<w:pStyle w:val="' + o.style + '"/>' : '') + (o.keep ? '<w:keepNext/>' : '') +
+        (o.jc ? '<w:jc w:val="' + o.jc + '"/>' : '') + '</w:pPr>' + (t === '' ? '' : run(t, o)) + '</w:p>';
+    }
+    function cell(t, w, o) {
+      o = o || {};
+      return '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/>' + (o.span ? '<w:gridSpan w:val="' + o.span + '"/>' : '') +
+        (o.fill ? '<w:shd w:val="clear" w:color="auto" w:fill="' + o.fill + '"/>' : '') + '</w:tcPr>' +
+        '<w:p><w:pPr><w:spacing w:before="20" w:after="20"/>' + (o.jc ? '<w:jc w:val="' + o.jc + '"/>' : '') + '</w:pPr>' + run(t, { b: o.b, sz: 20 }) + '</w:p></w:tc>';
+    }
+    // rows: [titulo] = subtítulo; [rótulo, valor, unidade]
+    function tabelaMem(rows) {
+      var W = [5300, 2300, 2038], out = '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9638" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>' +
+        W.map(function (w) { return '<w:gridCol w:w="' + w + '"/>'; }).join('') + '</w:tblGrid>';
+      rows.forEach(function (r) {
+        if (r.length === 1) out += '<w:tr><w:trPr><w:cantSplit/></w:trPr>' + cell(r[0], 9638, { span: 3, fill: 'E7ECF3', b: true }) + '</w:tr>';
+        else out += '<w:tr><w:trPr><w:cantSplit/></w:trPr>' + cell(r[0], W[0]) + cell(r[1], W[1], { jc: 'right' }) + cell(r[2] || '', W[2]) + '</w:tr>';
+      });
+      return out + '</w:tbl>' + p('');
+    }
+    function tabelaGrade(head, rows, W) {
+      var tot = W.reduce(function (a, b) { return a + b; }, 0);
+      var out = '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="' + tot + '" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>' +
+        W.map(function (w) { return '<w:gridCol w:w="' + w + '"/>'; }).join('') + '</w:tblGrid>';
+      if (head) out += '<w:tr><w:trPr><w:tblHeader/></w:trPr>' + head.map(function (h, i) { return cell(h, W[i], { fill: 'E7ECF3', b: true }); }).join('') + '</w:tr>';
+      rows.forEach(function (r) { out += '<w:tr><w:trPr><w:cantSplit/></w:trPr>' + r.map(function (v, i) { return cell(v, W[i], { jc: i ? 'right' : '' }); }).join('') + '</w:tr>'; });
+      return out + '</w:tbl>' + p('');
+    }
+    var NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+    function build(body, rodape) {
+      var doc = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ' + NS + '><w:body>' + body +
+        '<w:sectPr><w:footerReference w:type="default" r:id="rId2"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>';
+      var styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles ' + NS + '>' +
+        '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="22"/><w:lang w:val="pt-BR"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="100" w:line="264" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>' +
+        '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>' +
+        '<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="60"/></w:pPr><w:rPr><w:b/><w:sz w:val="40"/><w:color w:val="1F3A5F"/></w:rPr></w:style>' +
+        '<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:pPr><w:keepNext/><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="2" w:color="1F3A5F"/></w:pBdr><w:spacing w:before="320" w:after="120"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:sz w:val="28"/><w:color w:val="1F3A5F"/></w:rPr></w:style>' +
+        '<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:pPr><w:keepNext/><w:spacing w:before="200" w:after="80"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/><w:color w:val="333333"/></w:rPr></w:style>' +
+        '<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:tblPr><w:tblCellMar><w:left w:w="100" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style>' +
+        '<w:style w:type="table" w:styleId="TableGrid"><w:name w:val="Table Grid"/><w:basedOn w:val="TableNormal"/><w:tblPr><w:tblBorders>' +
+        ['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(function (b) { return '<w:' + b + ' w:val="single" w:sz="4" w:space="0" w:color="B8C0CC"/>'; }).join('') + '</w:tblBorders></w:tblPr></w:style></w:styles>';
+      var foot = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr ' + NS + '><w:p><w:pPr><w:pBdr><w:top w:val="single" w:sz="4" w:space="4" w:color="B8C0CC"/></w:pBdr><w:tabs><w:tab w:val="right" w:pos="9638"/></w:tabs></w:pPr>' +
+        run(rodape, { sz: 16, color: '666666' }) + '<w:r><w:rPr><w:sz w:val="16"/><w:color w:val="666666"/></w:rPr><w:tab/><w:t xml:space="preserve">Página </w:t></w:r>' +
+        '<w:r><w:rPr><w:sz w:val="16"/><w:color w:val="666666"/></w:rPr><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:rPr><w:sz w:val="16"/><w:color w:val="666666"/></w:rPr><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:rPr><w:sz w:val="16"/><w:color w:val="666666"/></w:rPr><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:sz w:val="16"/><w:color w:val="666666"/></w:rPr><w:t>1</w:t></w:r><w:r><w:rPr><w:sz w:val="16"/><w:color w:val="666666"/></w:rPr><w:fldChar w:fldCharType="end"/></w:r></w:p></w:ftr>';
+      var H = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+      var R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+      return zip([
+        { name: '[Content_Types].xml', data: H + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
+          '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>' },
+        { name: '_rels/.rels', data: H + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="' + R + '/officeDocument" Target="word/document.xml"/></Relationships>' },
+        { name: 'word/_rels/document.xml.rels', data: H + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="' + R + '/styles" Target="styles.xml"/><Relationship Id="rId2" Type="' + R + '/footer" Target="footer1.xml"/></Relationships>' },
+        { name: 'word/document.xml', data: doc }, { name: 'word/styles.xml', data: styles }, { name: 'word/footer1.xml', data: foot }
+      ]);
+    }
+    return { p: p, h1: function (t) { return p(t, { style: 'Heading1' }); }, h2: function (t) { return p(t, { style: 'Heading2' }); }, tabelaMem: tabelaMem, tabelaGrade: tabelaGrade, build: build };
+  })();
+
+  function memorialCorpo(c) {
+    var D = Docx, g = c.geo.g, lj = isLaje(), b = '';
+    var tf = g.bf > 0 && g.hf > 0, fx = c.flexao, ci = c.cis, t = c.tor;
+    var porM = lj ? '/m' : '';
+    var Tk = state.Tk === '' ? 0 : num(state.Tk);
+    var comTorcao = !lj && Tk > 0;
+    var okTxt = function (v) { return v ? 'Atende' : 'Não atende'; };
+    var erros = function (errs) { return errs.map(function (e) { return D.p('• ' + e); }).join(''); };
+    var n = 0, tit = function (s) { n++; return D.h1(n + '. ' + s); };
+
+    b += D.p('Memorial de cálculo', { style: 'Title' });
+    b += D.p((lj ? 'Laje de concreto armado (faixa de 1 m)' : 'Viga de concreto armado') + ' · dimensionamento conforme ABNT NBR 6118', { color: '555555' });
+    b += D.p('Emitido em ' + new Date().toLocaleDateString('pt-BR') + ' · DIMI-S', { color: '555555', sz: 20 });
+
+    // 1. Geometria e materiais
+    b += tit('Geometria e materiais');
+    var geo = [['Dimensões da seção']];
+    if (lj) geo.push(['Faixa considerada (b)', f(g.bw, 0), 'cm'], ['Espessura h', f(g.h, 1), 'cm']);
+    else {
+      geo.push(['Seção', tf ? 'T' : 'Retangular', ''], ['Largura da alma bw', f(g.bw, 1), 'cm'], ['Altura h', f(g.h, 1), 'cm']);
+      if (tf) geo.push(['Largura da mesa bf', f(g.bf, 1), 'cm'], ['Espessura da mesa hf', f(g.hf, 1), 'cm']);
+    }
+    geo.push(['Altura útil d', f(g.d, 1), 'cm'], ['Cobrimento nominal', f(g.cob, 1), 'cm']);
+    if (!lj) geo.push(['Diâmetro do estribo Φt', f(g.phiT, 1), 'mm']);
+    geo.push(['Dimensão máxima do agregado (brita)', String(state.brita), '']);
+    geo.push(['Materiais'], ['Resistência do concreto fck', f(g.fck, 0), 'MPa'], ['Aço', 'CA-' + (g.fyk / 10), ''], ['Resistência de escoamento fyk', f(g.fyk, 0), 'MPa']);
+    b += D.tabelaMem(geo);
+
+    // 2. Esforços
+    b += tit('Esforços solicitantes');
+    var ef = [['Valores característicos (informados)']];
+    if (num(state.Mk) > 0 || state.Mk !== '') ef.push(['Momento fletor positivo Mk⁺', f(num(state.Mk) || 0, 2), uM() + porM]);
+    if (state.Mkn !== '' && num(state.Mkn) > 0) ef.push(['Momento fletor negativo Mk⁻', f(num(state.Mkn), 2), uM() + porM]);
+    ef.push(['Força cortante Vk', f(num(state.Vk) || 0, 2), uF() + porM]);
+    if (!lj) ef.push(['Momento torçor Tk', f(Tk || 0, 2), uM()]);
+    ef.push(['Valores de cálculo (γf = 1,4)']);
+    if (num(state.Mk) > 0) ef.push(['Md⁺ = 1,4·Mk⁺', f(1.4 * num(state.Mk), 2), uM() + porM]);
+    if (state.Mkn !== '' && num(state.Mkn) > 0) ef.push(['Md⁻ = 1,4·Mk⁻', f(1.4 * num(state.Mkn), 2), uM() + porM]);
+    ef.push(['Vsd = 1,4·Vk', f(1.4 * (num(state.Vk) || 0), 2), uF() + porM]);
+    if (comTorcao) ef.push(['Tsd = 1,4·Tk', f(1.4 * Tk, 2), uM()]);
+    b += D.tabelaMem(ef);
+
+    // 3. Flexão
+    b += tit('Flexão simples');
+    if (fx.errs.length) b += D.p('Cálculo não realizado:', { b: true }) + erros(fx.errs);
+    else if (fx.esm) b += D.p('Há esmagamento do concreto na flexão: a armadura não foi determinada. Aumente a seção ou o fck.', { b: true });
+    else {
+      b += D.p('Hipóteses: diagrama retangular de tensões com 0,85·fcd e λ = 0,8, limite x/d ≤ 0,45, γc = 1,4 e γs = 1,15' + (tf ? ', seção T' : '') + '.');
+      if (fx.pos) { fx.pos.d = g.d; b += D.h2('Momento positivo (Mk⁺, tração embaixo)') + D.p(fx.pos.nomeCaso + (fx.pos.dupla ? ' (armadura dupla)' : ''), { i: true }) + D.tabelaMem(memFlex('Parâmetros e resultados', fx.pos).slice(1)); }
+      if (fx.neg) { fx.neg.d = fx.dSup; b += D.h2('Momento negativo (Mk⁻, tração em cima)') + D.p(fx.neg.nomeCaso + (fx.neg.dupla ? ' (armadura dupla)' : ''), { i: true }) + D.tabelaMem(memFlex('Parâmetros e resultados', fx.neg).slice(1)); }
+      var I = fx.inf, S = fx.sup, ad = [];
+      b += D.h2('Armadura adotada');
+      if (lj) {
+        var fa = function (nm, x) { return x.face ? [nm, 'Φ' + phiTxt(x.face.phi) + ' c/ ' + x.face.s + ' cm', f(x.face.As, 2), f(x.req, 2), okTxt(x.face.As + 1e-9 >= x.req)] : [nm, '–', '–', f(x.req, 2), x.req > 0 ? 'Não atende' : 'Dispensada']; };
+        b += D.tabelaGrade(['Face', 'Barras', 'As,ef (cm²/m)', 'As nec. (cm²/m)', 'Verificação'], [fa('Inferior', I), fa('Superior', S)], [1500, 2600, 1800, 1900, 1838]);
+        b += D.p('Espaçamento máximo: ' + f(fx.smax, 0) + ' cm (menor entre 20 cm e 2h).');
+      } else {
+        var fv = function (nm, x) { return [nm, layTxt(x.face), f(x.face.As, 2), f(x.req, 2), x.face.excede ? 'Largura excedida' : okTxt(x.face.As + 1e-9 >= x.req)]; };
+        b += D.tabelaGrade(['Face', 'Barras', 'As,ef (cm²)', 'As nec. (cm²)', 'Verificação'], [fv('Inferior', I), fv('Superior', S)], [1500, 2900, 1700, 1700, 1838]);
+        b += D.p('Centro de gravidade da armadura inferior a ' + f(I.face.cg, 2) + ' cm da face e da superior a ' + f(S.face.cg, 2) + ' cm da face.');
+        var pe = fx.pele;
+        if (pe) b += D.p(pe.necessaria ? 'Armadura de pele: 2 faces × ' + pe.n + ' Φ' + phiTxt(pe.phi) + ' c/ ' + f(pe.s, 0) + ' cm (As,pele = ' + f(pe.As, 2) + ' cm² por face; necessária ' + f(pe.Asp, 2) + ' cm², 0,10 % de bw·h).' : 'Armadura de pele dispensada (h menor que 60 cm).');
+      }
+      var asT = (I.face ? I.face.As : 0) + (S.face ? S.face.As : 0), Ac = lj ? 100 * g.h : g.bw * g.h + (tf ? (g.bf - g.bw) * g.hf : 0);
+      var lm = limite4(asT, Ac);
+      b += D.p('Armadura máxima (NBR 6118, 17.3.5.2.4): As + As′ = ' + f(asT, 2) + ' cm²' + porM + ' = ' + f(lm.pct, 2) + ' % de Ac, limite de 4 %. ' + okTxt(!lm.excede) + '.');
+    }
+
+    // 4. Cisalhamento
+    b += tit('Cisalhamento');
+    if (ci.errs.length) b += D.p('Cálculo não realizado:', { b: true }) + erros(ci.errs);
+    else {
+      var r = ci.r;
+      if (lj) {
+        b += D.p('Verificação da laje (NBR 6118, 19.4.1): Vsd comparado com VRd1 e VRd2.');
+        b += D.tabelaMem([['Resistências'], ['τRd = 0,25·fctd', f(r.tauRd * 10, 3), 'MPa'], ['k', f(r.k, 3), ''], ['As1 (armadura inferior adotada)', f(r.As1, 2), 'cm²/m'],
+          ['ρ1 = As1/(bw·d) ≤ 0,02', f(r.rho1 * 100, 3), '%'], ['VRd1 = τRd·k·(1,2 + 40·ρ1)·bw·d', f(toF(r.VRd1), 2), uF() + '/m'],
+          ['VRd2 = 0,27·αv2·fcd·bw·d', f(toF(r.VRd2), 2), uF() + '/m'], ['Vsd', f(toF(r.Vsd), 2), uF() + '/m'], ['Vsd / VRd1', f(r.razao1, 3), '']]);
+        if (!r.precisa) b += D.p('Vsd ≤ VRd1: a laje resiste ao cortante sem armadura transversal.', { b: true });
+        else if (r.esmagamento) b += D.p('Vsd > VRd2: há esmagamento da diagonal comprimida. Aumente a espessura ou o fck.', { b: true });
+        else {
+          b += D.p('Vsd > VRd1: é necessária armadura de cisalhamento (Modelo I, θ = 45°).', { b: true });
+          b += D.tabelaMem([['Armadura transversal'], ['Vc = 0,6·fctd·bw·d', f(toF(r.Vc), 2), uF() + '/m'], ['Vsw = Vsd − Vc', f(toF(r.Vsw), 2), uF() + '/m'], ['fywd (limitado pela espessura)', f(r.fywd * 10, 0), 'MPa'],
+            ['Asw calculada', f(r.AswCalc, 3), 'cm²/m'], ['Asw,mín = 100·bw·ρmín', f(r.Aswmin, 3), 'cm²/m'], ['Espaçamento máximo smáx', String(r.smax), 'cm']]);
+          if (ci.est) b += D.p('Estribo adotado: Φ' + phiTxt(ci.est.phi) + ' c/ ' + f(ci.est.s, 0) + ' cm, ' + ci.est.ramos + ' ramos por metro (Asw,ef = ' + f(ci.est.AswEf, 2) + ' cm²/m, necessária ' + f(ci.est.AswNec, 2) + ' cm²/m). ' + okTxt(ci.est.ok) + '.');
+        }
+      } else {
+        b += D.p('Modelo de cálculo I (NBR 6118, 17.4.2.2), com θ = 45° e Vc constante.');
+        if (r.esmagamento) b += D.p('Vsd = ' + f(toF(r.Vsd), 2) + ' ' + uF() + ' é maior que VRd2 = ' + f(toF(r.VRd2), 2) + ' ' + uF() + ': há esmagamento da diagonal comprimida. Aumente a seção ou o fck.', { b: true });
+        else {
+          b += D.tabelaMem([['Materiais'], ['fcd', f(r.mat.fcd * 10, 2), 'MPa'], ['fctd', f(r.mat.fctd * 10, 3), 'MPa'], ['fctm', f(r.mat.fctm * 10, 3), 'MPa'], ['fywd', f(r.mat.fywd * 10, 1), 'MPa'], ['αv2 = 1 − fck/250', f(r.mat.av2, 3), ''],
+            ['Verificações'], ['VRd2 = 0,27·αv2·fcd·bw·d', f(toF(r.VRd2), 2), uF()], ['Vsd', f(toF(r.Vsd), 2), uF()], ['Vsd / VRd2', f(r.razao, 3), ''],
+            ['Vc = 0,6·fctd·bw·d', f(toF(r.Vc), 2), uF()], ['Vsw = Vsd − Vc', f(toF(r.Vsw), 2), uF()], ['ρmín = 0,2·fctm/fywk', f(r.rhoMin * 100, 4), '%'],
+            ['Armadura transversal'], ['Asw calculada = 100·Vsw/(0,9·d·fywd)', f(r.AswCalc, 3), 'cm²/m'], ['Asw,mín = 100·bw·ρmín', f(r.Aswmin, 3), 'cm²/m'], ['Asw adotada (maior valor)', f(r.Asw, 3), 'cm²/m'],
+            ['Detalhamento'], ['Φ mínimo / máximo (bw/10)', f(r.phiMin, 0) + ' / ' + phiTxt(r.phiMax), 'mm'], ['smáx', String(r.smax), 'cm'], ['st,máx', String(r.stmax), 'cm'], ['Ramos mínimos', String(r.nMin), '']]);
+          if (ci.est) {
+            var e = ci.est;
+            b += D.p('Estribo adotado: Φ' + phiTxt(e.phi) + ' c/ ' + f(e.s, 0) + ' cm, ' + e.ramos + ' ramos. Asw,ef = ' + f(e.AswEf, 2) + ' cm²/m, necessária ' + f(e.AswNec, 2) + ' cm²/m: ' + okTxt(e.ok) + '.', { b: true });
+          }
+        }
+      }
+    }
+
+    // 5. Torção (somente com Tk > 0)
+    if (comTorcao) {
+      b += tit('Torção');
+      if (t.errs.length) b += D.p('Cálculo não realizado:', { b: true }) + erros(t.errs);
+      else {
+        var q = t.r;
+        b += D.p('Seção vazada equivalente (NBR 6118, 17.5.1), treliça com θ = 45° e verificação de interação com o cisalhamento.');
+        var rowsT = [['Seção vazada equivalente'], ['A = bw·h', f(q.A, 0), 'cm²'], ['u = 2(bw + h)', f(q.u, 0), 'cm'], ['A/u', f(q.Au, 2), 'cm'], ['c1 (eixo da barra à face)', f(t.inp.c1, 2), 'cm'],
+          ['he = máx(A/u; 2·c1)', f(q.he, 2), 'cm'], ['Ae = bnúcleo·hnúcleo', f(q.Ae, 0), 'cm²'],
+          ['Esmagamento da diagonal'], ['VRd2', f(toF(q.VRd2), 2), uF()], ['TRd2 = 0,5·αv2·fcd·Ae·he', f(toM(q.TRd2), 2), uM()],
+          ['Vsd / VRd2', f(q.rV, 4), ''], ['Tsd / TRd2', f(q.rT, 4), ''], ['Vsd/VRd2 + Tsd/TRd2 ≤ 1', f(q.inter, 4), '']];
+        b += D.tabelaMem(rowsT);
+        if (q.esmagamento) b += D.p('A soma é maior que 1: há esmagamento da diagonal comprimida. A armadura não foi determinada.', { b: true });
+        else {
+          b += D.tabelaMem([['Armadura transversal'], ['Aswc (cisalhamento)', f(q.Aswc, 3), 'cm²/m'], ['Aswt = 100·Tsd/(2·Ae·fywd)', f(q.AswtCalc, 3), 'cm²/m'], ['Asw,mín', f(q.Aswmin, 3), 'cm²/m'],
+            ['Asw por ramo = Aswt + Aswc/n', f(q.AswTot, 3), 'cm²/m'],
+            ['Armadura longitudinal'], ['Asl = 0,02·Aswt·(bnúcleo + hnúcleo)', f(q.Asl, 3), 'cm²']]);
+          b += D.p('Armadura longitudinal total (flexão + torção):', { b: true });
+          b += D.tabelaGrade(['Posição', 'Flexão (cm²)', 'Torção (cm²)', 'Total (cm²)', 'As,mín (cm²)'], [
+            ['Inferior', f(t.inp.AsInfF, 2), f(q.AsInfTors, 2), f(q.AsInf, 2), f(q.AsInfMin, 2)],
+            ['Superior', f(t.inp.AsSupF, 2), f(q.AsInfTors, 2), f(q.AsSup, 2), f(q.AsSupMin, 2)],
+            ['Lateral, por face', '–', f(q.AsLat, 2), f(q.AsLat, 2), '–']], [2100, 1900, 1900, 1900, 1838]);
+          var te = t.est;
+          if (te) {
+            b += D.p('Estribos adotados (ramos):', { b: true });
+            b += D.tabelaGrade(['Ramo', 'Tipo', 'Qtd.', 'Φ (mm)', 's (cm)'], te.groups.map(function (x, k) {
+              return [String(k + 1), x.tipo === 'f' ? 'Estribo fechado' : 'Perna simples', String(x.qtd), phiTxt(x.phi), f(x.sUse, 0)];
+            }), [1000, 3300, 1500, 1900, 1938]);
+            b += D.p('Total de ' + te.legsTot + ' pernas (mínimo ' + te.nMin + '); Asw total = ' + f(te.Atot, 2) + ' cm²/m. ' + (te.ok ? 'Todas as verificações atendem.' : 'Há verificações pendentes: reveja os estribos.'), { b: true });
+          }
+        }
+      }
+    }
+
+    b += D.h1('Observações');
+    b += D.p('Memorial gerado pelo DIMI-S com base na NBR 6118. Os resultados devem ser conferidos por profissional habilitado, que responde pelo projeto. Trechos não cobertos: armadura de ancoragem, decalagem do diagrama de momentos e redução do cortante junto ao apoio.', { sz: 20 });
+    return b;
+  }
+
+  function gerarMemorial() {
+    var c = compute(), msg = $('memMsg');
+    var blob = Docx.build(memorialCorpo(c), 'DIMI-S · ' + (isLaje() ? 'Laje' : 'Viga') + ' · memorial de cálculo');
+    var nome = 'Memorial_DIMI-S_' + (isLaje() ? 'laje' : 'viga') + '_' + new Date().toISOString().slice(0, 10) + '.docx';
+    function fallback() {
+      var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome;
+      document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      return 'Memorial gerado.';
+    }
+    var cl = window.claude && window.claude.use ? window.claude.use('downloads') : Promise.resolve(null);
+    cl.then(function (dl) {
+      if (!dl) return fallback();
+      return dl.save({ filename: nome, data: blob }).then(function () { return 'Memorial salvo.'; }, function (e) {
+        return e && e.code === 'declined' ? 'Download cancelado.' : 'Não foi possível salvar o arquivo neste ambiente.';
+      });
+    }).then(function (t) { msg.textContent = t; setTimeout(function () { msg.textContent = ''; }, 4000); });
+  }
+  window.__memorial = { corpo: memorialCorpo, gerar: gerarMemorial };
+
   /* ---------- atualização ---------- */
   function setStatus(id, kind) { var el = $('st-' + id); el.className = 'st ' + kind; }
   function statusOf(errs, r, warn) {
@@ -1749,10 +1999,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
     $('relink').addEventListener('click', function () {
       state.asInfF = ''; state.asSupF = ''; state.c1 = ''; ['asInfF', 'asSupF', 'c1'].forEach(function (k) { $(k).value = ''; }); refresh();
     });
-    $('reset').addEventListener('click', function () {
-      bak = {}; KEYS.forEach(function (k) { state[k] = DEFAULTS[k]; });
-      fillInputs(); refresh();
-    });
+    $('memorial').addEventListener('click', gerarMemorial);
     var hash = (location.hash || '').replace('#', '');
     setTab(['resumo', 'flexao', 'cisalhamento', 'torcao'].indexOf(hash) >= 0 ? hash : 'resumo');
     refresh();
