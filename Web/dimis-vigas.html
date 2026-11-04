@@ -1,4 +1,4 @@
-<title>DIMI-S Vigas</title>
+<title>DIMI-S Vigas e Lajes</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;500;600;700&display=swap">
 <style>
 /* Layout: barra de dados fixa à esquerda, módulos (Resumo, Flexão, Cisalhamento, Torção) à direita; empilha no celular. */
@@ -158,6 +158,9 @@ details .body{padding:0 16px 12px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
 .foot{margin-top:22px;font-size:12px;color:var(--muted);max-width:90ch}
 .foot b{color:var(--ink)}
+.seg.full{display:flex;width:100%}.seg.full button{flex:1}
+.elem{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+[hidden]{display:none !important}
 </style>
 
 <div class="app">
@@ -181,7 +184,15 @@ details .body{padding:0 16px 12px}
   </header>
 
   <div class="layout">
-    <aside class="side" aria-label="Dados da viga">
+    <aside class="side" aria-label="Dados do elemento">
+      <div class="card">
+        <h2>Elemento</h2>
+        <div class="seg full" role="group" aria-label="Tipo de elemento">
+          <button type="button" id="t-viga" aria-pressed="true">Viga</button>
+          <button type="button" id="t-laje" aria-pressed="false">Laje</button>
+        </div>
+        <p class="hint" id="tipohint"></p>
+      </div>
       <div class="card">
         <h2>Materiais</h2>
         <div class="grid2">
@@ -197,28 +208,28 @@ details .body{padding:0 16px 12px}
       <div class="card">
         <h2>Geometria</h2>
         <div class="grid2">
-          <label><span class="lt">bw <span class="u">cm</span></span><input id="bw" data-k="bw" inputmode="decimal"></label>
+          <label><span class="lt" id="lbw">bw <span class="u">cm</span></span><input id="bw" data-k="bw" inputmode="decimal"></label>
           <label><span class="lt">h <span class="u">cm</span></span><input id="h" data-k="h" inputmode="decimal"></label>
-          <label><span class="lt">bf <span class="u">cm · seção T</span></span><input id="bf" data-k="bf" inputmode="decimal" placeholder="vazio = retangular"></label>
-          <label><span class="lt">hf <span class="u">cm · seção T</span></span><input id="hf" data-k="hf" inputmode="decimal" placeholder="vazio = retangular"></label>
+          <label class="onlyviga"><span class="lt">bf <span class="u">cm · seção T</span></span><input id="bf" data-k="bf" inputmode="decimal" placeholder="vazio = retangular"></label>
+          <label class="onlyviga"><span class="lt">hf <span class="u">cm · seção T</span></span><input id="hf" data-k="hf" inputmode="decimal" placeholder="vazio = retangular"></label>
           <label><span class="lt">Cobrimento <span class="u">cm</span></span>
             <select id="cob" data-k="cob"><option>0.5</option><option>1</option><option>1.5</option><option>2</option><option>2.5</option><option>3</option><option>3.5</option><option>4</option><option>4.5</option><option>5</option></select></label>
-          <label><span class="lt">Estribo Φt <span class="u">mm</span></span>
+          <label id="lphiT"><span class="lt">Estribo Φt <span class="u">mm</span></span>
             <select id="phiT" data-k="phiT"><option>5</option><option>6.3</option><option>8</option><option>10</option><option>12.5</option></select></label>
           <label class="full"><span class="lt">d (altura útil) <span class="u">cm</span></span><input id="d" data-k="d" inputmode="decimal"></label>
         </div>
         <p class="hint" id="dhint"></p>
       </div>
       <div class="card">
-        <h2>Esforços</h2>
+        <h2 id="hef">Esforços</h2>
         <div class="grid2">
           <label><span class="lt">Mk <span class="u" id="lm">kN·m</span></span><input id="Mk" data-k="Mk" inputmode="decimal"></label>
           <label><span class="lt">Vk <span class="u" id="lv">kN</span></span><input id="Vk" data-k="Vk" inputmode="decimal"></label>
-          <label><span class="lt">Tk <span class="u" id="lt">kN·m</span></span><input id="Tk" data-k="Tk" inputmode="decimal"></label>
-          <label><span class="lt">Ramos do estribo</span>
+          <label class="onlyviga"><span class="lt">Tk <span class="u" id="lt">kN·m</span></span><input id="Tk" data-k="Tk" inputmode="decimal"></label>
+          <label><span class="lt" id="lramos">Ramos do estribo</span>
             <select id="ramos" data-k="ramos"><option>2</option><option>4</option><option>6</option><option>8</option><option>10</option><option>12</option></select></label>
         </div>
-        <p class="hint">Os esforços de cálculo são majorados por γf = 1,4. Tk só é usado no módulo Torção.</p>
+        <p class="hint" id="efhint">Os esforços de cálculo são majorados por γf = 1,4. Tk só é usado no módulo Torção.</p>
       </div>
     </aside>
 
@@ -233,7 +244,7 @@ details .body{padding:0 16px 12px}
               <select id="phiTr" data-k="phiTr"><option>5</option><option>6.3</option><option>8</option><option>10</option><option>12.5</option><option>16</option><option>20</option><option>25</option></select></label>
             <label><span class="lt">Compressão Φ <span class="u">mm</span></span>
               <select id="phiCo" data-k="phiCo"><option>5</option><option>6.3</option><option>8</option><option>10</option><option>12.5</option><option>16</option><option>20</option><option>25</option></select></label>
-            <label><span class="lt">Pele Φ <span class="u">mm</span></span>
+            <label class="onlyviga"><span class="lt">Pele Φ <span class="u">mm</span></span>
               <select id="phiPele" data-k="phiPele"><option>5</option><option>6.3</option><option>8</option><option>10</option><option>12.5</option><option>16</option></select></label>
           </div>
         </div>
@@ -241,11 +252,20 @@ details .body{padding:0 16px 12px}
       </section>
 
       <section class="panel" id="p-cisalhamento" hidden>
+        <div class="card" id="cis-laje-opts" hidden>
+          <h2>Opções da laje</h2>
+          <div class="ctl">
+            <label style="min-width:280px"><span class="lt">Armadura inferior no apoio (define k)</span>
+              <select id="apoio" data-k="apoio"><option value="chega">Chega ao apoio · k = |1,6 − d|</option><option value="nao">50 % ou mais não chega · k = 1</option></select></label>
+          </div>
+          <p class="hint">As1 e ρ1 vêm da armadura de tração adotada na aba Flexão.</p>
+        </div>
         <div id="out-cisalhamento" class="main"></div>
       </section>
 
       <section class="panel" id="p-torcao" hidden>
-        <div class="card">
+        <div id="tor-laje" class="main" hidden></div>
+        <div id="tor-viga"><div class="card">
           <h2>Opções da torção</h2>
           <div class="ctl">
             <label style="min-width:220px"><span class="lt">Verificação da armadura mínima</span>
@@ -256,7 +276,7 @@ details .body{padding:0 16px 12px}
           </div>
           <p class="hint">Asinf, Assup e c1 vêm da aba Flexão e dos dados da viga. Digite um valor para substituí-los. <button type="button" id="relink">Voltar ao valor automático</button></p>
         </div>
-        <div id="out-torcao" class="main"></div>
+        <div id="out-torcao" class="main"></div></div>
       </section>
     </main>
   </div>
@@ -504,6 +524,60 @@ var Motor = (function () {
     return r;
   }
 
+
+  /* ---------- LAJES (faixa de 1 m) ---------- */
+  function fywdLaje(h, fywdFull) {           // NBR 6118, 19.4.2: limite de fywd conforme a espessura
+    if (h <= 15) return Math.min(25, fywdFull);
+    if (h > 35) return fywdFull;
+    return Math.min(25 + (fywdFull - 25) * (h - 15) / 20, fywdFull);
+  }
+
+  function barrasLaje(r, i) {
+    var smax = Math.min(20, 2 * i.h);
+    var esc = 100 / i.bw;                    // As por metro
+    function faixa(phi, Asn) {
+      var Ab = area(phi);
+      var sCalc = Math.floor(100 * Ab / Asn + EPS);
+      var s = Math.min(smax, sCalc);
+      return { phi: phi, s: s, sCalc: sCalc, As: 100 * Ab / s, n: Math.floor(100 / s) + 1, curto: s < 7, limitadoSmax: sCalc > smax };
+    }
+    var out = { smax: smax };
+    out.tracao = faixa(i.phiTr, r.AsBase * esc);
+    out.compressao = r.dupla ? faixa(i.phiCo, r.Asc * esc) : null;
+    out.AsDist = Math.max(0.2 * out.tracao.As, 0.9, 0.5 * r.Asmin * esc);
+    return out;
+  }
+
+  /* VRd1 (sem armadura transversal) e, se Vsd > VRd1, armadura de cisalhamento (Modelo I, como em vigas) */
+  function cisalhamentoLaje(i) {
+    var m = materiais(i.fck, i.fyk);
+    var bw = i.bw, d = i.d, h = i.h, Vsd = i.Vsd;
+    var tauRd = 0.25 * m.fctd;                         // kN/cm²
+    var k = i.barrasChegam ? Math.abs(1.6 - d / 100) : 1;
+    var rho1 = Math.min(i.As1 / (bw * d), 0.02);
+    var VRd1 = (tauRd * k * (1.2 + 40 * rho1) + 0.15 * (i.sigmaCp || 0)) * bw * d;
+    var VRd2 = vRd2(m, bw, d);
+    var r = { mat: m, Vsd: Vsd, tauRd: tauRd, k: k, rho1: rho1, rho1Lim: i.As1 / (bw * d) > 0.02, As1: i.As1, VRd1: VRd1, VRd2: VRd2,
+      razao1: Vsd / VRd1, razao: Vsd / VRd2, precisa: Vsd > VRd1 };
+    if (!r.precisa) { r.esmagamento = false; return r; }
+    if (Vsd > VRd2) { r.esmagamento = true; return r; }
+    r.esmagamento = false;
+    var fywdFull = m.fywd, fywd = fywdLaje(h, fywdFull);
+    var rhoMin = 0.2 * m.fctm / m.fywk;
+    var Vc = 0.6 * bw * d * m.fctd;
+    r.fywdFull = fywdFull; r.fywd = fywd; r.rhoMin = rhoMin; r.Vc = Vc;
+    r.Vsw = Math.max(Vsd - Vc, 0);
+    r.AswCalc = 100 * r.Vsw / (0.9 * d * fywd);
+    r.Aswmin = 100 * bw * rhoMin;
+    r.Asw = Math.max(r.AswCalc, r.Aswmin);
+    r.VRd3 = Vc + r.Vsw;
+    r.smax = Math.trunc(r.razao > 0.67 ? Math.min(0.3 * d, 20) : Math.min(30, 0.6 * d));
+    r.ramos = i.ramos;
+    r.aswPerna = r.Asw / r.ramos;
+    r.opcoes = opcoesEstribos(r.aswPerna, r.smax, 12.5);
+    return r;
+  }
+
   /* ---------- TORÇÃO ---------- */
   function torcao(i) {
     var m = materiais(i.fck, i.fyk);
@@ -562,7 +636,7 @@ var Motor = (function () {
   }
 
   return { BARS: BARS, BRITA: BRITA, area: area, materiais: materiais, flexao: flexao, barrasFlexao: barrasFlexao,
-    cisalhamento: cisalhamento, torcao: torcao, phiMaxEstribo: phiMaxEstribo };
+    cisalhamento: cisalhamento, cisalhamentoLaje: cisalhamentoLaje, barrasLaje: barrasLaje, fywdLaje: fywdLaje, torcao: torcao, phiMaxEstribo: phiMaxEstribo };
 })();
 if (typeof module !== 'undefined') module.exports = Motor;
 
@@ -578,7 +652,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
     bw: '175', h: '100', bf: '', hf: '', cob: '5', d: '93', phiT: '8', ramos: '6',
     Mk: '368', Vk: '973', Tk: '580',
     phiTr: '20', phiCo: '16', phiPele: '16',
-    modoMin: 'parcela', asInfF: '', asSupF: '', c1: ''
+    modoMin: 'parcela', tipo: 'viga', apoio: 'chega', asInfF: '', asSupF: '', c1: ''
   };
   var state = {};
   var tab = 'resumo';
@@ -599,6 +673,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
   }
   function phiTxt(p) { return String(p).replace('.', ','); }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  var isLaje = function () { return state.tipo === 'laje'; };
   var isTf = function () { return state.unid === 'tf'; };
   var kF = function () { return isTf() ? 10 : 1; };          // kN por unidade de força
   var kM = function () { return isTf() ? 1000 : 100; };       // kN·cm por unidade de momento
@@ -614,13 +689,15 @@ if (typeof module !== 'undefined') module.exports = Motor;
       fck: num(state.fck), fyk: num(state.fyk), brita: state.brita, ramos: num(state.ramos),
       bf: state.bf === '' ? 0 : num(state.bf), hf: state.hf === '' ? 0 : num(state.hf)
     };
+    if (isLaje()) { g.bw = 100; g.bf = 0; g.hf = 0; }
     var errs = [];
     if (!(g.bw > 0)) errs.push('Informe bw maior que zero.');
     if (!(g.h > 0)) errs.push('Informe h maior que zero.');
     if (!(g.d > 0)) errs.push('Informe d maior que zero.');
     if (g.bw > 0 && g.h > 0 && g.d > 0 && g.d > g.h - g.cob) errs.push('d deve ser menor ou igual a h − cobrimento (' + f(g.h - g.cob, 1) + ' cm).');
-    if (g.bw < 10) errs.push('bw deve ser pelo menos 10 cm.');
-    if (g.h < 10) errs.push('h deve ser pelo menos 10 cm.');
+    if (!isLaje() && g.bw < 10) errs.push('bw deve ser pelo menos 10 cm.');
+    if (g.h < 7) errs.push('h deve ser pelo menos 7 cm.');
+    if (!isLaje() && g.h < 10) errs.push('h deve ser pelo menos 10 cm.');
     var t1 = g.bf > 0, t2 = g.hf > 0;
     if (t1 !== t2) errs.push('Para seção T, preencha bf e hf. Para seção retangular, deixe os dois vazios.');
     if (t1 && t2) {
@@ -646,7 +723,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
         Md: 1.4 * Mk * kM(), brita: g.brita, phiTr: num(state.phiTr), phiCo: num(state.phiCo), phiPele: num(state.phiPele) };
       var r = M.flexao(inp);
       out.flexao.inp = inp; out.flexao.r = r;
-      if (!r.esmagamento) out.flexao.b = M.barrasFlexao(r, inp);
+      if (!r.esmagamento) out.flexao.b = isLaje() ? M.barrasLaje(r, inp) : M.barrasFlexao(r, inp);
     }
 
     // Cisalhamento
@@ -655,24 +732,34 @@ if (typeof module !== 'undefined') module.exports = Motor;
     if (!(Vk > 0)) ce.push('Informe Vk maior que zero.');
     out.cis = { errs: ce };
     if (!ce.length) {
-      out.cis.inp = { bw: g.bw, d: g.d, fck: g.fck, fyk: g.fyk, ramos: g.ramos, Vsd: 1.4 * Vk * kF() };
-      out.cis.r = M.cisalhamento(out.cis.inp);
+      if (isLaje()) {
+        var fxr = out.flexao.r, fxb = out.flexao.b;
+        var as1 = fxb ? fxb.tracao.As : NaN;
+        out.cis.semAs1 = !(as1 > 0);
+        out.cis.inp = { bw: g.bw, d: g.d, h: g.h, fck: g.fck, fyk: g.fyk, ramos: g.ramos, Vsd: 1.4 * Vk * kF(),
+          As1: as1 > 0 ? as1 : 0, barrasChegam: state.apoio !== 'nao' };
+        out.cis.r = M.cisalhamentoLaje(out.cis.inp);
+      } else {
+        out.cis.inp = { bw: g.bw, d: g.d, fck: g.fck, fyk: g.fyk, ramos: g.ramos, Vsd: 1.4 * Vk * kF() };
+        out.cis.r = M.cisalhamento(out.cis.inp);
+      }
     }
 
     // Torção
     var Tk = num(state.Tk);
     var te = gErr.slice();
+    if (isLaje()) te.push('A torção não se aplica à laje.');
     if (!(Vk > 0)) te.push('Informe Vk maior que zero.');
     if (!(Tk > 0)) te.push('Informe Tk maior que zero.');
     if (g.d > 0 && g.h > 0 && g.d > g.h - g.cob - 1.5) te.push('Na torção, d deve ser menor ou igual a h − cobrimento − 1,5 cm (' + f(g.h - g.cob - 1.5, 1) + ' cm).');
-    var autoInf = out.flexao.b ? out.flexao.b.tracao.As : NaN;
-    var autoSup = out.flexao.b ? out.flexao.b.compressao.As : NaN;
+    var autoInf = out.flexao.b && !isLaje() ? out.flexao.b.tracao.As : NaN;
+    var autoSup = out.flexao.b && !isLaje() ? out.flexao.b.compressao.As : NaN;
     var autoC1 = g.cob + 0.1 * g.phiT + 0.05 * num(state.phiTr);
     var asInf = state.asInfF === '' ? autoInf : num(state.asInfF);
     var asSup = state.asSupF === '' ? autoSup : num(state.asSupF);
     var c1 = state.c1 === '' ? autoC1 : num(state.c1);
     out.auto = { asInf: autoInf, asSup: autoSup, c1: autoC1 };
-    if (!(asInf > 0) || !(asSup > 0)) te.push('Informe Asinf e Assup de flexão (ou preencha a aba Flexão).');
+    if (!isLaje() && (!(asInf > 0) || !(asSup > 0))) te.push('Informe Asinf e Assup de flexão (ou preencha a aba Flexão).');
     if (!(c1 > 0)) te.push('Informe c1 maior que zero.');
     out.tor = { errs: te };
     if (!te.length) {
@@ -721,14 +808,14 @@ if (typeof module !== 'undefined') module.exports = Motor;
   function secao(o) {
     var isT = o.bf > 0 && o.hf > 0;
     var W = isT ? o.bf : o.bw;
-    var sc = Math.min(300 / W, 300 / o.h);
+    var sc = o.laje ? Math.min(560 / W, 320 / o.h) : Math.min(300 / W, 300 / o.h);
     var padL = 50, padR = 54, padT = isT ? 40 : 30, padB = 40;
     var vw = W * sc + padL + padR, vh = o.h * sc + padT + padB;
     var xF = padL, y0 = padT;
     var xW = padL + (W - o.bw) / 2 * sc;
     var id = 'clip-' + (++secUid);
     var P = function (v) { return (Math.round(v * 100) / 100); };
-    var s = '<svg viewBox="0 0 ' + P(vw) + ' ' + P(vh) + '" role="img" aria-label="Seção transversal da viga">';
+    var s = '<svg viewBox="0 0 ' + P(vw) + ' ' + P(vh) + '" role="img" aria-label="Seção transversal">';
     var path;
     if (isT) {
       path = 'M' + P(xF) + ' ' + P(y0) + 'H' + P(xF + W * sc) + 'V' + P(y0 + o.hf * sc) + 'H' + P(xW + o.bw * sc) + 'V' + P(y0 + o.h * sc) +
@@ -748,12 +835,18 @@ if (typeof module !== 'undefined') module.exports = Motor;
       s += '<path class="s-wall" fill-rule="evenodd" d="' + outer + inner + '"/>';
       s += '<rect class="s-wallc" x="' + P(xW + he / 2 * sc) + '" y="' + P(y0 + he / 2 * sc) + '" width="' + P((o.bw - he) * sc) + '" height="' + P((o.h - he) * sc) + '"/>';
     }
-    // estribo
+    // estribo (não existe em laje sem armadura de cisalhamento)
     var e0 = o.cob + o.phiT / 20;
     var sx0 = xW + e0 * sc, sx1 = xW + (o.bw - e0) * sc, sy0 = y0 + e0 * sc, sy1 = y0 + (o.h - e0) * sc;
     var sw = Math.max(1.2, o.phiT / 10 * sc);
-    s += '<rect class="s-st" x="' + P(sx0) + '" y="' + P(sy0) + '" width="' + P(sx1 - sx0) + '" height="' + P(sy1 - sy0) + '" rx="' + P(Math.max(2, 2.5 * o.phiT / 10 * sc)) + '" stroke-width="' + P(sw) + '"/>';
-    for (var k = 1; k <= (o.ramos || 2) - 2; k++) {
+    if (o.laje && !o.semEstribo) {
+      var nl2 = Math.max(2, o.ramos || 2);
+      for (var q2 = 0; q2 < nl2; q2++) {
+        var xq = sx0 + (sx1 - sx0) * q2 / (nl2 - 1);
+        s += '<line class="s-st" x1="' + P(xq) + '" y1="' + P(sy0) + '" x2="' + P(xq) + '" y2="' + P(sy1) + '" stroke-width="' + P(sw) + '"/>';
+      }
+    } else     if (!o.semEstribo) s += '<rect class="s-st" x="' + P(sx0) + '" y="' + P(sy0) + '" width="' + P(sx1 - sx0) + '" height="' + P(sy1 - sy0) + '" rx="' + P(Math.max(2, 2.5 * o.phiT / 10 * sc)) + '" stroke-width="' + P(sw) + '"/>';
+    for (var k = 1; !o.semEstribo && !o.laje && k <= (o.ramos || 2) - 2; k++) {
       var xk = sx0 + (sx1 - sx0) * k / ((o.ramos || 2) - 1);
       s += '<line class="s-st" x1="' + P(xk) + '" y1="' + P(sy0) + '" x2="' + P(xk) + '" y2="' + P(sy1) + '" stroke-width="' + P(sw) + '"/>';
     }
@@ -794,7 +887,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
     // cotas
     var yb = y0 + o.h * sc + 14;
     s += '<line class="s-dim" x1="' + P(xW) + '" y1="' + P(yb) + '" x2="' + P(xW + o.bw * sc) + '" y2="' + P(yb) + '"/>';
-    s += '<text class="s-txt" text-anchor="middle" x="' + P(xW + o.bw * sc / 2) + '" y="' + P(yb + 13) + '">bw = ' + f(o.bw, 0) + ' cm</text>';
+    s += '<text class="s-txt" text-anchor="middle" x="' + P(xW + o.bw * sc / 2) + '" y="' + P(yb + 13) + '">' + (o.laje ? 'faixa de ' : 'bw = ') + f(o.bw, 0) + ' cm</text>';
     s += '<line class="s-dim" x1="' + P(xF - 14) + '" y1="' + P(y0) + '" x2="' + P(xF - 14) + '" y2="' + P(y0 + o.h * sc) + '"/>';
     s += '<text class="s-txt" text-anchor="middle" transform="translate(' + P(xF - 20) + ',' + P(y0 + o.h * sc / 2) + ') rotate(-90)">h = ' + f(o.h, 0) + ' cm</text>';
     if (isT) {
@@ -818,14 +911,105 @@ if (typeof module !== 'undefined') module.exports = Motor;
     return '<div class="legend">' + items.map(function (i) { return '<span><i style="background:' + i[0] + '"></i>' + i[1] + '</span>'; }).join('') + '</div>';
   }
 
+
+  function elemTag() {
+    return '<div class="elem">' + pill('info', isLaje() ? 'Elemento: Laje' : 'Elemento: Viga') +
+      '<span class="fixed">' + (isLaje() ? 'faixa de 1 m · sem estribos, salvo se Vsd > VRd1' : 'seção com estribos') + '</span></div>';
+  }
+  function slabRow(name, bar, Asnec, extra, okPill) {
+    return '<div class="arow"><span class="n">' + name + '</span><span class="t">Φ' + phiTxt(bar.phi) + ' c/ ' + bar.s + ' cm' +
+      '<small>As,ef = ' + f(bar.As, 2) + ' cm²/m · necessária ' + f(Asnec, 2) + ' cm²/m' + extra + '</small></span>' + okPill + '</div>';
+  }
+  function renderFlexaoLaje(c) {
+    var box = $('out-flexao'), fx = c.flexao, r = fx.r, g = c.geo.g, b = fx.b, html = elemTag();
+    var avisos = [];
+    if (r.kxExcedido) avisos.push('KX = ' + f(r.kx, 3) + ' ultrapassa 0,45. A armadura dupla compensa a diferença.');
+    if (b.tracao.curto) avisos.push('Espaçamento menor que 7 cm. Use bitola maior.');
+    if (b.tracao.limitadoSmax) avisos.push('Espaçamento limitado a ' + b.smax + ' cm (menor entre 20 cm e 2h).');
+    html += banner(r.dupla ? 'warn' : 'ok', 'Laje · ' + r.nomeCaso, avisos.join(' '));
+    html += '<div class="kpis">' +
+      kpi('As calculada', f(r.As, 2), 'cm²/m', r.minGoverna ? 'As,mín governa' : 'governa o cálculo', true) +
+      kpi('As,mín', f(r.Asmin, 2), 'cm²/m', 'ρmín = ' + f(r.Asmin / (g.bw * g.h) * 100, 3) + ' %') +
+      kpi('As′ compressão', f(r.Asc, 2), 'cm²/m', r.dupla ? 'armadura dupla' : 'não necessária') +
+      kpi('x / d', f(r.kx, 3), '', 'x = ' + f(r.x, 2) + ' cm · limite 0,45') +
+      kpi('Md', f(toM(r.Md), 1), uM() + '/m', 'domínio ' + r.dominio) + '</div>';
+    var t = b.tracao, co = b.compressao;
+    html += '<div class="card"><h2>Armadura adotada</h2><div class="adopt">' +
+      slabRow('Tração', t, r.AsBase, ' · ' + t.n + ' barras por metro', pill('ok', 'Suficiente · folga ' + f((t.As / r.AsBase - 1) * 100, 1) + ' %')) +
+      (co ? slabRow('Compressão', co, r.Asc, '', pill('ok', 'Suficiente · folga ' + f((co.As / r.Asc - 1) * 100, 1) + ' %'))
+          : '<div class="arow"><span class="n">Compressão</span><span class="t">Não necessária<small>laje com armadura simples</small></span>' + pill('ok', 'Dispensada') + '</div>') +
+      '<div class="arow"><span class="n">Distribuição</span><span class="t">As,dist ≥ ' + f(b.AsDist, 2) + ' cm²/m<small>maior entre 20 % da armadura principal, 0,9 cm²/m e 50 % de As,mín</small></span>' + pill('info', 'Secundária') + '</div>' +
+      '</div></div>';
+    html += '<div class="card sec"><h2>Seção transversal · faixa de 1 m</h2>' + secao({
+      laje: true, semEstribo: true, bw: g.bw, h: g.h, bf: 0, hf: 0, cob: g.cob, phiT: 0, ramos: 2, d: g.d,
+      tr: { phi: t.phi, n: t.n, porCamada: t.n, av: 2 },
+      co: co ? { phi: co.phi, n: co.n, porCamada: co.n, av: 2 } : null, coBar: 's-bar',
+      pele: null, nl: { x: r.x, blk: 0.8 * r.x }
+    }) + legend([['var(--rebar)', 'Armadura de tração' + (co ? ' e compressão' : '') + ' · Φ' + phiTxt(t.phi) + ' c/ ' + t.s + ' cm'], ['var(--conc-hi)', 'Zona comprimida (0,8·x)']]) +
+      '<p class="hint">Laje sem estribos. Se Vsd > VRd1, a aba Cisalhamento indica a armadura transversal.</p></div>';
+    html += memoria([['Esforços e materiais'],
+      ['Md = 1,4·Mk (por metro)', f(toM(r.Md), 2), uM()], ['Md,mín = 0,8·W0·fctk,sup', f(toM(r.Mdmin), 2), uM()], ['W0', f(r.W0, 0), 'cm³'],
+      ['fcd', f(r.mat.fcd * 10, 2), 'MPa'], ['fyd', f(r.mat.fyd * 10, 1), 'MPa'], ['fctk,sup', f(r.mat.fctkSup * 10, 2), 'MPa'],
+      ['Linha neutra'], ['KMD', f(r.KMD, 4), ''], ['Md,lim', f(toM(r.Mlim), 2), uM()], ['KX', f(r.kx, 4), ''], ['x', f(r.x, 3), 'cm'], ['εs', f(r.epsTracao, 2), '‰'],
+      ['Armaduras'], ['As', f(r.As, 3), 'cm²/m'], ['As,mín', f(r.Asmin, 3), 'cm²/m'], ['As′', f(r.Asc, 3), 'cm²/m'],
+      ['s máx = mín(20 cm, 2h)', f(b.smax, 0), 'cm']]);
+    box.innerHTML = html;
+  }
+
+  function renderCisLaje(c) {
+    var box = $('out-cisalhamento'), ci = c.cis, r = ci.r, g = c.geo.g, html = elemTag();
+    var fxb = c.flexao.b;
+    var barras = fxb ? { phi: fxb.tracao.phi, n: fxb.tracao.n, porCamada: fxb.tracao.n, av: 2 } : null;
+    var aviso = ci.semAs1 ? ' Mk não informado: ρ1 foi tomado como zero, a favor da segurança.' : '';
+    // verificação 1: VRd1
+    html += banner(r.precisa ? 'warn' : 'ok', r.precisa ? 'Vsd > VRd1 · precisa de armadura de cisalhamento' : 'Vsd ≤ VRd1 · não precisa de armadura de cisalhamento',
+      (r.precisa ? 'A laje não dispensa armadura transversal. A armadura é calculada como em vigas (Modelo I), com fywd limitado pela espessura.' : 'A laje resiste ao cortante só com o concreto.') + aviso);
+    html += '<div class="kpis">' +
+      kpi('Vsd', f(toF(r.Vsd), 1), uF() + '/m', '1,4 · Vk', true) +
+      kpi('VRd1', f(toF(r.VRd1), 1), uF() + '/m', f(r.razao1 * 100, 1) + ' % utilizado') +
+      kpi('VRd2', f(toF(r.VRd2), 1), uF() + '/m', f(r.razao * 100, 1) + ' % utilizado') +
+      kpi(r.precisa && !r.esmagamento ? 'Asw' : 'ρ1', r.precisa && !r.esmagamento ? f(r.Asw, 2) : f(r.rho1 * 100, 3), r.precisa && !r.esmagamento ? 'cm²/m' : '%', r.precisa && !r.esmagamento ? 'armadura transversal' : 'As1 / (bw·d)') + '</div>';
+    html += '<div class="card"><h2>1ª verificação · Vsd ≤ VRd1</h2>' + meter([{ v: r.razao1 }], [{ v: 0, l: '0' }, { v: 1, l: 'VRd1' }], r.precisa) +
+      '<p class="hint">Vsd / VRd1 = ' + f(r.razao1, 3) + ' · ' + (r.precisa ? pill('warn', 'Precisa armar ao cisalhamento') : pill('ok', 'Não precisa armar ao cisalhamento')) + '</p></div>';
+    if (r.precisa && r.esmagamento) {
+      html += banner('bad', 'Esmagamento da diagonal comprimida', 'Vsd = ' + f(toF(r.Vsd), 1) + ' ' + uF() + '/m é maior que VRd2 = ' + f(toF(r.VRd2), 1) + ' ' + uF() + '/m. Aumente a espessura ou o fck.');
+    } else if (r.precisa) {
+      html += '<div class="two"><div class="card"><h2>Armadura de cisalhamento</h2><table><tbody>' +
+        '<tr><td class="k">Vc = 0,6·fctd·bw·d</td><td>' + f(toF(r.Vc), 1) + ' ' + uF() + '/m</td></tr>' +
+        '<tr><td class="k">Vsw = Vsd − Vc</td><td>' + f(toF(r.Vsw), 1) + ' ' + uF() + '/m</td></tr>' +
+        '<tr><td class="k">fywd (limitado por h = ' + f(g.h, 0) + ' cm)</td><td>' + f(r.fywd * 10, 0) + ' MPa</td></tr>' +
+        '<tr><td class="k">Asw calculada</td><td>' + f(r.AswCalc, 2) + ' cm²/m</td></tr>' +
+        '<tr><td class="k">Asw,mín = 100·bw·ρmín</td><td>' + f(r.Aswmin, 2) + ' cm²/m</td></tr>' +
+        '<tr><td class="k">Espaçamento máx. smáx</td><td>' + r.smax + ' cm</td></tr>' +
+        '<tr><td class="k">Ramos por metro</td><td>' + r.ramos + '</td></tr>' +
+        '<tr><td class="k">Asw por ramo</td><td>' + f(r.aswPerna, 3) + ' cm²/m</td></tr></tbody></table></div>' +
+        '<div class="card"><h2>Estribos com ' + r.ramos + ' ramos por metro</h2>' + optsHtml(r.opcoes) +
+        '<p class="hint">Opções de estribo ou gancho. Confira o diâmetro máximo e o detalhamento na NBR 6118, item 19.4.2.</p></div></div>';
+    }
+    var o1 = r.precisa && !r.esmagamento ? r.opcoes[0] : null;
+    html += '<div class="card sec"><h2>Seção transversal · faixa de 1 m</h2>' + secao({
+      laje: true, semEstribo: !o1, bw: g.bw, h: g.h, bf: 0, hf: 0, cob: g.cob, phiT: o1 ? o1.phi : 0, ramos: r.ramos, d: g.d,
+      tr: barras, co: null
+    }) + legend(o1 ? [['var(--ink)', 'Estribo Φ' + phiTxt(o1.phi) + ' c/ ' + o1.s + ' cm · ' + r.ramos + ' ramos'], ['var(--rebar)', 'Armadura de tração']]
+      : [['var(--rebar)', 'Armadura de tração · sem estribos']]) + '</div>';
+    html += memoria([['Materiais'], ['fck', f(r.mat.fck, 0), 'MPa'], ['fctd = 0,7·0,3·fck^(2/3)/1,4', f(r.mat.fctd * 10, 3), 'MPa'],
+      ['VRd1 (NBR 6118, 19.4.1)'], ['τRd = 0,25·fctd', f(r.tauRd * 10, 3), 'MPa'],
+      ['k ' + (state.apoio === 'nao' ? '(50 % não chega ao apoio)' : '= |1,6 − d|'), f(r.k, 3), ''],
+      ['As1', f(r.As1, 2), 'cm²/m'], ['ρ1 = As1/(bw·d) ≤ 0,02', f(r.rho1 * 100, 3), '%'],
+      ['VRd1 = τRd·k·(1,2 + 40·ρ1)·bw·d', f(toF(r.VRd1), 2), uF() + '/m'], ['Vsd', f(toF(r.Vsd), 2), uF() + '/m'],
+      ['VRd2 = 0,27·αv2·fcd·bw·d', f(toF(r.VRd2), 2), uF() + '/m']]);
+    box.innerHTML = html;
+  }
+
   /* ---------- Flexão ---------- */
   function renderFlexao(c) {
     var box = $('out-flexao');
     var fx = c.flexao;
     if (fx.errs.length) { box.innerHTML = errBox(fx.errs); return; }
     var r = fx.r, g = c.geo.g, html = '';
+    if (!r.esmagamento && isLaje()) { renderFlexaoLaje(c); return; }
     if (r.esmagamento) {
-      box.innerHTML = banner('bad', 'Armadura não determinada', 'ΔMd,lim = ' + f(toM(r.dM), 1) + ' ' + uM() + ' é maior que Md,lim = ' + f(toM(r.Mlim), 1) + ' ' + uM() + '. Há esmagamento do concreto: aumente a seção ou a resistência do concreto.') +
+      box.innerHTML = elemTag() + banner('bad', 'Armadura não determinada', 'ΔMd,lim = ' + f(toM(r.dM), 1) + ' ' + uM() + ' é maior que Md,lim = ' + f(toM(r.Mlim), 1) + ' ' + uM() + '. Há esmagamento do concreto: aumente a seção ou a resistência do concreto.') +
         memoria([['Md', f(toM(r.Md), 1), uM()], ['Md,lim', f(toM(r.Mlim), 1), uM()], ['ΔMd,lim', f(toM(r.dM), 1), uM()]]);
       return;
     }
@@ -835,7 +1019,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
     if (r.kxExcedido) avisos.push('KX = ' + f(r.kx, 3) + ' ultrapassa o limite x/d = 0,45. A linha neutra foi limitada a 0,45·d e a armadura dupla compensa a diferença.');
     if (r.exagerada) avisos.push('Armadura dupla exagerada: As′ é ' + f(r.razaoAsc * 100, 1) + ' % de As, acima de 27 %.');
     if (b.avisoCG) avisos.push('A armadura tracionada ficou em ' + b.tracao.camadas + ' camadas. Verifique o centro de gravidade da armadura e o d real.');
-    html += banner(kind, r.nomeCaso, avisos.join(' '));
+    html += elemTag() + banner(kind, r.nomeCaso, avisos.join(' '));
 
     html += '<div class="kpis">' +
       kpi('As calculada', f(r.As, 2), 'cm²', r.minGoverna ? 'As,mín governa' : 'governa o cálculo', true) +
@@ -888,9 +1072,10 @@ if (typeof module !== 'undefined') module.exports = Motor;
   function renderCis(c) {
     var box = $('out-cisalhamento'), ci = c.cis;
     if (ci.errs.length) { box.innerHTML = errBox(ci.errs); return; }
-    var r = ci.r, g = c.geo.g, html = '';
+    if (isLaje()) { renderCisLaje(c); return; }
+    var r = ci.r, g = c.geo.g, html = elemTag();
     if (r.esmagamento) {
-      box.innerHTML = banner('bad', 'Esmagamento da diagonal comprimida', 'Vsd = ' + f(toF(r.Vsd), 1) + ' ' + uF() + ' é maior que VRd2 = ' + f(toF(r.VRd2), 1) + ' ' + uF() + '. A armadura não foi determinada: aumente a seção ou o fck.') +
+      box.innerHTML = elemTag() + banner('bad', 'Esmagamento da diagonal comprimida', 'Vsd = ' + f(toF(r.Vsd), 1) + ' ' + uF() + ' é maior que VRd2 = ' + f(toF(r.VRd2), 1) + ' ' + uF() + '. A armadura não foi determinada: aumente a seção ou o fck.') +
         '<div class="card"><h2>Verificação</h2>' + meter([{ v: r.razao }], [{ v: 0, l: '0' }, { v: 1, l: 'VRd2' }], true) + '</div>';
       return;
     }
@@ -986,7 +1171,11 @@ if (typeof module !== 'undefined') module.exports = Motor;
     else if (fx.r.esmagamento) html += card('flexao', 'Flexão', pill('bad', 'Esmagamento do concreto'), '<span class="fixed">Aumente a seção ou o fck.</span>');
     else {
       var r = fx.r, b = fx.b;
-      html += card('flexao', 'Flexão', pill(r.dupla ? 'warn' : 'ok', r.dupla ? 'Armadura dupla' : 'Armadura simples') + (r.isT ? ' ' + pill('info', 'Seção T') : ''),
+      if (isLaje()) html += card('flexao', 'Flexão · laje', pill(r.dupla ? 'warn' : 'ok', r.dupla ? 'Armadura dupla' : 'Armadura simples'),
+        '<div class="big">' + f(r.As, 2) + '<small>cm²/m de As</small></div><dl>' +
+        '<dt>Tração</dt><dd>Φ' + phiTxt(b.tracao.phi) + ' c/ ' + b.tracao.s + ' cm</dd>' +
+        '<dt>As,mín</dt><dd>' + f(r.Asmin, 2) + ' cm²/m</dd><dt>x / d</dt><dd>' + f(r.kx, 3) + '</dd></dl>');
+      else html += card('flexao', 'Flexão', pill(r.dupla ? 'warn' : 'ok', r.dupla ? 'Armadura dupla' : 'Armadura simples') + (r.isT ? ' ' + pill('info', 'Seção T') : ''),
         '<div class="big">' + f(r.As, 2) + '<small>cm² de As</small></div><dl>' +
         '<dt>Tração</dt><dd>' + b.tracao.n + ' Φ' + phiTxt(b.tracao.phi) + ' · ' + b.tracao.camadas + ' cam.</dd>' +
         '<dt>Compressão</dt><dd>' + b.compressao.n + ' Φ' + phiTxt(b.compressao.phi) + '</dd>' +
@@ -994,16 +1183,21 @@ if (typeof module !== 'undefined') module.exports = Motor;
     }
     // cisalhamento
     if (ci.errs.length) html += card('cisalhamento', 'Cisalhamento', pill('warn', 'Dados incompletos'), '<span class="fixed">' + esc(ci.errs[0]) + '</span>');
-    else if (ci.r.esmagamento) html += card('cisalhamento', 'Cisalhamento', pill('bad', 'Esmagamento da diagonal'), '<span class="fixed">Vsd maior que VRd2.</span>');
+    else if (ci.r.esmagamento && !isLaje()) html += card('cisalhamento', 'Cisalhamento', pill('bad', 'Esmagamento da diagonal'), '<span class="fixed">Vsd maior que VRd2.</span>');
     else {
-      var rc = ci.r, o = rc.opcoes[0];
-      html += card('cisalhamento', 'Cisalhamento', pill(rc.apenasMinima ? 'ok' : 'warn', rc.apenasMinima ? 'Armadura mínima' : 'Armadura calculada'),
+      var rc = ci.r, o = rc.opcoes ? rc.opcoes[0] : null;
+      if (isLaje()) html += card('cisalhamento', 'Cisalhamento · laje', rc.precisa ? (rc.esmagamento ? pill('bad', 'Esmagamento da diagonal') : pill('warn', 'Precisa armar')) : pill('ok', 'Não precisa armar'),
+        '<div class="big">' + f(rc.razao1, 2) + '<small>Vsd / VRd1</small></div><dl>' +
+        '<dt>Vsd</dt><dd>' + f(toF(rc.Vsd), 1) + ' ' + uF() + '/m</dd><dt>VRd1</dt><dd>' + f(toF(rc.VRd1), 1) + ' ' + uF() + '/m</dd>' +
+        '<dt>Estribos</dt><dd>' + (rc.precisa && !rc.esmagamento ? (o ? 'Φ' + phiTxt(o.phi) + ' c/ ' + o.s + ' cm' : '–') : 'dispensados') + '</dd></dl>');
+      else html += card('cisalhamento', 'Cisalhamento', pill(rc.apenasMinima ? 'ok' : 'warn', rc.apenasMinima ? 'Armadura mínima' : 'Armadura calculada'),
         '<div class="big">' + f(rc.Asw, 2) + '<small>cm²/m de Asw</small></div><dl>' +
         '<dt>Estribos</dt><dd>' + (o ? 'Φ' + phiTxt(o.phi) + ' c/ ' + o.s + ' · ' + rc.ramos + ' ramos' : '–') + '</dd>' +
         '<dt>Vsd / VRd2</dt><dd>' + f(rc.razao, 3) + '</dd><dt>smáx</dt><dd>' + rc.smax + ' cm</dd></dl>');
     }
     // torção
-    if (t.errs.length) html += card('torcao', 'Torção', pill('warn', 'Dados incompletos'), '<span class="fixed">' + esc(t.errs[0]) + '</span>');
+    if (isLaje()) html += card('torcao', 'Torção', pill('info', 'Não se aplica'), '<span class="fixed">A torção é verificada só em vigas.</span>');
+    else if (t.errs.length) html += card('torcao', 'Torção', pill('warn', 'Dados incompletos'), '<span class="fixed">' + esc(t.errs[0]) + '</span>');
     else if (t.r.esmagamento) html += card('torcao', 'Torção', pill('bad', 'Esmagamento da diagonal'), '<span class="fixed">Vsd/VRd2 + Tsd/TRd2 maior que 1.</span>');
     else {
       var rt = t.r, ot = rt.opcoes[0];
@@ -1014,9 +1208,10 @@ if (typeof module !== 'undefined') module.exports = Motor;
         '<dt>Asinf · Assup</dt><dd>' + f(rt.AsInf, 1) + ' · ' + f(rt.AsSup, 1) + ' cm²</dd></dl>');
     }
     html += '</div>';
-    html += '<div class="card flat"><h2>Dados da viga</h2><p class="fixed" style="margin:0">' +
-      (g.bf > 0 && g.hf > 0 ? 'Seção T' : 'Seção retangular') + ' · bw ' + f(g.bw, 0) + ' × h ' + f(g.h, 0) + ' cm' + (g.bf > 0 && g.hf > 0 ? ' · bf ' + f(g.bf, 0) + ' · hf ' + f(g.hf, 0) : '') +
-      ' · d ' + f(g.d, 1) + ' cm · C' + g.fck + ' · CA-' + (g.fyk / 10) + ' · Mk ' + f(num(state.Mk), 1) + ' ' + uM() + ' · Vk ' + f(num(state.Vk), 1) + ' ' + uF() + ' · Tk ' + f(num(state.Tk), 1) + ' ' + uM() + '</p></div>';
+    var tf = g.bf > 0 && g.hf > 0;
+    var geoTxt = isLaje() ? 'Laje · faixa de 1 m · h ' + f(g.h, 0) + ' cm' : (tf ? 'Seção T' : 'Seção retangular') + ' · bw ' + f(g.bw, 0) + ' × h ' + f(g.h, 0) + ' cm' + (tf ? ' · bf ' + f(g.bf, 0) + ' · hf ' + f(g.hf, 0) : '');
+    html += '<div class="card flat"><h2>Dados ' + (isLaje() ? 'da laje' : 'da viga') + '</h2><p class="fixed" style="margin:0">' + geoTxt +
+      ' · d ' + f(g.d, 1) + ' cm · C' + g.fck + ' · CA-' + (g.fyk / 10) + ' · Mk ' + f(num(state.Mk), 1) + ' ' + uM() + (isLaje() ? '/m' : '') + ' · Vk ' + f(num(state.Vk), 1) + ' ' + uF() + (isLaje() ? '/m' : ' · Tk ' + f(num(state.Tk), 1) + ' ' + uM()) + '</p></div>';
     $('p-resumo').innerHTML = html;
   }
 
@@ -1029,11 +1224,12 @@ if (typeof module !== 'undefined') module.exports = Motor;
   }
 
   function refresh() {
+    syncTipo();
     var c = compute();
     renderFlexao(c); renderCis(c); renderTor(c); renderResumo(c);
     setStatus('flexao', c.flexao.errs.length ? 'warn' : statusOf([], c.flexao.r, false));
     setStatus('cisalhamento', c.cis.errs.length ? 'warn' : statusOf([], c.cis.r, false));
-    setStatus('torcao', c.tor.errs.length ? 'warn' : statusOf([], c.tor.r, false));
+    setStatus('torcao', isLaje() ? '' : c.tor.errs.length ? 'warn' : statusOf([], c.tor.r, false));
     // campos automáticos da torção
     [['asInfF', c.auto.asInf], ['asSupF', c.auto.asSup], ['c1', c.auto.c1]].forEach(function (p) {
       var el = $(p[0]);
@@ -1053,6 +1249,41 @@ if (typeof module !== 'undefined') module.exports = Motor;
     var tPart = (state.bf === '') !== (state.hf === '');
     ['bf', 'hf'].forEach(function (k) { $(k).setAttribute('aria-invalid', tPart ? 'true' : 'false'); });
     save();
+  }
+
+  var bak = {};
+  var TIPO_KEYS = ['bw', 'h', 'bf', 'hf', 'cob', 'd', 'phiT', 'ramos', 'Mk', 'Vk', 'Tk', 'phiTr', 'phiCo'];
+  var LAJE_DEF = { bw: '100', h: '12', bf: '', hf: '', cob: '2.5', d: '9', phiT: '5', ramos: '2', Mk: '10', Vk: '20', Tk: '0', phiTr: '8', phiCo: '5' };
+  function setTipo(t) {
+    if (t === state.tipo) return;
+    bak[state.tipo] = {}; TIPO_KEYS.forEach(function (k) { bak[state.tipo][k] = state[k]; });
+    var src = bak[t];
+    if (!src) {
+      if (t === 'laje') {
+        src = {}; TIPO_KEYS.forEach(function (k) { src[k] = LAJE_DEF[k]; });
+        if (isTf()) ['Mk', 'Vk', 'Tk'].forEach(function (k) { src[k] = String(Math.round(parseFloat(src[k]) * 0.1 * 1000) / 1000).replace('.', ','); });
+      } else { src = {}; TIPO_KEYS.forEach(function (k) { src[k] = DEFAULTS[k]; }); }
+    }
+    TIPO_KEYS.forEach(function (k) { state[k] = src[k]; });
+    state.tipo = t;
+    fillInputs(); refresh();
+  }
+  function syncTipo() {
+    var l = isLaje();
+    $('t-viga').setAttribute('aria-pressed', l ? 'false' : 'true');
+    $('t-laje').setAttribute('aria-pressed', l ? 'true' : 'false');
+    Array.prototype.forEach.call(document.querySelectorAll('.onlyviga'), function (el) { el.hidden = l; });
+    $('lphiT').hidden = l;
+    $('bw').disabled = l; if (l) { state.bw = '100'; $('bw').value = '100'; }
+    $('lbw').firstChild.nodeValue = l ? 'Largura da faixa ' : 'bw ';
+    $('lramos').textContent = l ? 'Ramos por metro (se armar ao cisalhamento)' : 'Ramos do estribo';
+    $('hef').textContent = l ? 'Esforços por metro' : 'Esforços';
+    $('efhint').textContent = l ? 'Mk e Vk são os esforços característicos por metro de largura. Os esforços de cálculo são majorados por γf = 1,4.' : 'Os esforços de cálculo são majorados por γf = 1,4. Tk só é usado no módulo Torção.';
+    $('tipohint').textContent = l ? 'Laje maciça em faixa de 100 cm. Verifica Vsd contra VRd1 e não desenha estribos na seção.' : 'Viga com estribos, seção retangular ou T.';
+    $('cis-laje-opts').hidden = !l;
+    $('tor-laje').hidden = !l; $('tor-viga').hidden = l;
+    $('tor-laje').innerHTML = l ? '<div class="card"><h2>Torção</h2><p class="hint" style="margin:0">A torção é verificada só em vigas. Mude o elemento para Viga para usar este módulo.</p></div>' : '';
+    document.querySelector('.brand span').textContent = (l ? 'Lajes' : 'Vigas') + ' de concreto armado · NBR 6118';
   }
 
   function setTab(t) {
@@ -1106,13 +1337,15 @@ if (typeof module !== 'undefined') module.exports = Motor;
       var t = e.target.closest ? e.target.closest('[data-go]') : null;
       if (t) setTab(t.getAttribute('data-go'));
     });
+    $('t-viga').addEventListener('click', function () { setTipo('viga'); });
+    $('t-laje').addEventListener('click', function () { setTipo('laje'); });
     $('u-kn').addEventListener('click', function () { setUnits('kN'); });
     $('u-tf').addEventListener('click', function () { setUnits('tf'); });
     $('relink').addEventListener('click', function () {
       state.asInfF = ''; state.asSupF = ''; state.c1 = ''; ['asInfF', 'asSupF', 'c1'].forEach(function (k) { $(k).value = ''; }); refresh();
     });
     $('reset').addEventListener('click', function () {
-      KEYS.forEach(function (k) { state[k] = DEFAULTS[k]; });
+      bak = {}; KEYS.forEach(function (k) { state[k] = DEFAULTS[k]; });
       fillInputs(); refresh();
     });
     var hash = (location.hash || '').replace('#', '');
