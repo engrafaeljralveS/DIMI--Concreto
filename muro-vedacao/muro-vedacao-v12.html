@@ -280,10 +280,14 @@ td.txt{font-family:var(--body);text-align:left;color:var(--muted);font-size:12.5
           <label><input type="checkbox" data-v3l="pano" checked> Alvenaria / parede</label>
           <label>Vãos <select id="v3nv"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label>
           <label><input type="checkbox" id="v3xr"> Alvenaria transparente</label>
+          <label><input type="checkbox" data-v3l="pres" checked> Pressão lateral</label>
+          <label><select id="v3case"><option value="E">Vento para o interior + empuxo do vizinho</option><option value="I">Vento para a divisa + empuxo interno</option></select></label>
+          <label><input type="checkbox" data-v3l="sobre" checked> Sobrecarga</label>
         </div>
       </div>
       <div id="v3box" class="v3box"><div id="v3msg" class="note v3msg">Carregando o visualizador 3D…</div></div>
       <div class="legend" id="v3leg"></div>
+      <p class="note" id="v3sel" role="status">Clique num elemento para ver o nome e as dimensões.</p>
     </div>
     <div class="nav"><button class="btn" type="button" data-go="4">← Detalhamento</button></div>
   </section>
@@ -2210,9 +2214,9 @@ function v3init(){if(V3.st)return V3.st;const box=$('v3box');
   const rnd=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});rnd.setPixelRatio(Math.min(2,window.devicePixelRatio||1));box.appendChild(rnd.domElement);
   const scn=new THREE.Scene(),cam=new THREE.PerspectiveCamera(35,1,0.05,500);
   scn.add(new THREE.HemisphereLight(0xffffff,0x8a8070,0.75));const dl=new THREE.DirectionalLight(0xffffff,0.75);dl.position.set(4,9,6);scn.add(dl);const dl2=new THREE.DirectionalLight(0xffffff,0.3);dl2.position.set(-6,4,-5);scn.add(dl2);
-  const ctl=new THREE.OrbitControls(cam,rnd.domElement);ctl.enableDamping=true;ctl.dampingFactor=0.12;ctl.screenSpacePanning=true;ctl.maxPolarAngle=Math.PI*0.98;
+  const ctl=new THREE.OrbitControls(cam,rnd.domElement);{let d0=null;rnd.domElement.addEventListener('pointerdown',e=>{d0=[e.clientX,e.clientY]});rnd.domElement.addEventListener('pointerup',e=>{if(d0&&Math.hypot(e.clientX-d0[0],e.clientY-d0[1])<5&&e.button===0)v3pick(e);d0=null})}ctl.enableDamping=true;ctl.dampingFactor=0.12;ctl.screenSpacePanning=true;ctl.maxPolarAngle=Math.PI*0.98;
   const grp=new THREE.Group();scn.add(grp);
-  const st=V3.st={rnd,scn,cam,ctl,grp,box,ready:false};
+  const st=V3.st={rnd,scn,cam,ctl,grp,box,ready:false};V3.sel=null;
   const size=()=>{const w=box.clientWidth||800,h=box.clientHeight||520;rnd.setSize(w,h,false);rnd.domElement.style.width=w+'px';rnd.domElement.style.height=h+'px';cam.aspect=w/h;cam.updateProjectionMatrix()};
   st.size=size;size();if(window.ResizeObserver)new ResizeObserver(size).observe(box);
   const loop=()=>{requestAnimationFrame(loop);if($('s5').hidden)return;ctl.update();rnd.render(scn,cam)};loop();return st}
@@ -2256,8 +2260,8 @@ function v3tex(cer){const k=cer?'k':'c';V3.tx=V3.tx||{};if(V3.tx[k])return V3.tx
   const c=document.createElement('canvas');c.width=256;c.height=128;const g=c.getContext('2d');g.fillStyle=cer?'#c8775c':'#aab3bc';g.fillRect(0,0,256,128);
   g.strokeStyle=cer?'#8f4a35':'#6f7a85';g.lineWidth=4;g.beginPath();[0,64,128].forEach(y=>{g.moveTo(0,y);g.lineTo(256,y)});[0,128,256].forEach(x=>{g.moveTo(x,0);g.lineTo(x,64)});[64,192].forEach(x=>{g.moveTo(x,64);g.lineTo(x,128)});g.stroke();
   const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=4;return V3.tx[k]=t}
-function v3build(R){const st=V3.st;if(!st)return;const G0=v3geo(R),g=st.grp;
-  while(g.children.length){const c=g.children.pop();c.geometry&&c.geometry.dispose();if(c.material){c.material.map&&c.material.map.dispose();c.material.dispose()}}
+function v3build(R){const st=V3.st;if(!st)return;V3.sel=null;const G0=v3geo(R),g=st.grp;
+  while(g.children.length){g.children.pop().traverse(c=>{c.geometry&&c.geometry.dispose();if(c.material){c.material.map&&c.material.map.dispose();c.material.dispose()}})}
   const xr=$('v3xr')&&$('v3xr').checked;
   const M={conc:[0xcfd3d8,1],cw:[0xcfd3d8,1],grout:[0xb7b0a5,1],blk:[G0.cer?0xc8775c:0xa9b2bb,xr?0.35:1],soilE:[0xb58a52,0.28],soilI:[0xc29a5e,0.28]};
   const on={};document.querySelectorAll('[data-v3l]').forEach(c=>on[c.dataset.v3l]=c.checked);
@@ -2265,21 +2269,62 @@ function v3build(R){const st=V3.st;if(!st)return;const G0=v3geo(R),g=st.grp;
     const geo=new THREE.BoxGeometry(p.x2-p.x1,p.y2-p.y1,p.z2-p.z1);
     const mat=new THREE.MeshLambertMaterial({color:col,transparent:tr,opacity:op,depthWrite:!tr,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1});
     if(p.mat==='blk'){const tx=v3tex(G0.cer).clone();tx.needsUpdate=true;tx.repeat.set((p.z2-p.z1)/(G0.bl[0]*2),(p.y2-p.y1)/(G0.bl[1]*2));mat.map=tx;mat.color.set(0xffffff)}
-    const m=new THREE.Mesh(geo,mat);m.position.set((p.x1+p.x2)/2,(p.y1+p.y2)/2,(p.z1+p.z2)/2);m.userData.name=p.name;g.add(m);
+    const m=new THREE.Mesh(geo,mat);m.position.set((p.x1+p.x2)/2,(p.y1+p.y2)/2,(p.z1+p.z2)/2);Object.assign(m.userData,p);g.add(m);
     if(p.lay!=='solo'){const e=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:0x3a4550,transparent:true,opacity:p.mat==='blk'&&xr?0.35:0.7}));e.position.copy(m.position);g.add(e)}});
+  // ações: pressão lateral (vento + empuxo ativo do caso escolhido) e sobrecarga nos terrenos
+  if(on.pres!==false)v3press(R,G0,g);
+  if(on.sobre!==false)v3surch(R,G0,g);
   // linha da divisa e níveis do terreno
   if(!R.cen){const pts=[new THREE.Vector3(0,I.NTopo+0.4,G0.z1-0.4),new THREE.Vector3(0,I.NTopo+0.4,G0.z2+0.4)];const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineDashedMaterial({color:0xb3261e,dashSize:0.2,gapSize:0.1}));l.computeLineDistances();g.add(l)}
   st.ext={x:[G0.xMin,G0.xMax],y:[G0.yb,I.NTopo],z:[G0.z1-0.4,G0.z2+0.4]};
   const bg=getComputedStyle(document.body).getPropertyValue('--paper').trim()||'#ffffff';try{st.rnd.setClearColor(new THREE.Color(bg))}catch(e){st.rnd.setClearColor(0xffffff)}
-  $('v3leg').innerHTML=[['conc','Concreto'],...(R.CW?[['cw','Parede de concreto']]:[]),['blk',G0.cer?'Bloco cerâmico':'Bloco de concreto'],['soilE','Solo']].map(([k,n])=>`<span><i style="background:#${M[k][0].toString(16).padStart(6,'0')}"></i>${n}</span>`).join('')+`<span>${R.cen?'':'Linha vermelha tracejada: divisa · '}na vista lateral, o lado do vizinho fica à esquerda</span>`;
+  $('v3leg').innerHTML=[['conc','Concreto'],...(R.CW?[['cw','Parede de concreto']]:[]),['blk',G0.cer?'Bloco cerâmico':'Bloco de concreto'],['soilE','Solo']].map(([k,n])=>`<span><i style="background:#${M[k][0].toString(16).padStart(6,'0')}"></i>${n}</span>`).join('')+(on.pres!==false?`<span><i style="background:#2f6fd0;opacity:.5"></i>Pressão lateral característica (${V3.legPres}), em escala gráfica</span>`:'')+(on.sobre!==false&&(R.qE>0||R.qI>0)?`<span><i style="background:#c8902e;opacity:.6"></i>Sobrecarga no terreno</span>`:'')+`<span>${R.cen?'':'Linha vermelha tracejada: divisa · '}na vista lateral, o lado do vizinho fica à esquerda</span>`;
   if(!V3.cam)v3view('iso')}
+// rótulo sempre visível (sprite)
+function v3label(txt,pos,col='#1c5ca3',h=0.26){const c=document.createElement('canvas'),g=c.getContext('2d');g.font='600 44px Arial';const w=Math.ceil(g.measureText(txt).width)+24;c.width=w;c.height=64;
+  g.font='600 44px Arial';g.fillStyle='rgba(255,255,255,.88)';g.fillRect(0,0,w,64);g.fillStyle=col;g.textBaseline='middle';g.fillText(txt,12,34);
+  const t=new THREE.CanvasTexture(c),sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true}));sp.scale.set(h*w/64,h,1);sp.position.copy(pos);sp.renderOrder=10;return sp}
+function v3arrow(g,from,dir,len,col){if(len<0.04)return;const a=new THREE.ArrowHelper(dir.clone().normalize(),from,len,col,Math.min(0.12,len*0.45),Math.min(0.07,len*0.3));g.add(a)}
+// pressão lateral com sinal (+ empurra para o interior), kN/m², no caso escolhido
+function v3case(){const v=$('v3case')?$('v3case').value:'E';return v==='I'?{c:-1,k:1,lab:'vento para a divisa + empuxo ativo interno'}:{c:1,k:0,lab:'vento para o interior + empuxo ativo do vizinho'}}
+function v3press(R,G0,g){const D=R.D,C=v3case(),EC=R.EC[C.k];const pr=[];
+  for(let i=0;i<=D.n;i+=5)pr.push([D.Y[i],C.c*D.WW[i]+EC.WE[i]]);if(D.n%5)pr.push([D.Y[D.n],C.c*D.WW[D.n]+EC.WE[D.n]]);
+  const pm=Math.max(1e-6,...pr.map(q=>Math.abs(q[1]))),k=1.0/pm,xE=Math.min(0,R.fx0,R.px0),xI=Math.max(R.t/100,R.bp/100,R.px0+R.bpe/100),z1=G0.z1,L=G0.z2-G0.z1;
+  const col=0x2f6fd0,mat=new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0.18,side:THREE.DoubleSide,depthWrite:false});
+  [1,-1].forEach(sg=>{const x0=sg>0?xE:xI,sh=new THREE.Shape();let any=false;sh.moveTo(x0,pr[0][0]);
+    pr.forEach(([y,p])=>{const v=Math.max(0,sg*p);if(v>1e-9)any=true;sh.lineTo(x0-sg*v*k,y)});sh.lineTo(x0,pr[pr.length-1][0]);sh.lineTo(x0,pr[0][0]);if(!any)return;
+    const geo=new THREE.ExtrudeGeometry(sh,{depth:L,bevelEnabled:false}),m=new THREE.Mesh(geo,mat.clone());m.position.z=z1;m.userData.load=true;g.add(m);
+    const e=new THREE.LineSegments(new THREE.EdgesGeometry(geo,30),new THREE.LineBasicMaterial({color:col,transparent:true,opacity:.55}));e.position.z=z1;g.add(e);
+    // setas a cada ~0,4 m em algumas posições ao longo do muro
+    const zA=[0.12,0.5,0.88].map(u=>z1+u*L),nA=Math.max(4,Math.round((I.NTopo-I.Nf)/0.4));
+    for(let j=0;j<=nA;j++){const y=I.NTopo-(j+0.5)*(I.NTopo-I.Nf)/(nA+1);
+      const pp=Math.max(0,sg*(C.c*R.at(D.WW,y)+R.at(EC.WE,y)));if(pp*k<0.06)continue;
+      zA.forEach(z=>v3arrow(g,new THREE.Vector3(x0-sg*pp*k,y,z),new THREE.Vector3(sg,0,0),pp*k-0.01,col))}
+    // rótulo do valor máximo deste lado
+    let iy=0,vm=0;pr.forEach(([y,p],i)=>{const v=sg*p;if(v>vm){vm=v;iy=i}});
+    if(vm>0)g.add(v3label(`${f(vm)} kN/m²`,new THREE.Vector3(x0-sg*(vm*k+0.35),pr[iy][0],z1+L+0.05)))});
+  V3.legPres=C.lab}
+function v3surch(R,G0,g){const col=0xc8902e,xE=Math.min(0,R.fx0,R.px0),xI=Math.max(R.t/100,R.bp/100,R.px0+R.bpe/100),z1=G0.z1-0.4,z2=G0.z2+0.4;
+  [[R.qE,G0.xMin,xE,I.NT2],[R.qI,xI,G0.xMax,I.NT]].forEach(([q,a,b,y])=>{if(!(q>0)||b-a<0.05)return;const h=0.06;
+    const geo=new THREE.BoxGeometry(b-a,h,z2-z1),m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0.22,depthWrite:false}));m.position.set((a+b)/2,y+0.45,(z1+z2)/2);m.userData.load=true;g.add(m);
+    const e=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:col}));e.position.copy(m.position);g.add(e);
+    const nx=Math.max(2,Math.round((b-a)/0.8)),nz=Math.max(3,Math.round((z2-z1)/1.2));
+    for(let i=0;i<nx;i++)for(let j=0;j<nz;j++)v3arrow(g,new THREE.Vector3(a+(i+.5)*(b-a)/nx,y+0.42,z1+(j+.5)*(z2-z1)/nz),new THREE.Vector3(0,-1,0),0.4,0x9a6a1c);
+    g.add(v3label(`q = ${f(q)} kN/m²`,new THREE.Vector3((a+b)/2,y+0.75,z2),'#8a5a12'))})}
+// seleção por clique (sem arrastar)
+function v3pick(ev){const st=V3.st;if(!st)return;const r=st.rnd.domElement.getBoundingClientRect(),m=new THREE.Vector2((ev.clientX-r.left)/r.width*2-1,-(ev.clientY-r.top)/r.height*2+1);
+  const rc=new THREE.Raycaster();rc.setFromCamera(m,st.cam);const hit=rc.intersectObjects(st.grp.children.filter(o=>o.isMesh&&o.userData.name&&!(o.material.transparent&&o.material.opacity<0.5)),false)[0];
+  if(V3.sel){V3.sel.material.emissive&&V3.sel.material.emissive.setHex(0);V3.sel=null}
+  const out=$('v3sel');if(!hit){if(out)out.textContent='Clique num elemento para ver o nome e as dimensões.';return}
+  const o=hit.object,p=o.userData;V3.sel=o;o.material.emissive&&o.material.emissive.setHex(0x553300);
+  if(out)out.textContent=`${p.name[0].toUpperCase()+p.name.slice(1)}: ${f(p.x2-p.x1)} m (transversal) × ${f(p.z2-p.z1)} m (ao longo do muro) × ${f(p.y2-p.y1)} m (altura), de ${sgn(p.y1)} a ${sgn(p.y2)}`}
 function v3view(k){const st=V3.st;if(!st||!st.ext)return;V3.cam=k;const e=st.ext,c=new THREE.Vector3((e.x[0]+e.x[1])/2,(e.y[0]+e.y[1])/2,(e.z[0]+e.z[1])/2);
   const D=Math.max(e.x[1]-e.x[0],e.y[1]-e.y[0],e.z[1]-e.z[0])*1.9;
-  const dir={iso:[1,0.55,-0.85],int:[1,0.12,0],viz:[-1,0.12,0],lat:[0,0.12,1],top:[0.001,1,0]}[k]||[1,.55,-.85];
+  const sx=(V3.st&&$('v3case')&&$('v3case').value==='I')?1:-1,dir={iso:[sx,0.55,-0.85],int:[1,0.12,0],viz:[-1,0.12,0],lat:[0,0.12,1],top:[0.001,1,0]}[k]||[1,.55,-.85];
   const v=new THREE.Vector3(...dir).normalize().multiplyScalar(D);st.cam.position.copy(c.clone().add(v));st.cam.up.set(0,1,0);st.ctl.target.copy(c);st.cam.lookAt(c);st.ctl.update()}
 function v3show(){const msg=$('v3msg');v3load().then(()=>{v3init();if(msg)msg.hidden=true;V3.st.size();v3build(calc())}).catch(()=>{if(msg){msg.hidden=false;msg.textContent='Não foi possível carregar o visualizador 3D (biblioteca Three.js da internet). Verifique a conexão e abra a aba de novo.'}})}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-v3view]');if(b)v3view(b.dataset.v3view)});
-document.addEventListener('change',e=>{if(e.target.closest('[data-v3l]')||e.target.id==='v3nv'||e.target.id==='v3xr'){if(V3.st)v3build(calc());if(e.target.id==='v3nv')v3view(V3.cam||'iso')}});
+document.addEventListener('change',e=>{if(e.target.closest('[data-v3l]')||e.target.id==='v3nv'||e.target.id==='v3xr'||e.target.id==='v3case'){if(V3.st)v3build(calc());if(e.target.id==='v3nv'||e.target.id==='v3case')v3view(V3.cam||'iso')}});
 
 /* ---------- navegação ---------- */
 function go(n){[1,2,3,4,5].forEach(i=>$('s'+i).hidden=i!==n);if(n===5)v3show();
