@@ -164,13 +164,13 @@ details .body{padding:0 16px 12px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
 .foot{margin-top:22px;font-size:12px;color:var(--muted);max-width:90ch}
 .foot b{color:var(--ink)}
-.grow{display:grid;grid-template-columns:128px 176px 74px 84px 96px 1fr 34px;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+.grow{display:grid;grid-template-columns:128px 176px 120px 74px 84px 96px 1fr 34px;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
 .grow .n{font-weight:600;font-size:13px}.grow .gs{font:12px var(--f-mono);color:var(--muted)}
-.ghd{display:grid;grid-template-columns:128px 176px 74px 84px 96px 1fr 34px;gap:8px;font:11px var(--f-mono);color:var(--muted);margin-bottom:2px}
+.ghd{display:grid;grid-template-columns:128px 176px 120px 74px 84px 96px 1fr 34px;gap:8px;font:11px var(--f-mono);color:var(--muted);margin-bottom:2px}
 #tor-viga{display:flex;flex-direction:column;gap:14px}
 .chk{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:5px 0;border-top:1px solid var(--line);font-size:13px}
 .chk small{display:block;color:var(--muted);font:11.5px var(--f-mono)}
-@media (max-width:760px){.grow,.ghd{grid-template-columns:90px 1fr 60px 70px 34px}.grow .gs,.ghd span:nth-child(6){grid-column:1/-1}.grow select:nth-of-type(2){grid-column:auto}}
+@media (max-width:760px){.grow,.ghd{grid-template-columns:90px 1fr 1fr 60px 70px 34px}.grow .gs,.ghd span:nth-child(7){grid-column:1/-1}.grow select:nth-of-type(2){grid-column:auto}}
 .seg.full{display:flex;width:100%}.seg.full button{flex:1}
 .elem{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 [hidden]{display:none !important}
@@ -781,12 +781,17 @@ var Motor = (function () {
   // Grupo 1 = estribo fechado na seção vazada (pernas externas, resistem à torção); demais = pernas adicionais.
   function estribosTorcao(r, groups) {
     var legsTot = 0;
-    groups.forEach(function (g) { g.legs = (g.tipo === 'f' ? 2 : 1) * g.qtd; legsTot += g.legs; });
-    var out = { groups: groups, legsTot: legsTot, Aswt: r.Aswt, Aswc: r.AswcFinal, Aswmin: r.Aswmin };
+    var nT = 0;
+    groups.forEach(function (g) {
+      g.legs = (g.tipo === 'f' ? 2 : 1) * g.qtd; legsTot += g.legs;
+      g.tor = g.tipo === 'f' && g.tor !== false;           // só estribo fechado participa da torção
+      if (g.tor) nT += g.qtd;
+    });
+    var out = { groups: groups, legsTot: legsTot, nT: nT, Aswt: r.Aswt, Aswc: r.AswcFinal, Aswmin: r.Aswmin };
     var Atot = 0;
     groups.forEach(function (g, k) {
       var Ab = area(g.phi);
-      var need = Math.max((k === 0 ? r.Aswt : 0) + r.AswcFinal / Math.max(legsTot, 1), r.Aswmin / Math.max(legsTot, 1));
+      var need = Math.max((g.tor ? r.Aswt / nT : 0) + r.AswcFinal / Math.max(legsTot, 1), r.Aswmin / Math.max(legsTot, 1));
       g.Ab = Ab; g.sAuto = Math.min(r.smax, Math.trunc(Ab * 100 / need + EPS));
       g.auto = !(g.s > 0); g.sUse = g.auto ? g.sAuto : g.s;
       g.A = g.sUse > 0 ? g.legs * Ab * 100 / g.sUse : 0;           // cm²/m
@@ -796,13 +801,14 @@ var Motor = (function () {
       Atot += g.A;
     });
     out.Atot = Atot;
-    var g0 = groups[0];
-    out.closedOk = !!g0 && g0.tipo === 'f' && g0.qtd >= 1;
-    out.a1 = g0 ? g0.a : 0;
+    var torSum = 0;
+    groups.forEach(function (g) { if (g.tor) torSum += g.qtd * g.a; });
+    out.closedOk = nT >= 1;
+    out.a1 = torSum;
     var cisPerna = r.AswcFinal / Math.max(legsTot, 1);          // cisalhamento dividido igualmente entre as pernas
-    out.cisPerna = cisPerna; out.reqOuter = r.Aswt + cisPerna;
-    out.torsOk = out.closedOk && out.a1 + 1e-9 >= out.reqOuter;
-    out.shearOk = groups.slice(1).every(function (g) { return g.a + 1e-9 >= cisPerna; });
+    out.cisPerna = cisPerna; out.reqOuter = r.Aswt + nT * cisPerna;
+    out.torsOk = out.closedOk && torSum + 1e-9 >= out.reqOuter;
+    out.shearOk = groups.every(function (g) { return g.a + 1e-9 >= cisPerna; });
     out.minOk = Atot + 1e-9 >= r.Aswmin;
     out.sOk = groups.every(function (g) { return g.sOk; });
     out.phiOk = groups.every(function (g) { return g.phiOk; });
@@ -917,13 +923,15 @@ if (typeof module !== 'undefined') module.exports = Motor;
   function parseGroups(str) {
     var a = String(str || '').split('|').filter(Boolean).map(function (t) {
       var p = t.split(':');
-      return { tipo: p[0] === 'p' ? 'p' : 'f', qtd: p[1] === undefined ? '1' : p[1], phi: p[2] === undefined ? '8' : p[2], s: p[3] === undefined ? '' : p[3] };
+      var tp = p[0] === 'p' ? 'p' : 'f';
+      return { tipo: tp, qtd: p[1] === undefined ? '1' : p[1], phi: p[2] === undefined ? '8' : p[2], s: p[3] === undefined ? '' : p[3], tor: p[4] === undefined ? '' : p[4] };
     });
-    if (!a.length) a = [{ tipo: 'f', qtd: '1', phi: '8', s: '' }];
+    if (!a.length) a = [{ tipo: 'f', qtd: '1', phi: '8', s: '', tor: '1' }];
+    a.forEach(function (g, k) { if (g.tor === '') g.tor = k === 0 ? '1' : '0'; if (g.tipo === 'p') g.tor = '0'; });
     a[0].tipo = 'f';
     return a;
   }
-  function serGroups(a) { return a.map(function (g) { return g.tipo + ':' + g.qtd + ':' + g.phi + ':' + g.s; }).join('|'); }
+  function serGroups(a) { return a.map(function (g) { return g.tipo + ':' + g.qtd + ':' + g.phi + ':' + g.s + ':' + (g.tipo === 'p' ? '0' : g.tor); }).join('|'); }
   function serLay(a) { return a.map(function (l) { return l.phi + ':' + l.n; }).join('|'); }
   var isLaje = function () { return state.tipo === 'laje'; };
   var isTf = function () { return state.unid === 'tf'; };
@@ -1059,7 +1067,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
     out.tor = { errs: te };
     var grp = parseGroups(state.estTor).map(function (x, k) {
       var q = Math.round(num(x.qtd)); var ph = k === 0 ? g.phiT : num(x.phi);
-      return { tipo: x.tipo, qtd: q >= 1 ? q : 1, phi: isFinite(ph) ? ph : g.phiT, s: x.s === '' ? 0 : num(x.s) };
+      return { tipo: x.tipo, qtd: q >= 1 ? q : 1, phi: isFinite(ph) ? ph : g.phiT, s: x.s === '' ? 0 : num(x.s), tor: x.tor === '1' };
     });
     var legsG = grp.reduce(function (a, x) { return a + (x.tipo === 'f' ? 2 : 1) * x.qtd; }, 0);
     if (!te.length) {
@@ -1483,8 +1491,8 @@ if (typeof module !== 'undefined') module.exports = Motor;
     if (t.errs.length || !t.r || t.r.esmagamento || !t.est) { box.innerHTML = ''; return; }
     var r = t.r, e = t.est;
     var h = '<div class="adopt" style="margin-top:8px">' +
-      chk('Estribo fechado do ramo 1 (torção + cisalhamento)', 'a = ' + f(e.a1, 2) + ' cm²/m por perna · necessária ' + f(e.reqOuter, 2) + ' cm²/m (Aswt ' + f(r.Aswt, 2) + ' + cisalhamento ' + f(e.cisPerna, 2) + ')', e.torsOk, e.torsOk ? 'Suficiente' : (e.closedOk ? 'Insuficiente' : 'Precisa ser fechado')) +
-      (e.groups.length > 1 ? chk('Pernas adicionais (cisalhamento)', 'cada perna precisa de ' + f(e.cisPerna, 2) + ' cm²/m', e.shearOk, e.shearOk ? 'Suficiente' : 'Insuficiente') : '') +
+      chk('Ramos que participam da torção (' + e.nT + ' perna' + (e.nT === 1 ? '' : 's') + ' por lado)', 'a = ' + f(e.a1, 2) + ' cm²/m · necessária ' + f(e.reqOuter, 2) + ' cm²/m (Aswt ' + f(r.Aswt, 2) + ' + cisalhamento ' + f(e.nT * e.cisPerna, 2) + ')', e.torsOk, e.torsOk ? 'Suficiente' : (e.closedOk ? 'Insuficiente' : 'Nenhum ramo participa')) +
+      (e.groups.length > 1 ? chk('Todas as pernas (cisalhamento)', 'cada perna precisa de ' + f(e.cisPerna, 2) + ' cm²/m', e.shearOk, e.shearOk ? 'Suficiente' : 'Insuficiente') : '') +
       chk('Armadura transversal mínima', 'total ' + f(e.Atot, 2) + ' cm²/m · mínimo ' + f(r.Aswmin, 2) + ' cm²/m', e.minOk, e.minOk ? 'Atende' : 'Abaixo do mínimo') +
       chk('Espaçamento máximo', 'smáx = ' + r.smax + ' cm' + (e.groups.some(function (g) { return g.curto; }) ? ' · há espaçamento menor que 7 cm' : ''), e.sOk, e.sOk ? 'Atende' : 'Acima de smáx') +
       chk('Diâmetro', 'Φ entre 5 mm e ' + phiTxt(r.phiMax) + ' mm', e.phiOk, e.phiOk ? 'Atende' : 'Fora do limite') +
@@ -1503,11 +1511,12 @@ if (typeof module !== 'undefined') module.exports = Motor;
   var GPHIS = ['5', '6.3', '8', '10', '12.5', '16'];
   function buildGroups() {
     var arr = parseGroups(state.estTor), box = $('tor-groups');
-    var h = '<div class="ghd"><span></span><span>Tipo</span><span>Quantidade</span><span>Φ (mm)</span><span>s (cm)</span><span>Resumo</span><span></span></div>';
+    var h = '<div class="ghd"><span></span><span>Tipo</span><span>Na torção</span><span>Quantidade</span><span>Φ (mm)</span><span>s (cm)</span><span>Resumo</span><span></span></div>';
     arr.forEach(function (g, k) {
       var phi = k === 0 ? state.phiT : g.phi;
       h += '<div class="grow"><span class="n">Ramo ' + (k + 1) + (k === 0 ? ' · seção vazada' : '') + '</span>' +
         '<select class="gt"' + (k === 0 ? ' disabled' : '') + '><option value="f"' + (g.tipo === 'f' ? ' selected' : '') + '>Estribo fechado</option><option value="p"' + (g.tipo === 'p' ? ' selected' : '') + '>Perna simples</option></select>' +
+        '<select class="gtor" aria-label="Participação do ramo ' + (k + 1) + ' na torção"' + (g.tipo === 'p' ? ' disabled' : '') + '><option value="1"' + (g.tor === '1' ? ' selected' : '') + '>Participa</option><option value="0"' + (g.tor !== '1' ? ' selected' : '') + '>Só cisalhamento</option></select>' +
         '<input class="gq" inputmode="numeric" aria-label="Quantidade do ramo ' + (k + 1) + '" value="' + esc(g.qtd) + '">' +
         '<select class="gp" aria-label="Diâmetro do ramo ' + (k + 1) + '">' + GPHIS.map(function (p) { return '<option' + (num(p) === num(phi) ? ' selected' : '') + '>' + p + '</option>'; }).join('') + '</select>' +
         '<input class="gsp" inputmode="decimal" aria-label="Espaçamento do ramo ' + (k + 1) + '" value="' + esc(g.s) + '" placeholder="automático">' +
@@ -1519,7 +1528,9 @@ if (typeof module !== 'undefined') module.exports = Motor;
     function read() {
       var out = [];
       Array.prototype.forEach.call(box.querySelectorAll('.grow'), function (row, k) {
-        out.push({ tipo: k === 0 ? 'f' : row.querySelector('.gt').value, qtd: row.querySelector('.gq').value.trim() || '1', phi: row.querySelector('.gp').value, s: row.querySelector('.gsp').value.trim() });
+        var tp = k === 0 ? 'f' : row.querySelector('.gt').value, ts = row.querySelector('.gtor');
+        ts.disabled = tp === 'p'; if (tp === 'p') ts.value = '0';
+        out.push({ tipo: tp, qtd: row.querySelector('.gq').value.trim() || '1', phi: row.querySelector('.gp').value, s: row.querySelector('.gsp').value.trim(), tor: row.querySelector('.gtor').value });
       });
       return out;
     }
@@ -1529,13 +1540,14 @@ if (typeof module !== 'undefined') module.exports = Motor;
         if (k === 0) { state.phiT = a[0].phi; $('phiT').value = state.phiT; $('phiT2').value = state.phiT; }
         refresh();
       };
-      ['gt', 'gp'].forEach(function (cl) { row.querySelector('.' + cl).addEventListener('change', upd); });
+      ['gt', 'gtor', 'gp'].forEach(function (cl) { row.querySelector('.' + cl).addEventListener('change', upd); });
       ['gq', 'gsp'].forEach(function (cl) { row.querySelector('.' + cl).addEventListener('input', upd); });
+      row.querySelector('.gt').addEventListener('change', function () { if (this.value === 'p') row.querySelector('.gtor').value = '0'; });
       var x = row.querySelector('.lx');
       if (x) x.addEventListener('click', function () { var a = read(); a.splice(k, 1); state.estTor = serGroups(a); buildGroups(); refresh(); });
     });
     box.querySelector('.ladd').addEventListener('click', function () {
-      var a = read(); a.push({ tipo: 'p', qtd: '1', phi: a[a.length - 1].phi, s: '' }); state.estTor = serGroups(a); buildGroups(); refresh();
+      var a = read(); a.push({ tipo: 'p', qtd: '1', phi: a[a.length - 1].phi, s: '', tor: '0' }); state.estTor = serGroups(a); buildGroups(); refresh();
     });
   }
 
@@ -1923,9 +1935,9 @@ if (typeof module !== 'undefined') module.exports = Motor;
           var te = t.est;
           if (te) {
             b += D.p('Estribos adotados (ramos):', { b: true });
-            b += D.tabelaGrade(['Ramo', 'Tipo', 'Qtd.', 'Φ (mm)', 's (cm)'], te.groups.map(function (x, k) {
-              return [String(k + 1), x.tipo === 'f' ? 'Estribo fechado' : 'Perna simples', String(x.qtd), phiTxt(x.phi), f(x.sUse, 0)];
-            }), [1000, 3300, 1500, 1900, 1938]);
+            b += D.tabelaGrade(['Ramo', 'Tipo', 'Na torção', 'Qtd.', 'Φ (mm)', 's (cm)'], te.groups.map(function (x, k) {
+              return [String(k + 1), x.tipo === 'f' ? 'Estribo fechado' : 'Perna simples', x.tor ? 'Participa' : 'Só cisalhamento', String(x.qtd), phiTxt(x.phi), f(x.sUse, 0)];
+            }), [800, 2300, 2100, 1100, 1600, 1738]);
             b += D.p('Total de ' + te.legsTot + ' pernas (mínimo ' + te.nMin + '); Asw total = ' + f(te.Atot, 2) + ' cm²/m. ' + (te.ok ? 'Todas as verificações atendem.' : 'Há verificações pendentes: reveja os estribos.'), { b: true });
           }
         }
