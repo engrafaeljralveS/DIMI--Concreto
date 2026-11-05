@@ -1,6 +1,6 @@
-# Muro de vedação – v11
+# Muro de vedação – v12
 
-Aplicativo em uma única página HTML para dimensionar muro de vedação de divisa. Para usar: https://engrafaeljralves.github.io/DIMI--Concreto/muro-vedacao/ (GitHub Pages), ou abra `muro-vedacao-v11.html` no navegador.
+Aplicativo em uma única página HTML para dimensionar muro de vedação de divisa. Para usar: https://engrafaeljralves.github.io/DIMI--Concreto/muro-vedacao/ (GitHub Pages), ou abra `muro-vedacao-v12.html` no navegador.
 
 **Sistemas**
 - Pilares de concreto com alvenaria de vedação, baldrame, cinta superior e sapata isolada ou corrida, de divisa ou centrada.
@@ -43,3 +43,7 @@ Versões anteriores ficam na mesma pasta (por exemplo, `muro-vedacao-v6.html`).
 - Modelo do eixo do pilar ao meio do vão (simetria), base engastada na sapata, topo livre com a reação do pano na parede e o cortante e o momento do pilar acima na largura do pilar; dois limites para o pano (parcela na base ou inteiro no pilar).
 - Pilar na altura da parede dimensionado pelos esforços da sua faixa na placa; memorial e diagramas atualizados.
 - Memorial lista só os dados usados; item 4.3 enxuto.
+
+## v12
+- Nova aba **3D**: modelo do muro (sapata, pescoços ou baldrame, pilares, cintas, canaletas, pano de alvenaria com textura de blocos, parede de concreto, solo dos dois lados e divisa) com rotação, zoom e deslocamento (Three.js r147 + OrbitControls, carregados do jsDelivr só quando a aba é aberta).
+- Vistas rápidas (isométrica, lado interno, lado do vizinho, lateral, topo), camadas liga/desliga, alvenaria transparente e escolha de 1 a 4 vãos; o modelo acompanha os dados.
