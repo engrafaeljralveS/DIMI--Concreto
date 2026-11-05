@@ -79,6 +79,15 @@ input.auto{color:var(--muted);font-style:italic}
 .hint button{border:0;background:none;color:var(--accent);cursor:pointer;padding:0;text-decoration:underline;font-size:12px}
 .btn{border:1px solid var(--line);background:var(--panel);border-radius:5px;padding:6px 12px;font-family:var(--f-display);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:15px;cursor:pointer}
 .btn:hover{border-color:var(--ink)}
+.dlg{border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);padding:0;width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 48px)}
+.dlg::backdrop{background:rgba(0,0,0,.45)}
+.dlg .in{padding:16px 18px;overflow:auto;max-height:calc(100vh - 56px)}
+.dlg h2{margin:0 0 10px;font-size:16px}.dlg h3{margin:16px 0 6px;font:12px var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.dlg .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.dlg .row>input[type=text]{flex:1 1 220px}
+.dlg ul{list-style:none;margin:0;padding:0}.dlg li{display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.dlg li .nm{flex:1 1 180px;min-width:0}.dlg li .nm b{display:block;overflow-wrap:anywhere}.dlg li .nm small{color:var(--muted);font:12px var(--f-mono)}
+.dlg .sm{padding:4px 10px;font-size:13px}.dlg .msg{min-height:20px;font-size:13px;color:var(--muted);margin-top:8px}
+
 .fixed{font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
 
 /* Resultados */
@@ -196,6 +205,7 @@ details .body{padding:0 16px 12px}
           <button type="button" id="u-tf" aria-pressed="false">tf · tf·m</button>
         </div>
         <span class="fixed" id="memMsg" role="status" aria-live="polite"></span>
+        <button type="button" class="btn" id="calcs">Salvar e abrir cálculos</button>
         <button type="button" class="btn" id="memorial">Gerar memorial de cálculo</button>
       </div>
     </div>
@@ -356,6 +366,19 @@ details .body{padding:0 16px 12px}
   <p class="foot"><b>Importante.</b> O motor de cálculo reproduz as abas Flexão, Cisalhamento e Torção da planilha “1.3.0 - CA - DIM. DE VIGAS”, desenvolvida pelo Eng. Me. André Luís L. Velame Branco. Esta ferramenta deve ser usada apenas para fins didáticos, em auxílio ao estudo do conteúdo das disciplinas de Concreto Armado. A interpretação e a validação dos resultados são de exclusiva responsabilidade do usuário.</p>
 </div>
 
+<dialog class="dlg" id="dlg-calcs" aria-labelledby="dlg-t"><div class="in">
+  <h2 id="dlg-t">Salvar e abrir cálculos</h2>
+  <h3>Salvar o cálculo atual</h3>
+  <div class="row"><input type="text" id="calc-nome" placeholder="Nome do cálculo (ex.: Viga V12 - 25x60)" aria-label="Nome do cálculo" maxlength="80">
+    <button type="button" class="btn sm" id="calc-salvar">Salvar no navegador</button>
+    <button type="button" class="btn sm" id="calc-baixar">Baixar arquivo</button></div>
+  <h3>Abrir um arquivo</h3>
+  <div class="row"><input type="file" id="calc-arq" accept=".json,.dimis,application/json" aria-label="Arquivo de cálculo"></div>
+  <h3>Salvos neste navegador</h3>
+  <ul id="calc-lista"></ul>
+  <div class="msg" id="calc-msg" role="status" aria-live="polite"></div>
+  <div class="row" style="justify-content:flex-end;margin-top:10px"><button type="button" class="btn sm" id="calc-fechar">Fechar</button></div>
+</div></dialog>
 <script>
 /* Motor de cálculo — reproduz as abas Flexão, Cisalhamento e Torção da planilha
    "1.3.0 - CA - DIM. DE VIGAS" (Eng. Me. André Luís L. Velame Branco).
@@ -2009,6 +2032,91 @@ if (typeof module !== 'undefined') module.exports = Motor;
   }
   window.__memorial = { corpo: memorialCorpo, gerar: gerarMemorial };
 
+
+  /* ---------- Salvar, exportar e importar cálculos ---------- */
+  var SALVOS = 'dimis-vigas-salvos';
+  function lerSalvos() { try { var a = JSON.parse(localStorage.getItem(SALVOS) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+  function gravarSalvos(a) { try { localStorage.setItem(SALVOS, JSON.stringify(a)); return true; } catch (e) { return false; } }
+  function pacote(nome) {
+    var est = {}; KEYS.forEach(function (k) { est[k] = String(state[k]); });
+    return { app: 'DIMI-S', versao: 1, nome: nome, data: new Date().toISOString(), estado: est };
+  }
+  function aplicarPacote(p) {
+    if (!p || p.app !== 'DIMI-S' || !p.estado || typeof p.estado !== 'object') throw new Error('Arquivo não é um cálculo do DIMI-S.');
+    var n = 0;
+    KEYS.forEach(function (k) { if (typeof p.estado[k] === 'string' || typeof p.estado[k] === 'number') { state[k] = String(p.estado[k]); n++; } });
+    if (!n) throw new Error('O arquivo não tem dados de cálculo.');
+    if (state.tipo !== 'laje') state.tipo = 'viga';
+    if (state.unid !== 'tf') state.unid = 'kN';
+    save(); fillInputs(); syncTipo(); refresh();
+  }
+  function nomeArq(s) { return (String(s || 'calculo').trim().replace(/[^\w\- ]+/g, '').replace(/\s+/g, '_').slice(0, 60) || 'calculo') + '.dimis.json'; }
+  function entregar(blob, nome) {
+    function viaLink() {
+      var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome;
+      document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      return 'Arquivo baixado: ' + nome;
+    }
+    var cl = window.claude && window.claude.use ? window.claude.use('downloads') : Promise.resolve(null);
+    return cl.then(function (dl) {
+      if (!dl) return viaLink();
+      return dl.save({ filename: nome, data: blob }).then(function () { return 'Arquivo salvo: ' + nome; }, function (e) {
+        return e && e.code === 'declined' ? 'Download cancelado.' : 'Não foi possível salvar o arquivo neste ambiente.';
+      });
+    });
+  }
+  function msgCalc(t) { $('calc-msg').textContent = t; }
+  function listarCalcs() {
+    var ul = $('calc-lista'), a = lerSalvos();
+    ul.innerHTML = a.length ? '' : '<li><span class="nm"><small>Nenhum cálculo salvo ainda.</small></span></li>';
+    a.forEach(function (it) {
+      var li = document.createElement('li');
+      var d = new Date(it.data), tp = it.estado && it.estado.tipo === 'laje' ? 'Laje' : 'Viga';
+      li.innerHTML = '<span class="nm"><b></b><small>' + tp + ' · ' + (isFinite(d) ? d.toLocaleString('pt-BR') : '') + '</small></span>' +
+        '<button type="button" class="btn sm" data-a="abrir">Abrir</button><button type="button" class="btn sm" data-a="baixar">Baixar</button><button type="button" class="btn sm" data-a="excluir">Excluir</button>';
+      li.querySelector('b').textContent = it.nome || 'Sem nome';
+      li.addEventListener('click', function (e) {
+        var b = e.target.closest ? e.target.closest('button[data-a]') : null; if (!b) return;
+        var ac = b.getAttribute('data-a');
+        if (ac === 'abrir') { try { aplicarPacote(it); msgCalc('Aberto: ' + (it.nome || 'Sem nome')); } catch (er) { msgCalc(er.message); } }
+        else if (ac === 'baixar') entregar(new Blob([JSON.stringify(it, null, 1)], { type: 'application/json' }), nomeArq(it.nome)).then(msgCalc);
+        else { gravarSalvos(lerSalvos().filter(function (x) { return x.id !== it.id; })); listarCalcs(); msgCalc('Excluído.'); }
+      });
+      ul.appendChild(li);
+    });
+  }
+  function initCalcs() {
+    var dlg = $('dlg-calcs');
+    $('calcs').addEventListener('click', function () {
+      $('calc-nome').value = ''; msgCalc(''); listarCalcs();
+      if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+    });
+    $('calc-fechar').addEventListener('click', function () { if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); });
+    dlg.addEventListener('click', function (e) { if (e.target === dlg && dlg.close) dlg.close(); });
+    $('calc-salvar').addEventListener('click', function () {
+      var nome = $('calc-nome').value.trim() || ((isLaje() ? 'Laje' : 'Viga') + ' ' + new Date().toLocaleString('pt-BR'));
+      var p = pacote(nome); p.id = String(Date.now()) + Math.random().toString(36).slice(2, 6);
+      var a = lerSalvos(); a.unshift(p);
+      if (gravarSalvos(a)) { listarCalcs(); msgCalc('Salvo neste navegador: ' + nome + '. Use "Baixar arquivo" para guardar uma cópia.'); }
+      else msgCalc('Este navegador não permite guardar dados. Use "Baixar arquivo".');
+    });
+    $('calc-baixar').addEventListener('click', function () {
+      var nome = $('calc-nome').value.trim() || (isLaje() ? 'Laje' : 'Viga');
+      entregar(new Blob([JSON.stringify(pacote(nome), null, 1)], { type: 'application/json' }), nomeArq(nome)).then(msgCalc);
+    });
+    $('calc-arq').addEventListener('change', function () {
+      var fl = this.files && this.files[0], inp = this; if (!fl) return;
+      if (fl.size > 1e6) { msgCalc('Arquivo grande demais para ser um cálculo.'); return; }
+      var fr = new FileReader();
+      fr.onload = function () {
+        try { var p = JSON.parse(fr.result); aplicarPacote(p); msgCalc('Aberto: ' + (p.nome || fl.name)); }
+        catch (er) { msgCalc(er instanceof SyntaxError ? 'Arquivo inválido: não é um JSON.' : er.message); }
+        inp.value = '';
+      };
+      fr.readAsText(fl);
+    });
+  }
+
   /* ---------- atualização ---------- */
   function setStatus(id, kind) { var el = $('st-' + id); el.className = 'st ' + kind; }
   function statusOf(errs, r, warn) {
@@ -2195,6 +2303,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
       state.asInfF = ''; state.asSupF = ''; state.c1 = ''; ['asInfF', 'asSupF', 'c1'].forEach(function (k) { $(k).value = ''; }); refresh();
     });
     $('memorial').addEventListener('click', gerarMemorial);
+    initCalcs();
     var hash = (location.hash || '').replace('#', '');
     setTab(['resumo', 'flexao', 'cisalhamento', 'torcao'].indexOf(hash) >= 0 ? hash : 'resumo');
     refresh();
