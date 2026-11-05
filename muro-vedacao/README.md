@@ -46,5 +46,5 @@ Versões anteriores ficam na mesma pasta (por exemplo, `muro-vedacao-v6.html`).
 
 ## v12
 - Nova aba **3D**: modelo do muro (sapata, pescoços ou baldrame, pilares, cintas, canaletas, pano de alvenaria com textura de blocos, parede de concreto, solo dos dois lados e divisa) com rotação, zoom e deslocamento (Three.js r147 + OrbitControls, carregados do jsDelivr só quando a aba é aberta).
-- Ações no 3D: diagrama de pressão lateral (vento + empuxo ativo, nos dois casos de cálculo) com setas e valor máximo, sobrecarga nos terrenos e seleção de elementos por clique com nome e dimensões.
+- Ações no 3D por componente: vento, empuxo ativo de cada lado (tardoz) e passivo resistente × fator, com opção "Todos os carregamentos", por caso de cálculo ou isoladas com setas e valor máximo, sobrecarga nos terrenos e seleção de elementos por clique com nome e dimensões.
 - Vistas rápidas (isométrica, lado interno, lado do vizinho, lateral, topo), camadas liga/desliga, alvenaria transparente e escolha de 1 a 4 vãos; o modelo acompanha os dados.

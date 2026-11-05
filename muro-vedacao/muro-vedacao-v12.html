@@ -280,8 +280,8 @@ td.txt{font-family:var(--body);text-align:left;color:var(--muted);font-size:12.5
           <label><input type="checkbox" data-v3l="pano" checked> Alvenaria / parede</label>
           <label>Vãos <select id="v3nv"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label>
           <label><input type="checkbox" id="v3xr"> Alvenaria transparente</label>
-          <label><input type="checkbox" data-v3l="pres" checked> Pressão lateral</label>
-          <label><select id="v3case"><option value="E">Vento para o interior + empuxo do vizinho</option><option value="I">Vento para a divisa + empuxo interno</option></select></label>
+          <label><input type="checkbox" data-v3l="pres" checked> Ações laterais</label>
+          <label><select id="v3case" aria-label="Carregamentos mostrados"><option value="T" selected>Todos os carregamentos</option><option value="E">Caso: vento para o interior + ativo do vizinho (+ passivo interno)</option><option value="I">Caso: vento para a divisa + ativo interno (+ passivo do vizinho)</option><option value="W">Só vento</option><option value="A">Só empuxo ativo (dos dois lados)</option><option value="P">Só empuxo passivo</option></select></label>
           <label><input type="checkbox" data-v3l="sobre" checked> Sobrecarga</label>
         </div>
       </div>
@@ -2278,32 +2278,35 @@ function v3build(R){const st=V3.st;if(!st)return;V3.sel=null;const G0=v3geo(R),g
   if(!R.cen){const pts=[new THREE.Vector3(0,I.NTopo+0.4,G0.z1-0.4),new THREE.Vector3(0,I.NTopo+0.4,G0.z2+0.4)];const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineDashedMaterial({color:0xb3261e,dashSize:0.2,gapSize:0.1}));l.computeLineDistances();g.add(l)}
   st.ext={x:[G0.xMin,G0.xMax],y:[G0.yb,I.NTopo],z:[G0.z1-0.4,G0.z2+0.4]};
   const bg=getComputedStyle(document.body).getPropertyValue('--paper').trim()||'#ffffff';try{st.rnd.setClearColor(new THREE.Color(bg))}catch(e){st.rnd.setClearColor(0xffffff)}
-  $('v3leg').innerHTML=[['conc','Concreto'],...(R.CW?[['cw','Parede de concreto']]:[]),['blk',G0.cer?'Bloco cerâmico':'Bloco de concreto'],['soilE','Solo']].map(([k,n])=>`<span><i style="background:#${M[k][0].toString(16).padStart(6,'0')}"></i>${n}</span>`).join('')+(on.pres!==false?`<span><i style="background:#2f6fd0;opacity:.5"></i>Pressão lateral característica (${V3.legPres}), em escala gráfica</span>`:'')+(on.sobre!==false&&(R.qE>0||R.qI>0)?`<span><i style="background:#c8902e;opacity:.6"></i>Sobrecarga no terreno</span>`:'')+`<span>${R.cen?'':'Linha vermelha tracejada: divisa · '}na vista lateral, o lado do vizinho fica à esquerda</span>`;
+  $('v3leg').innerHTML=[['conc','Concreto'],...(R.CW?[['cw','Parede de concreto']]:[]),['blk',G0.cer?'Bloco cerâmico':'Bloco de concreto'],['soilE','Solo']].map(([k,n])=>`<span><i style="background:#${M[k][0].toString(16).padStart(6,'0')}"></i>${n}</span>`).join('')+(on.pres!==false&&V3.legPres?V3.legPres.filter((c,i,a)=>a.findIndex(d=>d.n===c.n)===i).map(c=>`<span><i style="background:#${c.col.toString(16).padStart(6,'0')};opacity:.7"></i>${c.n}</span>`).join('')+'<span>valores característicos; largura em escala gráfica</span>':'')+(on.sobre!==false&&(R.qE>0||R.qI>0)?`<span><i style="background:#c8902e;opacity:.6"></i>Sobrecarga no terreno</span>`:'')+`<span>${R.cen?'':'Linha vermelha tracejada: divisa · '}na vista lateral, o lado do vizinho fica à esquerda</span>`;
   if(!V3.cam)v3view('iso')}
 // rótulo sempre visível (sprite)
 function v3label(txt,pos,col='#1c5ca3',h=0.26){const c=document.createElement('canvas'),g=c.getContext('2d');g.font='600 44px Arial';const w=Math.ceil(g.measureText(txt).width)+24;c.width=w;c.height=64;
   g.font='600 44px Arial';g.fillStyle='rgba(255,255,255,.88)';g.fillRect(0,0,w,64);g.fillStyle=col;g.textBaseline='middle';g.fillText(txt,12,34);
   const t=new THREE.CanvasTexture(c),sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true}));sp.scale.set(h*w/64,h,1);sp.position.copy(pos);sp.renderOrder=10;return sp}
 function v3arrow(g,from,dir,len,col){if(len<0.04)return;const a=new THREE.ArrowHelper(dir.clone().normalize(),from,len,col,Math.min(0.12,len*0.45),Math.min(0.07,len*0.3));g.add(a)}
-// pressão lateral com sinal (+ empurra para o interior), kN/m², no caso escolhido
-function v3case(){const v=$('v3case')?$('v3case').value:'E';return v==='I'?{c:-1,k:1,lab:'vento para a divisa + empuxo ativo interno'}:{c:1,k:0,lab:'vento para o interior + empuxo ativo do vizinho'}}
-function v3press(R,G0,g){const D=R.D,C=v3case(),EC=R.EC[C.k];const pr=[];
-  for(let i=0;i<=D.n;i+=5)pr.push([D.Y[i],C.c*D.WW[i]+EC.WE[i]]);if(D.n%5)pr.push([D.Y[D.n],C.c*D.WW[D.n]+EC.WE[D.n]]);
-  const pm=Math.max(1e-6,...pr.map(q=>Math.abs(q[1]))),k=1.0/pm,xE=Math.min(0,R.fx0,R.px0),xI=Math.max(R.t/100,R.bp/100,R.px0+R.bpe/100),z1=G0.z1,L=G0.z2-G0.z1;
-  const col=0x2f6fd0,mat=new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0.18,side:THREE.DoubleSide,depthWrite:false});
-  [1,-1].forEach(sg=>{const x0=sg>0?xE:xI,sh=new THREE.Shape();let any=false;sh.moveTo(x0,pr[0][0]);
-    pr.forEach(([y,p])=>{const v=Math.max(0,sg*p);if(v>1e-9)any=true;sh.lineTo(x0-sg*v*k,y)});sh.lineTo(x0,pr[pr.length-1][0]);sh.lineTo(x0,pr[0][0]);if(!any)return;
-    const geo=new THREE.ExtrudeGeometry(sh,{depth:L,bevelEnabled:false}),m=new THREE.Mesh(geo,mat.clone());m.position.z=z1;m.userData.load=true;g.add(m);
-    const e=new THREE.LineSegments(new THREE.EdgesGeometry(geo,30),new THREE.LineBasicMaterial({color:col,transparent:true,opacity:.55}));e.position.z=z1;g.add(e);
-    // setas a cada ~0,4 m em algumas posições ao longo do muro
-    const zA=[0.12,0.5,0.88].map(u=>z1+u*L),nA=Math.max(4,Math.round((I.NTopo-I.Nf)/0.4));
-    for(let j=0;j<=nA;j++){const y=I.NTopo-(j+0.5)*(I.NTopo-I.Nf)/(nA+1);
-      const pp=Math.max(0,sg*(C.c*R.at(D.WW,y)+R.at(EC.WE,y)));if(pp*k<0.06)continue;
-      zA.forEach(z=>v3arrow(g,new THREE.Vector3(x0-sg*pp*k,y,z),new THREE.Vector3(sg,0,0),pp*k-0.01,col))}
-    // rótulo do valor máximo deste lado
-    let iy=0,vm=0;pr.forEach(([y,p],i)=>{const v=sg*p;if(v>vm){vm=v;iy=i}});
-    if(vm>0)g.add(v3label(`${f(vm)} kN/m²`,new THREE.Vector3(x0-sg*(vm*k+0.35),pr[iy][0],z1+L+0.05)))});
-  V3.legPres=C.lab}
+// ações laterais por componente (cada uma com sua cor): vento, empuxo ativo de cada lado (tardoz) e passivo resistente (× fator)
+function v3case(){return $('v3case')?$('v3case').value:'T'}
+function v3comps(R){const cs=v3case(),phi=I.phi*Math.PI/180,sKp=Math.sqrt(R.Kp),fp=+I.fp||0;
+  const xE=Math.min(0,R.fx0,R.px0),xI=Math.max(R.t/100,R.bp/100,R.px0+R.bpe/100),xT=Math.max(xI,R.fx0+I.B),xV=Math.min(0,R.fx0);
+  const pas=(gl,y)=>{const d=gl-y;return d>0?fp*(R.Kp*I.gam*d+2*I.c*sKp):0};
+  const W=(sg,x0)=>({k:'W',n:'Vento',col:0x1f9e89,sg,x0,y1:R.Hg,y2:I.NTopo,p:y=>y>=R.Hg?R.pv:0});
+  const AE={k:'AE',n:'Empuxo ativo do vizinho',col:0x2f6fd0,sg:1,x0:xE,y1:I.Nf,y2:I.NT2,p:R.pE},AI={k:'AI',n:'Empuxo ativo interno',col:0x7b4fd0,sg:-1,x0:xI,y1:I.Nf,y2:I.NT,p:R.pI};
+  const PI={k:'PI',n:`Passivo interno (× ${f(fp,2)})`,col:0xd0552f,sg:-1,x0:xT,y1:I.Nf,y2:I.NT,p:y=>pas(I.NT,y)},PE={k:'PE',n:`Passivo do vizinho (× ${f(fp,2)})`,col:0xd0552f,sg:1,x0:xV,y1:I.Nf,y2:I.NT2,p:y=>pas(I.NT2,y)};
+  const C={T:[W(1,xE),W(-1,xI),AE,AI,...(fp>0?[PI,PE]:[])],E:[W(1,xE),AE,...(fp>0?[PI]:[])],I:[W(-1,xI),AI,...(fp>0?[PE]:[])],W:[W(1,xE),W(-1,xI)],A:[AE,AI],P:fp>0?[PI,PE]:[]};
+  return C[cs]||C.T}
+function v3press(R,G0,g){const L0=v3comps(R),z1=G0.z1,L=G0.z2-G0.z1;V3.legPres=L0;if(!L0.length)return;
+  const N=80,pm=Math.max(1e-6,...L0.map(c=>{let m=0;for(let i=0;i<=N;i++)m=Math.max(m,c.p(c.y1+(c.y2-c.y1)*i/N));c.max=m;return m})),k=1.0/pm;
+  const used={};L0.forEach(c=>{if(c.y2-c.y1<0.02||c.max<1e-6)return;const sg=c.sg,x0=c.x0,sh=new THREE.Shape(),pr=[];
+    for(let i=0;i<=N;i++){const y=c.y2-(c.y2-c.y1)*i/N;pr.push([y,c.p(y)])}
+    sh.moveTo(x0,c.y2);pr.forEach(([y,p])=>sh.lineTo(x0-sg*p*k,y));sh.lineTo(x0,c.y1);sh.lineTo(x0,c.y2);
+    const geo=new THREE.ExtrudeGeometry(sh,{depth:L,bevelEnabled:false}),m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:c.col,transparent:true,opacity:0.2,side:THREE.DoubleSide,depthWrite:false}));m.position.z=z1;g.add(m);
+    const e=new THREE.LineSegments(new THREE.EdgesGeometry(geo,30),new THREE.LineBasicMaterial({color:c.col,transparent:true,opacity:.6}));e.position.z=z1;g.add(e);
+    // setas: o ativo e o vento empurram o muro; o passivo reage contra o deslocamento
+    const zA=[0.15,0.5,0.85].map(u=>z1+u*L),nA=Math.max(2,Math.round((c.y2-c.y1)/0.35));
+    for(let j=0;j<nA;j++){const y=c.y2-(j+0.5)*(c.y2-c.y1)/nA,pp=c.p(y)*k;if(pp<0.06)continue;zA.forEach(z=>v3arrow(g,new THREE.Vector3(x0-sg*pp,y,z),new THREE.Vector3(sg,0,0),pp-0.01,c.col))}
+    let ym=c.y1,vm=0;pr.forEach(([y,p])=>{if(p>vm+1e-9){vm=p;ym=y}});const U=used[sg]=used[sg]||[];while(U.some(u=>Math.abs(u-ym)<0.32))ym+=0.32;U.push(ym); // rótulos do mesmo lado não se sobrepõem
+    g.add(v3label(`${c.k==='W'?'vento':c.k[0]==='A'?'ativo':'passivo'} ${f(vm)} kN/m²`,new THREE.Vector3(x0-sg*(vm*k+0.5),ym,sg>0?z1+L+0.05:z1-0.05),'#'+c.col.toString(16).padStart(6,'0')))})}
 function v3surch(R,G0,g){const col=0xc8902e,xE=Math.min(0,R.fx0,R.px0),xI=Math.max(R.t/100,R.bp/100,R.px0+R.bpe/100),z1=G0.z1-0.4,z2=G0.z2+0.4;
   [[R.qE,G0.xMin,xE,I.NT2],[R.qI,xI,G0.xMax,I.NT]].forEach(([q,a,b,y])=>{if(!(q>0)||b-a<0.05)return;const h=0.06;
     const geo=new THREE.BoxGeometry(b-a,h,z2-z1),m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0.22,depthWrite:false}));m.position.set((a+b)/2,y+0.45,(z1+z2)/2);m.userData.load=true;g.add(m);
@@ -2320,7 +2323,7 @@ function v3pick(ev){const st=V3.st;if(!st)return;const r=st.rnd.domElement.getBo
   if(out)out.textContent=`${p.name[0].toUpperCase()+p.name.slice(1)}: ${f(p.x2-p.x1)} m (transversal) × ${f(p.z2-p.z1)} m (ao longo do muro) × ${f(p.y2-p.y1)} m (altura), de ${sgn(p.y1)} a ${sgn(p.y2)}`}
 function v3view(k){const st=V3.st;if(!st||!st.ext)return;V3.cam=k;const e=st.ext,c=new THREE.Vector3((e.x[0]+e.x[1])/2,(e.y[0]+e.y[1])/2,(e.z[0]+e.z[1])/2);
   const D=Math.max(e.x[1]-e.x[0],e.y[1]-e.y[0],e.z[1]-e.z[0])*1.9;
-  const sx=(V3.st&&$('v3case')&&$('v3case').value==='I')?1:-1,dir={iso:[sx,0.55,-0.85],int:[1,0.12,0],viz:[-1,0.12,0],lat:[0,0.12,1],top:[0.001,1,0]}[k]||[1,.55,-.85];
+  const sx=(V3.st&&$('v3case')&&['I','A'].includes($('v3case').value))?1:-1,dir={iso:[sx,0.55,-0.85],int:[1,0.12,0],viz:[-1,0.12,0],lat:[0,0.12,1],top:[0.001,1,0]}[k]||[1,.55,-.85];
   const v=new THREE.Vector3(...dir).normalize().multiplyScalar(D);st.cam.position.copy(c.clone().add(v));st.cam.up.set(0,1,0);st.ctl.target.copy(c);st.cam.lookAt(c);st.ctl.update()}
 function v3show(){const msg=$('v3msg');v3load().then(()=>{v3init();if(msg)msg.hidden=true;V3.st.size();v3build(calc())}).catch(()=>{if(msg){msg.hidden=false;msg.textContent='Não foi possível carregar o visualizador 3D (biblioteca Three.js da internet). Verifique a conexão e abra a aba de novo.'}})}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-v3view]');if(b)v3view(b.dataset.v3view)});
