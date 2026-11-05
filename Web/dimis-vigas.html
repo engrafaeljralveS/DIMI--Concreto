@@ -792,7 +792,7 @@ var Motor = (function () {
     groups.forEach(function (g, k) {
       var Ab = area(g.phi);
       var need = Math.max((g.tor ? r.Aswt / nT : 0) + r.AswcFinal / Math.max(legsTot, 1), r.Aswmin / Math.max(legsTot, 1));
-      g.Ab = Ab; g.sAuto = Math.min(r.smax, Math.trunc(Ab * 100 / need + EPS));
+      g.need = need; g.Ab = Ab; g.sAuto = Math.min(r.smax, Math.trunc(Ab * 100 / need + EPS));
       g.auto = !(g.s > 0); g.sUse = g.auto ? g.sAuto : g.s;
       g.A = g.sUse > 0 ? g.legs * Ab * 100 / g.sUse : 0;           // cm²/m
       g.a = g.sUse > 0 ? Ab * 100 / g.sUse : 0;                      // cm²/m por perna
@@ -1505,7 +1505,7 @@ if (typeof module !== 'undefined') module.exports = Motor;
     grp.forEach(function (x, k) {
       var el = $('gs-' + k); if (!el) return;
       var g = t.est && t.est.groups[k];
-      el.textContent = g ? g.legs + ' pernas · ' + f(g.A, 2) + ' cm²/m' + (g.auto ? ' · s automático ' + g.sUse + ' cm' : '') : '';
+      el.textContent = g ? g.legs + ' pernas · cada perna ' + f(g.a, 2) + ' cm²/m (necessária ' + f(g.need, 2) + (g.tor ? ': torção + cisalhamento' : ': cisalhamento') + ') ' + (g.a + 1e-9 >= g.need ? '✓' : '✗ insuficiente') + (g.auto ? ' · s automático ' + g.sUse + ' cm' : '') : '';
     });
   }
   var GPHIS = ['5', '6.3', '8', '10', '12.5', '16'];
