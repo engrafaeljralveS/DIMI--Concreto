@@ -389,7 +389,12 @@ const DEF=[
   ['L','Comprimento L da sapata isolada (ao longo do muro)','m',2.00,null,'pil'],
   ['hs','Altura hs','m',0.45],
   ['pos','Posição da sapata','sel','divisa',[['divisa','De divisa (só para o lado interno)'],['centro','Centrada no eixo do muro']]],
-  ['crit','Critério com vento','sel','total',[['total','Toda comprimida (e ≤ B/6)'],['23','2/3 comprimida (NBR 6122)']]]]],
+  ['crit','Critério com vento','sel','total',[['total','Toda comprimida (e ≤ B/6)'],['23','2/3 comprimida (NBR 6122)']]],
+  ['chav','Chaveta (dente) sob a sapata, contra o deslizamento','sel','nao',[['nao','Sem chaveta'],['sim','Com chaveta']]],
+  ['hk','Chaveta – altura abaixo do fundo da sapata','m',0.40],
+  ['bk','Chaveta – largura','cm',25],
+  ['xk','Chaveta – posição','sel','muro',[['muro','Sob o muro (continua as esperas)'],['meio','No meio da sapata'],['ponta','Na ponta interna da sapata']]],
+  ['fpk','Chaveta – fator do passivo na frente da chaveta (1 = total)','–',1.0]]],
  ['Solo','',[
   ['gam','Peso específico γ','kN/m³',18],
   ['phi','Ângulo de atrito φ','°',30],
@@ -468,7 +473,7 @@ function applySys(){
   document.querySelectorAll('#form [data-sys]').forEach(el=>el.hidden=el.dataset.sys!==I.sys);
   document.querySelectorAll('#form [data-only]').forEach(el=>el.hidden=el.dataset.only!==I.sys);
   const hideIf=(id,cond)=>{const el=$(id),fl=el&&el.closest&&el.closest('.field');if(fl&&cond)fl.hidden=true};
-  hideIf('S2m',I.s2mode!=='man');{const ce=(I.bloco||'')[0]==='k';hideIf('fpkM',!ce);hideIf('fpkCM',!ce);}hideIf('L',I.tipoSap==='cor');['NA','bwi'].forEach(k=>{const fl=$(k).closest('.field');if(fl)fl.hidden=I.sys==='pil'&&I.tipoSap==='cor'});if(I.sys==='pil'){hideIf('bwi',I.tipoSap==='cor');hideIf('hci',I.tipoSap==='cor');hideIf('hPes',I.tipoSap!=='cor');hideIf('ehPI',I.canPI!=='sim');{const cw=I.tipoSap==='cor'&&I.pInf==='conc';hideIf('pInf',I.tipoSap!=='cor');['hcw','bcw','phW'].forEach(k=>hideIf(k,!cw))}hideIf('phPI',I.canPI!=='sim')}else hideIf('hPes',true);
+  hideIf('S2m',I.s2mode!=='man');['hk','bk','xk','fpk'].forEach(k=>hideIf(k,I.chav!=='sim'));{const ce=(I.bloco||'')[0]==='k';hideIf('fpkM',!ce);hideIf('fpkCM',!ce);}hideIf('L',I.tipoSap==='cor');['NA','bwi'].forEach(k=>{const fl=$(k).closest('.field');if(fl)fl.hidden=I.sys==='pil'&&I.tipoSap==='cor'});if(I.sys==='pil'){hideIf('bwi',I.tipoSap==='cor');hideIf('hci',I.tipoSap==='cor');hideIf('hPes',I.tipoSap!=='cor');hideIf('ehPI',I.canPI!=='sim');{const cw=I.tipoSap==='cor'&&I.pInf==='conc';hideIf('pInf',I.tipoSap!=='cor');['hcw','bcw','phW'].forEach(k=>hideIf(k,!cw))}hideIf('phPI',I.canPI!=='sim')}else hideIf('hPes',true);
   {const can=I.sys==='pil'&&I.canPI==='sim',ce=(I.bloco||'')[0]==='k';[['fbk',1],['fpkOut',1],['fpkM',ce],['fpkCM',ce]].forEach(([k,c])=>{const fl=$(k)&&$(k).closest('.field');if(fl&&can)fl.hidden=!c})}hideIf('zCi',I.cintaInt!=='sim');['drB','drPhi','drLas','drAr','drSel','drImp'].forEach(k=>{const el=$(k),fl=el&&el.closest&&el.closest('.field');if(fl)fl.hidden=I.drLado==='nao'});['lenr','tenr','eenrOut','phE'].forEach(k=>hideIf(k,I.enr!=='sim'));hideIf('p3d',I.tipoSap==='cor');
 }
 
@@ -598,9 +603,13 @@ function calc(){
    // sobrecarga sobre a sapata (variável): entra só nas tensões no solo, não na estabilidade
    let Wq=0,Mq=0;for(let i=0;i<k;i++){const x=R.fx0+(i+.5)*dx,q=inW(x)||inB(x)?0:x<0?R.qE:R.qI,len=(x>P0&&x<P1)?L-lp:L,w=q*len*dx;Wq+=w;Mq+=w*(x-fc)}
    R.Pq=Wq;R.xq=Wq>0?Mq/Wq:0;}
-  R.N=R.Nwall+R.Npes+R.Psap+R.Psolo;
+  // chaveta (dente) sob a sapata: prisma de concreto abaixo do fundo, ao longo de toda a sapata
+  R.chav=I.chav==='sim'&&+I.hk>0;R.K=null;
+  if(R.chav){const hk=+I.hk,bk=Math.max(0.15,(+I.bk||25)/100);let x0=I.xk==='ponta'?R.fx0+I.B-bk:I.xk==='meio'?R.fx0+(I.B-bk)/2:R.px0+bpe/200-bk/2;
+    x0=Math.min(R.fx0+I.B-bk,Math.max(R.fx0,x0));R.K={hk,bk,x0,P:25*bk*hk*L,x:x0+bk/2-fc}}
+  R.N=R.Nwall+R.Npes+R.Psap+R.Psolo+(R.K?R.K.P:0);
   R.xw=R.cw-fc; R.xpe=R.px0+bpe/200-fc;
-  R.Mv=R.Nwall*R.xw+R.Npes*R.xpe+R.Psolo*R.xs;
+  R.Mv=R.Nwall*R.xw+R.Npes*R.xpe+R.Psolo*R.xs+(R.K?R.K.P*R.K.x:0);
   // diagramas por metro
   const n=500,y0=I.NTopo,y1=I.Nf,dy=(y0-y1)/n;
   const Y=[],WW=[],WE=[],VW=[0],MW=[0],VE=[0],ME=[0];
@@ -626,6 +635,10 @@ function calc(){
     const Le=(iso&&I.p3d==='3d')?Math.min(L+h2*Math.tan(phi),s):L;
     return {E:(+I.fp)*(E1+E2)*Le,Efull:(E1+E2)*Le,y:(E1+E2)>0?(E1*h2/3+E2*h2/2)/(E1+E2):0,h:h2,Le}};
   R.pExt=pasv(I.NT2); R.pInt=pasv(I.NT);
+  // chaveta: empuxo passivo na face da chaveta, do fundo da sapata até a ponta da chaveta, com a sobrecarga do solo acima do fundo (lado para onde o muro tende a deslizar)
+  if(R.K){const K=R.K,fk=Math.max(0,+I.fpk);const kp=gl=>{const d1=Math.max(0,gl-I.Nf),q1=R.Kp*I.gam*d1+2*I.c*sKp,q2=q1+R.Kp*I.gam*K.hk,e=(q1+q2)/2*K.hk;
+      return {q1,q2,Em:fk*e,E:fk*e*L,Mm:fk*(q1*K.hk*K.hk/2+R.Kp*I.gam*K.hk**3/3)}};
+    K.ext=kp(I.NT2);K.int=kp(I.NT)}
   R.EaInt=R.EAi.E*s; R.EaExt=R.EAe.E*s;
   // cunha de arrancamento: solo além da projeção da sapata, aberta com ângulo β (não avança sobre o vizinho)
   const Hs=Math.max(0,I.NT-R.ytop),tb=Math.tan(Math.max(0,I.beta)*Math.PI/180),wq=I.gam*0.5*Hs*Hs*tb;
@@ -635,7 +648,7 @@ function calc(){
   R.Wc_out=I.cone==='sim'&&R.cen?wq*L:0;        // borda externa, só com sapata centrada
   R.Wc=R.Wc_in+R.Wc_lat+R.Wc_out;
   R.delta=2/3*phi; R.ca=2/3*I.c; R.kern=I.B/6;
-  const loads=[[R.Nwall,R.xw],[R.Npes,R.xpe],[R.Psap,0],[R.Psolo,R.xs]];
+  const loads=[[R.Nwall,R.xw],[R.Npes,R.xpe],[R.Psap,0],[R.Psolo,R.xs],...(R.K?[[R.K.P,R.K.x]]:[])];
   // estabilidade (Rankine; NBR 11682): o empuxo de um lado não é descontado pelo do outro. Para o interior: Ea do vizinho + vento;
   // para a divisa: Ea do lado interno + vento. O solo do lado oposto só resiste, com o passivo × fator (pode não existir ou não se mobilizar)
   R.EaE={H:R.EAe.E*s,M:R.EAe.E*R.EAe.y*s};R.EaI={H:R.EAi.E*s,M:R.EAi.E*R.EAi.y*s};
@@ -646,8 +659,10 @@ function calc(){
     const pp=Hh<0?R.pExt:R.pInt;
     if(Mh<-1e-9)FSt=(loads.reduce((q,[N,x])=>q+N*(x+I.B/2),0)+R.Wc_in*(I.B+R.Hs*R.tb/3)+R.Wc_lat*I.B/2+pp.E*pp.y)/(-Mh);
     else if(Mh>1e-9)FSt=(loads.reduce((q,[N,x])=>q+N*(I.B/2-x),0)+R.Wc_out*(I.B+R.Hs*R.tb/3)+R.Wc_lat*I.B/2+pp.E*pp.y)/Mh;
-    const FSd=Math.abs(Hh)>1e-9?(R.N*Math.tan(R.delta)+R.ca*I.B*L+pp.E)/Math.abs(Hh):Infinity;
-    return {lab,d,Mh,Hh,Mt,e,...P,FSt,FSd,Ep:pp.E,Ea:Ea.H,pside:Hh<0?'externo':'interno'}};
+    const kk=R.K?(Hh<0?R.K.ext:R.K.int):null,Ek=kk?kk.E:0; // chaveta: passivo abaixo do fundo, do lado para onde o muro tende a deslizar
+    const FSd=Math.abs(Hh)>1e-9?(R.N*Math.tan(R.delta)+R.ca*I.B*L+pp.E+Ek)/Math.abs(Hh):Infinity;
+    const Fk=kk?Math.min(Ek,Math.max(0,Math.abs(Hh)-R.N*Math.tan(R.delta)-R.ca*I.B*L-pp.E)):0; // força que a chaveta precisa mobilizar (equilíbrio)
+    return {lab,d,Mh,Hh,Mt,e,...P,FSt,FSd,Ep:pp.E,Ek,Fk,kk,Ea:Ea.H,pside:Hh<0?'externo':'interno'}};
   R.perm=mk(`Permanente (sem vento): Ea ${R.EaE.M>=R.EaI.M?'do vizinho':'interno'}`,0);
   R.cW=[mk('Vento para o interior + Ea do vizinho',1),mk('Vento para a divisa + Ea interno',-1)];
   R.crit=Math.abs(R.cW[0].e)>Math.abs(R.cW[1].e)?R.cW[0]:R.cW[1];
@@ -660,6 +675,11 @@ function calc(){
   // ---- concreto ----
   const fcd=I.fck/1.4/10, fctm=0.3*Math.pow(I.fck,2/3), fctd=0.7*fctm/1.4, tauRd=0.25*fctd*1000;
   const Eci=5600*Math.sqrt(I.fck), Ecs=Math.min(1,0.8+0.2*I.fck/80)*Eci; R.Ecs=Ecs;
+  if(R.K){const K=R.K,b=100,h=K.bk*100,dd=h-5-I.phs/20;
+    // esforço de cálculo: a força que a chaveta mobiliza em cada caso (no máximo o passivo), com o braço do diagrama passivo; mínimo de 1/3 do passivo
+    {let V=0,M=0;[R.perm,...R.cW].forEach(c=>{if(!c.kk)return;const F=Math.max(c.Fk,c.kk.E/3)/L,arm=c.kk.Em>0?c.kk.Mm/c.kk.Em:K.hk/2;if(F>V){V=F;M=F*arm}});K.Vk=V;K.Mk=M}K.Md=1.4*K.Mk;K.d=dd;const r=flex(K.Md,b,dd);K.r=r;K.Asmin=0.0015*b*h;K.As=Math.max(r.As||0,K.Asmin);K.okF=!!r.ok;
+    K.sp=Math.max(5,Math.min(20,Math.floor(area(I.phs)/K.As*100)));K.Vd=1.4*K.Vk;const rho=Math.min(0.02,area(I.phs)*100/K.sp/(b*dd));
+    K.VRd1=0.25*fctd*1000*Math.max(1,1.6-dd/100)*(1.2+40*rho)*b/100*dd/100;K.vOk=K.Vd<=K.VRd1;K.ok=K.okF&&K.vOk}
   const momW=(y,ecc)=>{const Mw=R.at(MW,y)*s;return Math.max(...R.EC.map(c=>{const Me=R.at(c.ME,y)*s;return Math.max(Math.abs(Mw+Me-ecc),Math.abs(-Mw+Me-ecc))}))};
   // cortante com estribos – NBR 6118, 17.4.2.2 (Modelo I, estribos a 90°), usado quando Vd > VRd1
   // bw, d em cm; Vd em kN; devolve Asw/s em cm²/m
@@ -1012,7 +1032,7 @@ function calc(){
 /* ---------- desenho do corte ---------- */
 function lvl(x,y,txt,sub){return `<path d="M${x-5} ${y-8}H${x+5}L${x} ${y}Z" fill="none" stroke="var(--ink)"/><line x1="${x-12}" y1="${y}" x2="${x+12}" y2="${y}" stroke="var(--ink)"/><text x="${x+16}" y="${y+4}">${txt}</text>${sub?[].concat(sub).map((t,i)=>`<text x="${x+16}" y="${y+16+i*12}" class="t-muted" font-size="10">${t}</text>`).join(''):''}`}
 function drawCorte(R){
-  const top=46,bot=500,yMax=I.NTopo+0.3,yMin=I.Nf-0.12,range=yMax-yMin;
+  const top=46,bot=500,yMax=I.NTopo+0.3,yMin=I.Nf-0.12-(R.K?R.K.hk:0),range=yMax-yMin;
   let sc=Math.min((bot-top)/range,330/Math.max(I.B,0.4));const xface=190+(R.cen?Math.max(0,-R.fx0*sc-80):0);
   const Y=e=>top+(yMax-e)*sc,X=m=>xface+m*sc,wa=R.t/200,Yb=Y(yMin);
   let s=`<defs>
@@ -1026,7 +1046,7 @@ function drawCorte(R){
   s+=ground(90,xface,Y(I.NT2))+ground(xface,550,Y(I.NT));
   const rect=(m1,m2,e1,e2,fill,stroke)=>`<rect x="${X(Math.min(m1,m2))}" y="${Y(e1)}" width="${Math.abs(m2-m1)*sc}" height="${Math.max(0,Y(e2)-Y(e1))}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/>`;
   const F0=R.fx0,F1=R.fx0+I.B,P0=R.px0,P1=R.px0+R.bpe/100;
-  s+=rect(F0,F1,R.ytop,I.Nf,'var(--conc)','var(--concline)');
+  s+=rect(F0,F1,R.ytop,I.Nf,'var(--conc)','var(--concline)');if(R.K)s+=rect(R.K.x0,R.K.x0+R.K.bk,I.Nf,I.Nf-R.K.hk,'var(--conc)','var(--concline)');
   s+=rect(P0,P1,R.yt,R.ytop,'var(--conc)','var(--concline)');
   if(!R.arm&&!R.cor)s+=rect(wa-I.bwi/200,wa+I.bwi/200,NAe,NAe-I.hci/100,'var(--conc)','var(--concline)');
   if(R.cor&&R.hEmb>0){s+=rect(0,R.t/100,NAe,R.ytop,'url(#pBlk)',R.Bl[0][0]==='k'?'var(--brickline)':'var(--blockline)');
@@ -1317,11 +1337,12 @@ function renderChecks(R){
   const lim=1.3*I.sadm,cases=[R.perm,...R.cW];
   $('critTxt').textContent=(R.arm?'Sapata corrida, por metro · ':R.cor?`Sapata corrida, trecho B × s = ${f(I.B)} × ${f(R.s)} m por pilar · `:'Sapata isolada, por pilar · ')+(I.crit==='23'?'com vento ≥ 2/3 comprimida; permanente toda comprimida':'toda comprimida: |e| ≤ B/6');
   $('tabCases').innerHTML=`<tr><th>Caso</th><th>M total (kN·m)</th><th>e (m)</th><th>Comprimido</th><th>σmáx (kPa)</th><th>σmín (kPa)</th><th>Passivo (kN)</th><th>FS tomb.</th><th>FS desl.</th><th></th></tr>`+
-    cases.map(c=>`<tr><td>${c.lab}</td><td>${f(c.Mt)}</td><td>${f(c.e,3)}</td><td>${f(Math.min(1,c.lc/I.B)*100,0)}%</td><td>${f(c.smax,1)}</td><td>${f(c.smin,1)}</td><td>${c.d?`${f(c.Ep,1)} (${c.pside})`:'–'}</td><td>${c.d?f(c.FSt):'–'}</td><td>${c.d?f(c.FSd):'–'}</td><td>${pill(c.ok)}</td></tr>`).join('');
+    cases.map(c=>`<tr><td>${c.lab}</td><td>${f(c.Mt)}</td><td>${f(c.e,3)}</td><td>${f(Math.min(1,c.lc/I.B)*100,0)}%</td><td>${f(c.smax,1)}</td><td>${f(c.smin,1)}</td><td>${c.d?`${f(c.Ep,1)}${c.Ek?` + chaveta ${f(c.Ek,1)}`:''} (${c.pside})`:'–'}</td><td>${c.d?f(c.FSt):'–'}</td><td>${c.d?f(c.FSd):'–'}</td><td>${pill(c.ok)}</td></tr>`).join('');
   const C=[{n:'Contato com o solo',v:`${f(Math.min(...R.cW.map(c=>c.lc))/I.B*100,0)}%`,l:I.crit==='23'?'mín. 67% com vento':'100% exigido',ok:R.cW.every(c=>c.ok)&&R.perm.ok},
    {n:'Tensão no solo',v:`${f(R.sigPerm,1)} · ${f(R.sigW,1)} kPa`,l:`permanente ≤ ${f(I.sadm,0)} · com vento ≤ ${f(lim,0)} kPa`,ok:R.sigOk},
    {n:`Tombamento FS ≥ ${f(+I.FStMin||1.5,1)}`,v:f(R.FSt),l:[+I.fp>0?'passivo reduzido':'sem passivo',I.cone==='sim'?`cunha β ${f(I.beta,0)}° ${f(R.Wc,1)} kN`:'sem cunha'].join(' · '),ok:R.FSt>=(+I.FStMin||1.5)},
-   {n:`Deslizamento FS ≥ ${f(+I.FSdMin||1.5,1)}`,v:f(R.FSd),l:`δ = 2/3 φ = ${f(R.delta*180/Math.PI,1)}°`,ok:R.FSd>=(+I.FSdMin||1.5)},
+   {n:`Deslizamento FS ≥ ${f(+I.FSdMin||1.5,1)}`,v:f(R.FSd),l:`δ = 2/3 φ = ${f(R.delta*180/Math.PI,1)}°${R.K?' · com chaveta':''}`,ok:R.FSd>=(+I.FSdMin||1.5)},
+   ...(R.K?[{n:'Chaveta (dente)',v:`${f(R.K.bk*100,0)} × ${f(R.K.hk*100,0)} cm`,l:`passivo na chaveta até ${f(Math.max(R.K.ext.E,R.K.int.E),1)} kN · Md ${f(R.K.Md,2)} kN·m/m · Vd ${f(R.K.Vd,1)} ≤ VRd1 ${f(R.K.VRd1,1)} kN/m`,ok:R.K.ok}]:[]),
    {n:'Rigidez hs ≥ 2a/3',v:`${f(I.hs)} m`,l:R.rig?`mín. ${f(2*R.aMax/3,2)} m`:'flexível · cortante verificada',ok:R.rig?true:'warn'}];
   $('checks').innerHTML=C.map(c=>`<div class="check ${cls(c.ok)}"><span>${c.n}</span><b>${c.v}</b><small>${c.l}</small><div>${pill(c.ok)}</div></div>`).join('');
   // alvenaria
@@ -1481,7 +1502,7 @@ function detDefaults(R){
     if(R.enr){const E=R.E;D.E1={n:E.nP,phi:E.phi};D.E2={n:E.nN,phi:E.phi};D.E3={phi:E.phH,s:E.sw};
       D.E4={n:E.PE.nb,phi:E.phi};D.E5={phi:5,s:Math.floor(Math.min(15,R.eenr,12*E.phi/10))};}
   }
-  D.N5={phi:I.phs,s:R.SB.sp}; D.N6={phi:I.phs,s:R.SBs?R.SBs.sp:20};
+  D.N5={phi:I.phs,s:R.SB.sp};if(R.K)D.N21={phi:I.phs,s:R.K.sp}; D.N6={phi:I.phs,s:R.SBs?R.SBs.sp:20};
   if(R.cor){const nb=Math.max(4,Math.ceil(R.SL.Asf/area(I.phs)-1e-9));D.N7={n:nb,phi:I.phs}}
   else D.N7={phi:I.phs,s:R.SL.sp||20};
   return D;
@@ -1548,6 +1569,7 @@ function detRows(R,D){
   rows.push({id:'N6',el:'Sapata',pos:R.SBs?'Superior, direção B':'Superior, direção B (não exigida pelo cálculo)',mode:'s',req:R.SBs?`${f(R.SBs.Asf)} cm²/m`:'—',ad:`${f(as6)} cm²/m`,ok:R.SBs?(R.SBs.ok&&as6>=R.SBs.Asf-1e-6&&D.N6.s<=20):true});
   if(R.cor){const as7=D.N7.n*area(D.N7.phi);rows.push({id:'N7',el:'Sapata corrida',pos:'Longitudinal entre pilares, em cada face',mode:'n',req:`${f(R.SL.Asf)} cm²`,ad:`${f(as7)} cm²`,ok:as7>=R.SL.Asf-1e-6,lap:lapLen(D.N7.phi)})}
   else{const as7=AsS(D.N7.phi,D.N7.s);rows.push({id:'N7',el:'Sapata',pos:R.arm?'Distribuição, direção longitudinal':'Direção L',mode:'s',req:`${f(R.SL.Asf)} cm²/m`,ad:`${f(as7)} cm²/m`,ok:as7>=R.SL.Asf-1e-6&&D.N7.s<=20})}
+  if(R.K){const K=R.K,a21=AsS(D.N21.phi,D.N21.s);rows.push({id:'N21',el:'Chaveta',pos:`Barras em U nas duas faces da chaveta ${f(K.bk*100,0)} × ${f(K.hk*100,0)} cm, ancoradas na sapata`,mode:'s',req:`${f(K.As)} cm²/m`,ad:`${f(a21)} cm²/m`,ok:K.ok&&a21>=K.As-1e-6&&D.N21.s<=20})}
   return rows;
 }
 function detText(id,D){const v=D[id];if(!v)return '';return v.n!=null?`${v.n} ${phiTxt(v.phi)}`:`${phiTxt(v.phi)} c/${v.s}`}
@@ -1570,13 +1592,16 @@ function detSvg(R,D){
   T(40,40,`ESBOÇO DO DETALHAMENTO DAS ARMADURAS – MURO DE VEDAÇÃO (${sysT})`,18,'start',ink,'bold');
   T(40,62,`${R.Bl[1]}${R.arm?'':` · pilares ${f(R.bp,0)}×${f(R.hp,0)} cm a cada ${f(R.s)} m`} · concreto C${f(I.fck,0)} · aço CA-${f(I.fyk/10,0)} · cobrimento ${f(I.cob,1)} cm e 5 cm na sapata`,13,'start',mut);
   // ---- corte ----
-  const yMax=I.NTopo+0.25,yMin=I.Nf-0.2,top=110,bot=1080,sc=(bot-top)/(yMax-yMin),xface=120+(R.cen?Math.max(0,-R.fx0*sc):0);
+  const yMax=I.NTopo+0.25,yMin=I.Nf-0.2-(R.K?R.K.hk:0),top=110,bot=1080,sc=(bot-top)/(yMax-yMin),xface=120+(R.cen?Math.max(0,-R.fx0*sc):0);
   const Y=v=>top+(yMax-v)*sc,X=m=>xface+m*sc;
   T(40,98,R.arm?'A – CORTE DO MURO':'A – CORTE NO EIXO DO PILAR',15,'start',ink,'bold');
   o.push(`<rect x="${X(Math.min(R.fx0,0)-0.3).toFixed(1)}" y="${Y(I.NT).toFixed(1)}" width="${((I.B+0.6)*sc).toFixed(1)}" height="${(Y(yMin)-Y(I.NT)).toFixed(1)}" fill="${soilc}"/>`);
   Ln(X(Math.min(R.fx0,0)-0.3),Y(I.NT),X(R.fx0+I.B+0.3),Y(I.NT),soill,1.6);
   const bp=R.bp/100,bpe=R.bpe/100,ytop=R.ytop,hs=I.hs,B=I.B,F0=R.fx0,P0=R.px0,c=I.cob/100,ct=c+I.pht/1000,cs=0.05,t=R.t/100;
   Rc(X(F0),Y(ytop),B*sc,hs*sc); Rc(X(P0),Y(NAe),bpe*sc,(NAe-ytop)*sc);
+  if(R.K&&D.N21){const K=R.K,xa=X(K.x0+0.05),xb=X(K.x0+K.bk-0.05),yb=Y(I.Nf-K.hk+0.05),yt=Y(I.Nf+hs-0.08);Rc(X(K.x0),Y(I.Nf),K.bk*sc,K.hk*sc);
+    Pp(`M${xa.toFixed(1)} ${yt.toFixed(1)} V${yb.toFixed(1)} H${xb.toFixed(1)} V${yt.toFixed(1)}`,steel,2.2);
+    T(X(K.x0),Y(I.Nf-K.hk)+18,`N21 – chaveta ${f(K.bk*100,0)}×${f(K.hk*100,0)} cm · ${detText('N21',D)} em U`,13,'start',steel,'bold')}
   if(R.cor&&R.hEmb>0){Rc(X(0),Y(NAe),t*sc,(NAe-ytop)*sc,'#efe9df','#8a7d6b',1);for(let v=ytop+R.hcan;v<NAe-1e-6;v+=R.hcan)Ln(X(0),Y(v),X(t),Y(v),'#8a7d6b',.7);
     o.push(`<rect x="${X(P0).toFixed(1)}" y="${Y(NAe).toFixed(1)}" width="${(bpe*sc).toFixed(1)}" height="${((NAe-ytop)*sc).toFixed(1)}" fill="none" stroke="${concl}" stroke-width="1.2" stroke-dasharray="6 3"/>`);}
   if(R.arm){Rc(X(0),Y(I.NTopo-I.hcs/100),t*sc,(I.NTopo-I.hcs/100-NAe)*sc,'#efe9df','#8a7d6b');Rc(X(0),Y(I.NTopo),t*sc,I.hcs/100*sc)}
@@ -1828,14 +1853,14 @@ function secaoSvg(R){
   T(40,44,Dr?'SEÇÃO TRANSVERSAL TÍPICA E DETALHE DO DRENO':'SEÇÃO TRANSVERSAL TÍPICA',18,'start',ink,'bold');
   T(40,66,`${R.arm?'Alvenaria estrutural armada':'Pilares de concreto e alvenaria de vedação'} · ${R.Bl[1]} · sapata ${R.arm||R.cor?'corrida':'isolada'} ${R.cen?'centrada':'de divisa'} · cotas em metros · sem escala exata`,13,'start',mut);
   // ===== seção geral =====
-  {const wMain=Dr?430:900,xMin=Math.min(F0,0,Dr?Dr.x1:0)-0.35,xMax=Math.max(F0+B,Dr?Dr.x2:0)+0.35,yMax=I.NTopo+0.3,yMin=I.Nf-0.3,top=160,bot=Hd-170;
+  {const wMain=Dr?430:900,xMin=Math.min(F0,0,Dr?Dr.x1:0)-0.35,xMax=Math.max(F0+B,Dr?Dr.x2:0)+0.35,yMax=I.NTopo+0.3,yMin=I.Nf-0.3-(R.K?R.K.hk:0),top=160,bot=Hd-170;
    const sc=Math.min((bot-top)/(yMax-yMin),wMain/(xMax-xMin)),x0=60-xMin*sc,X=m=>x0+m*sc,Y=v=>top+(yMax-v)*sc;
    T(40,108,'SEÇÃO TRANSVERSAL TÍPICA',15,'start',ink,'bold');
    const xs0=Math.min(0,F0,P0);
    Rc(X(xMin),Y(gE),X(xs0)-X(xMin),Y(yMin)-Y(gE),'url(#sSoil)','none',0);Rc(X(xs0),Y(Math.min(gE,gI)),X(xMax)-X(xs0),Y(yMin)-Y(Math.min(gE,gI)),'url(#sSoil)','none',0);
    if(gI>gE)Rc(X(wT),Y(gI),X(xMax)-X(wT),Y(gE)-Y(gI),'url(#sSoil)','none',0);
    ground(X(xMin),X(Math.min(0,P0)),Y(gE));ground(X(Math.max(wT,P0+bpe)),X(xMax),Y(gI));
-   Rc(X(F0),Y(R.ytop),B*sc,I.hs*sc);Rc(X(P0),Y(NAe),bpe*sc,(NAe-R.ytop)*sc);
+   Rc(X(F0),Y(R.ytop),B*sc,I.hs*sc);Rc(X(P0),Y(NAe),bpe*sc,(NAe-R.ytop)*sc);if(R.K){Rc(X(R.K.x0),Y(I.Nf),R.K.bk*sc,R.K.hk*sc);T(X(R.K.x0+R.K.bk)+6,Y(I.Nf-R.K.hk/2)+4,'chaveta',11,'start',mut)}
    if(!R.arm&&!R.cor)Rc(X(0),Y(NAe),bp*sc,(I.hci/100)*sc);
    if(R.cor&&R.hEmb>0)Rc(X(0),Y(NAe),t*sc,R.hEmb*sc,'url(#sBlk)','#7d8994',.8);
    if(R.CW)Rc(X(0),Y(R.yA),R.CW.b/100*sc,R.CW.h*sc);
@@ -1914,7 +1939,7 @@ function svgToPng(svg,w,h){return new Promise((res,rej)=>{const img=new Image();
 // vista frontal (esboço)
 function elevSvg(R){
   const W=900,H=440;let s='';const top=40,bot=400;
-  const yMax=I.NTopo+0.25,yMin=I.Nf-0.15;
+  const yMax=I.NTopo+0.25,yMin=I.Nf-0.15-(R.K?R.K.hk:0);
   const nP=R.arm?0:3, len=R.enr?2*R.lenr+R.eenr/100:R.arm?3.0:2*R.s+R.hp/100;
   const sc=Math.min((W-120)/(len+0.6),(bot-top)/(yMax-yMin));
   const Y=e=>top+(yMax-e)*sc, x0=70, X=m=>x0+m*sc;
@@ -1922,7 +1947,7 @@ function elevSvg(R){
   const rect=(a,b,e1,e2,fill,st,dash)=>`<rect x="${X(a)}" y="${Y(e1)}" width="${(b-a)*sc}" height="${Math.max(0,Y(e2)-Y(e1))}" fill="${fill}" stroke="${st}" stroke-width="1.1"${dash?' stroke-dasharray="5 3"':''}/>`;
   const blk=R.Bl[0][0]==='k'?LIGHT.brick:LIGHT.block, blkL=R.Bl[0][0]==='k'?LIGHT.brickline:LIGHT.blockline;
   // fundação
-  if(R.arm||R.cor)s+=rect(0,len,R.ytop,I.Nf,LIGHT.conc,LIGHT.concline);
+  if(R.arm||R.cor){s+=rect(0,len,R.ytop,I.Nf,LIGHT.conc,LIGHT.concline);if(R.K)s+=rect(0,len,I.Nf,I.Nf-R.K.hk,LIGHT.conc,LIGHT.concline)}
   if(R.arm)s+=rect(0,len,NAe,R.ytop,LIGHT.conc,LIGHT.concline);
   // alvenaria
   s+=rect(0,len,I.NTopo-I.hcs/100,NAe,blk,blkL);
@@ -1939,7 +1964,7 @@ function elevSvg(R){
       s+=rect(xc-R.hpe/200,xc+R.hpe/200,NAe,R.ytop,LIGHT.conc,LIGHT.concline);
       if(R.cor&&R.hEmb>0&&i<nP-1)s+=rect(xc+R.hpe/200,xc+R.s-R.hpe/200,NAe,R.ytop,blk,blkL);
       if(R.CW&&i<nP-1)s+=rect(xc+R.hp/200,xc+R.s-R.hp/200,R.yA,R.ytop,LIGHT.conc,LIGHT.concline);
-      if(!R.cor)s+=rect(xc-I.L/2,xc+I.L/2,R.ytop,I.Nf,LIGHT.conc,LIGHT.concline);
+      if(!R.cor){s+=rect(xc-I.L/2,xc+I.L/2,R.ytop,I.Nf,LIGHT.conc,LIGHT.concline);if(R.K)s+=rect(xc-I.L/2,xc+I.L/2,I.Nf,I.Nf-R.K.hk,LIGHT.conc,LIGHT.concline)}
       s+=`<line x1="${X(xc)}" y1="${Y(I.NTopo)-12}" x2="${X(xc)}" y2="${Y(I.Nf)+8}" stroke="${LIGHT.muted}" stroke-dasharray="10 3 2 3" stroke-width=".7"/>`;}
     // cota s
     const yd=Y(I.NTopo)-24;for(let i=0;i<nP-1;i++){const a=R.hp/200+i*R.s,b=a+R.s;s+=`<line x1="${X(a)}" y1="${yd}" x2="${X(b)}" y2="${yd}" stroke="${LIGHT.ink}" stroke-width=".8"/><path d="M${X(a)} ${yd-5}V${yd+5}M${X(b)} ${yd-5}V${yd+5}" stroke="${LIGHT.ink}"/><text x="${X((a+b)/2)}" y="${yd-5}" text-anchor="middle">s = ${f(R.s)} m</text>`}
@@ -2076,11 +2101,13 @@ function memorialXML(R,figs,state){
     [arm?'Parede de fundação':'Pescoço',f(R.Npes,2),f(R.xpe,3),f(R.Npes*R.xpe,2)],
     ['Sapata',f(R.Psap,2),'0,000','0,00'],
     ['Solo interno sobre a sapata',f(R.Psolo,2),f(R.xs,3),f(R.Psolo*R.xs,2)],
+    ...(R.K?[['Chaveta',f(R.K.P,2),f(R.K.x,3),f(R.K.P*R.K.x,2)]]:[]),
     ['Total',f(R.N,2),'',f(R.Mv,2)]],[4,1.6,1.6,1.8]));
   b.push(EQ('Ações horizontais na base:',`vento ± ${f(R.Hw,2)} kN e ± ${f(R.Mw,2)} kN·m; empuxo ativo do vizinho ${f(R.EaE.H,2)} kN e ${f(R.EaE.M,2)} kN·m (empurra para o lote); empuxo ativo interno ${f(R.EaI.H,2)} kN e ${f(R.EaI.M,2)} kN·m (empurra para o vizinho). Cada caso usa só o empuxo do lado que empurra; o outro lado resiste pelo passivo × ${f(+I.fp||0,2)}.`));
   b.push(EQ('Excentricidade e tensões:',`e = M/N; se |e| ≤ B/6: σ = N/(B·L) · (1 ± 6e/B); se não: σmáx = 2N / [3L(B/2 − |e|)]. B/6 = ${f(R.kern,3)} m.`));
   b.push(EQ('Tombamento:',`FS = Σ momentos estabilizantes em torno da borda de giro / momento horizontal ≥ ${f(+I.FStMin||1.5,1)}`));
-  b.push(EQ('Deslizamento:',`FS = (N tan δ + ca·B·L + Ep) / H ≥ ${f(+I.FSdMin||1.5,1)}, com δ = 2/3 φ = ${f(R.delta*180/Math.PI,1)}°`));
+  b.push(EQ('Deslizamento:',`FS = (N tan δ + ca·B·L + Ep${R.K?' + Ek':''}) / H ≥ ${f(+I.FSdMin||1.5,1)}, com δ = 2/3 φ = ${f(R.delta*180/Math.PI,1)}°`));
+  if(R.K){const K=R.K;b.push(EQ('Chaveta (dente):',`${f(K.bk*100,0)} × ${f(K.hk*100,0)} cm abaixo do fundo da sapata, ${I.xk==='ponta'?'na ponta interna':I.xk==='meio'?'no meio da sapata':'sob o muro'}, ao longo de toda a sapata. Na face da chaveta atua o empuxo passivo do solo abaixo do fundo, com a sobrecarga do solo acima dele: σp = Kp·(γ·z + γ·d) + 2c√Kp, de σp,topo = ${f(K.int.q1,1)} a ${f(K.int.q2,1)} kPa (deslizamento para o lote) e de ${f(K.ext.q1,1)} a ${f(K.ext.q2,1)} kPa (para a divisa), × fator ${f(+I.fpk,2)}. Ek = ${f(K.int.E,2)} kN e ${f(K.ext.E,2)} kN, somados à resistência ao deslizamento.`))}
   b.push(TBL([['Caso','M (kN·m)','e (m)','Comprimido','σmáx (kPa)','σmín (kPa)','FS tomb.','FS desl.','Situação'],
     ...[R.perm,...R.cW].map(c=>[c.lab,f(c.Mt,2),f(c.e,3),`${f(Math.min(1,c.lc/I.B)*100,0)}%`,f(c.smax,1),f(c.smin,1),c.d?f(c.FSt):'–',c.d?f(c.FSd):'–',ST(c.ok)])],[2.6,1.1,1,1.2,1.1,1.1,1,1,1.3]));
   FIGN('acoes_base.png','Ações na base da sapata: resultante N com excentricidade, força horizontal H e pressões no solo (kPa) nos três casos.');
@@ -2095,6 +2122,11 @@ function memorialXML(R,figs,state){
   b.push(TXT(`Concreto fck = ${f(I.fck,0)} MPa, aço fyk = ${f(I.fyk,0)} MPa, cobrimento ${f(I.cob,1)} cm. Flexão simples: KMD = Md/(b·d²·fcd) ≤ 0,251; KX = [0,68 − √(0,68² − 4·0,272·KMD)]/(2·0,272); KZ = 1 − 0,4·KX; As = Md/(KZ·d·fyd).`));
   const DD=detGet(R),DR=detRows(R,DD),ADT=ids=>{const t=ids.map(id=>{const r=DR.find(x=>x.id===id);return r?`${id} ${detText(id,DD)}${r.mode==='n'&&/N1$|N2$|N2a$|N10$|N15$/.test(id)?' por face':''} = ${r.ad} (necessário ${r.req}) – ${ST(r.ok)}`:''}).filter(Boolean);return t.length?EQ('Adotado (detalhamento):',t.join('; ')):null};
   const pushA=ids=>{const e=ADT(ids);if(e)b.push(e)};
+  const chavBlock=()=>{if(!R.K)return;const K=R.K;b.push(H2('Chaveta (dente) sob a sapata'));
+    b.push(TXT(`A chaveta é um balanço de concreto engastado no fundo da sapata, carregado pelo empuxo passivo que ela mobiliza. Força de cálculo: a parcela da força horizontal que o atrito na base e o passivo à frente da sapata não absorvem, no máximo o passivo da chaveta e no mínimo 1/3 dele.`));
+    b.push(EQ('Esforços (por metro):',`Vk = ${f(K.Vk,2)} kN/m e Mk = ${f(K.Mk,2)} kN·m/m no engaste; Vd = 1,4·Vk = ${f(K.Vd,2)} kN/m e Md = ${f(K.Md,2)} kN·m/m`));
+    b.push(EQ('Flexão:',`b = 100 cm, h = ${f(K.bk*100,0)} cm, d = ${f(K.d,1)} cm → As = ${f(K.r.As||0,2)} cm²/m; mínimo 0,15% = ${f(K.Asmin,2)} cm²/m; adotado ${f(K.As,2)} cm²/m em cada face (barras em U)`));
+    b.push(EQ('Cisalhamento:',`Vd = ${f(K.Vd,2)} ≤ VRd1 = ${f(K.VRd1,2)} kN/m (NBR 6118, 19.4.1) – ${ST(K.vOk)}`));pushA(['N21'])};
   const pilBlock=(P,tit,ids)=>{b.push(H2(tit));
     b.push(EQ('Momento:',`Mk = ${f(P.Mk,2)} kN·m; Md1 = 1,4·Mk = ${f(P.M1d,2)} kN·m`));
     if(P.gn>1)b.push(EQ('Coeficiente adicional:',`menor dimensão < 19 cm → γn = 1,95 − 0,05·b = ${f(P.gn,2)} (NBR 6118, 13.2.3), aplicado a Md e Vd`));
@@ -2133,6 +2165,7 @@ function memorialXML(R,figs,state){
   b.push(EQ('Cortante a d da face:',`Vd = ${f(R.SV.Vd,2)} kN/m ≤ VRd1 = ${f(R.SV.VRd1,2)} kN/m (${ST(R.SV.ok)})`));
   if(R.PU)b.push(EQ('Punção:',`sapata flexível; Fsd = ${f(R.PU.Fsd,1)} kN; na face τ = ${f(R.PU.tau0/1000,3)} ≤ τRd2 = ${f(R.PU.tRd2/1000,2)} MPa; no contorno a 2d (u = ${f(R.PU.u1,2)} m, β = ${f(R.PU.beta,2)}) τ = ${f(R.PU.tau1/1000,3)} ≤ τRd1 = ${f(R.PU.tRd1/1000,3)} MPa${R.PU.fits?'':' (contorno a 2d sai da sapata: não se forma)'} (${ST(R.PU.ok)})`));
   if(R.cor&&R.TS)b.push(EQ('Torção:',`Td = Md,pescoço/2 = ${f(R.TS.Td,2)} kN·m ≤ TRd2 = ${f(R.TS.TRd2,1)} kN·m; A90/s = ${f(R.TS.A90,2)} cm²/m; Asl = ${f(R.TS.Asl,2)} cm² (${ST(R.TS.ok)})`));
+  chavBlock();
   // alvenaria
   b.push(H1('8. Alvenaria'));
   if(!arm){
@@ -2322,8 +2355,8 @@ function v3geo(R){
   if(R.arm){const len=R.enr?nv*R.lenr:Math.max(3,nv*1.5);z1=0;z2=len;if(R.enr)for(let i=0;i<=nv;i++)zs.push(i*R.lenr)}
   else{for(let i=0;i<=nv;i++)zs.push(i*R.s);z1=-hp/2;z2=nv*R.s+hp/2}
   // fundação
-  if(R.arm||R.cor)box('fund','conc',F0,F0+B,I.Nf,R.ytop,z1,z2,'sapata corrida');
-  else zs.forEach(z=>box('fund','conc',F0,F0+B,I.Nf,R.ytop,z-I.L/2,z+I.L/2,'sapata'));
+  if(R.arm||R.cor){box('fund','conc',F0,F0+B,I.Nf,R.ytop,z1,z2,'sapata corrida');if(R.K)box('fund','conc',R.K.x0,R.K.x0+R.K.bk,I.Nf-R.K.hk,I.Nf,z1,z2,'chaveta')}
+  else zs.forEach(z=>{box('fund','conc',F0,F0+B,I.Nf,R.ytop,z-I.L/2,z+I.L/2,'sapata');if(R.K)box('fund','conc',R.K.x0,R.K.x0+R.K.bk,I.Nf-R.K.hk,I.Nf,z-I.L/2,z+I.L/2,'chaveta')});
   if(R.arm){box('fund','conc',P0,P0+bpe,R.ytop,NAe,z1,z2,'parede de fundação')}
   else{zs.forEach(z=>box('fund','conc',P0,P0+bpe,R.ytop,NAe,z-hpe/2,z+hpe/2,'pescoço'));
     if(!R.cor)box('fund','conc',0,bp,NAe-hci,NAe,z1,z2,'viga baldrame')}
@@ -2341,7 +2374,7 @@ function v3geo(R){
     zs.forEach(z=>box('conc','conc',0,bp,NAe,yC,z-hp/2,z+hp/2,'pilar'))}
   else if(R.enr)zs.forEach(z=>box('conc','grout',t,R.tenr/100,R.ytop,yC,z-R.eenr/200,z+R.eenr/200,'enrijecedor'));
   // solo (vizinho à esquerda de x = 0, interno à direita)
-  const xMin=Math.min(F0,0,P0)-1.2,xMax=Math.max(F0+B,wT)+1.6,yb=I.Nf-0.35,gE=I.NT2,gI=I.NT,xi=Math.max(wT,P0+bpe);
+  const xMin=Math.min(F0,0,P0)-1.2,xMax=Math.max(F0+B,wT)+1.6,yb=I.Nf-0.35-(R.K?R.K.hk:0),gE=I.NT2,gI=I.NT,xi=Math.max(wT,P0+bpe);
   box('solo','soilE',xMin,Math.min(0,F0,P0),yb,gE,z1-0.4,z2+0.4,'solo vizinho');
   if(F0<0&&gE>R.ytop)box('solo','soilE',F0,Math.min(0,P0),R.ytop,gE,z1-0.4,z2+0.4,'solo vizinho');
   box('solo','soilI',xi,xMax,Math.max(yb,R.ytop),gI,z1-0.4,z2+0.4,'solo interno');
@@ -2504,6 +2537,7 @@ function quantidades(R,D){const A=phi=>area(phi),kg=(cm2,L)=>cm2*1e-4*L*7850,q={
   // sapata: malhas N5/N6 na direção B e N7 ao longo do muro
   {const n5=D.N5,n6=R.SBs?D.N6:null,n7=D.N7,L=R.arm||R.cor?1:I.L,per=R.arm||R.cor?1:1/R.s;
    q.aco+=(kg(A(n5.phi),B)*L/(n5.s/100)+(n6?kg(A(n6.phi),B)*L/(n6.s/100):0)+(n7.n?kg(n7.n*A(n7.phi),L):kg(A(n7.phi),L)*B/(n7.s/100)))*per}
+  if(R.K){const per=R.arm||R.cor?1:I.L/R.s,K=R.K;q.conc+=K.bk*K.hk*per;q.esc+=K.bk*K.hk*per;if(D.N21)q.aco+=kg(A(D.N21.phi)/(D.N21.s/100),2*K.hk+K.bk+1.0)*per}
   q.reat=Math.max(0,q.esc-q.conc*0.6);
   return q}
 function custo(q,R){const p=precos(),fck=+I.fck||25,pc=p.c25+(p.c30-p.c25)*(fck-25)/5,pb=(p[I.bloco]||p.c14_39)+(R.arm||R.canPI?p.fbk*Math.max(0,+I.fbk-4):0)+(I.fa==='2'?p.fa2:I.fa==='8'?p.fa8:0);
@@ -2530,9 +2564,12 @@ async function otimizar(){if(OTM)return;const btn=$('otmBtn'),st=$('otmStatus'),
       const setH=()=>{if(I.pInf==='conc'){const yt=I.Nf+I.hs;I.hcw=Math.max(0.6,Math.ceil((Math.max(I.NT,I.NT2)-yt)/0.2-1e-9)*0.2)}};
       // para cada profundidade de apoio (a informada e mais funda, até 1,2 m abaixo): 1) menor B estável; 2) hs e materiais mais baratos que fazem tudo passar
       let best=null;const mats=otmMats(lay);
-      for(const dz of [0,0.4,0.8,1.2]){I.Nf=+(base.Nf-dz).toFixed(2);if(I.sys==='pil'&&I.tipoSap!=='cor'&&I.Nf+0.3>NAeOf(I)-0.2)continue;
-        let okB=false;I.hs=0.30;for(let B=0.8;B<=4.0+1e-9;B+=0.1){I.B=+B.toFixed(2);if(I.tipoSap==='iso')I.L=Math.max(I.L,Math.min(I.B,I.s-0.4));setH();let R;try{R=calc()}catch(e){break}
-          if(otmStab(R)){okB=true;break}if(B>3.95){const r=Math.min(R.FSd/(+I.FSdMin||1.5),R.FSt/(+I.FStMin||1.5));if(!diag||r>diag.r)diag={r,FSd:R.FSd,FSt:R.FSt,Nf:I.Nf}}}
+      for(const dz of [0,0.4,0.8,1.2]){for(const ck of [{chav:'nao'},{chav:'sim',hk:0.3},{chav:'sim',hk:0.5},{chav:'sim',hk:0.8}]){I.Nf=+(base.Nf-dz).toFixed(2);if(I.sys==='pil'&&I.tipoSap!=='cor'&&I.Nf+0.3>NAeOf(I)-0.2)continue;
+        Object.assign(I,ck,{bk:25,xk:base.xk||'muro',fpk:base.fpk!=null?base.fpk:1});
+        // menor B estável por bisseção (passos de 0,10 m entre 0,80 e 4,00 m)
+        let okB=false;I.hs=0.30;{const stabAt=k=>{I.B=+(k/10).toFixed(2);if(I.tipoSap==='iso')I.L=Math.max(0.8,Math.min(2.0,I.s-0.4),Math.min(I.B,I.s-0.4));setH();let R;try{R=calc()}catch(e){return false}
+            if(k===40&&!otmStab(R)){const r=Math.min(R.FSd/(+I.FSdMin||1.5),R.FSt/(+I.FStMin||1.5));if(!diag||r>diag.r)diag={r,FSd:R.FSd,FSt:R.FSt,Nf:I.Nf}}return otmStab(R)};
+          if(stabAt(40)){let lo=8,hi=40;if(stabAt(lo))hi=lo;else{while(hi-lo>1){const m=(lo+hi)>>1;if(stabAt(m))hi=m;else lo=m}}stabAt(hi);okB=true}}
         if(!okB)continue;
         let got=null;
         const pass=()=>{let R;try{R=calc()}catch(e){return null}return otmStab(R)&&otmOk(R)?R:null};
@@ -2544,7 +2581,7 @@ async function otimizar(){if(OTM)return;const btn=$('otmBtn'),st=$('otmStatus'),
           for(const fb of fbks){I.fbk=fb;if(pass())break}
           if(I.sys==='arm'){I.ehor=0.6;if(!pass())I.ehor=0.4;for(const ph of ['8','10','12.5']){I.phH=ph;if(pass())break}}
           const R=pass();if(!R)continue;const q=quantidades(R,detDefaults(R)),c=custo(q,R);got={I:{...I},c,q};break}
-        if(got&&(!best||got.c.tot<best.c.tot))best=got;else if(!got)nStruct++}
+        if(got&&(!best||got.c.tot<best.c.tot))best=got;else if(!got)nStruct++}if(best)break} // com solução numa profundidade, não desce mais
       if(best)res.push(best)}
   }finally{I=base;I.det=det;OTM=null;btn.disabled=false}
   if(!res.length){st.textContent=diag?`Nenhuma combinação atende. A estabilidade não fecha nem com sapata de 4,00 m e apoio até ${sgn(diag.Nf)}: FS ao deslizamento ${f(diag.FSd)} e ao tombamento ${f(diag.FSt)}. Considere o empuxo passivo (fator em Solo), apoio mais profundo, um dente sob a sapata ou contenção de outro tipo.`:'Nenhuma combinação testada atende a todas as verificações. Revise as cotas, o solo ou a tensão admissível.';update();return}
@@ -2552,8 +2589,8 @@ async function otimizar(){if(OTM)return;const btn=$('otmBtn'),st=$('otmStatus'),
   I={...win.I,det:{...(base.det||{})}};delete I.det[I.sys];save();fill();update();
   renderOtm(res.slice(0,6));st.textContent=`Aplicada a solução de menor custo entre ${res.length} que atendem (de ${lays.length} arranjos testados).`}
 function otmDesc(J){const b=BLOCOS.find(x=>x[0]===J.bloco),bt=b?b[1].replace(/ × 19 × \d+ cm/,''):J.bloco;
-  return J.sys==='arm'?`Alvenaria armada · ${bt}${J.enr==='sim'?` · enrijecedores ${String(J.tenr)} cm a cada ${f(J.lenr)} m`:' · sem enrijecedores'} · fbk ${J.fbk} MPa`:
-   `Pilares a cada ${f(J.s)} m · sapata ${J.tipoSap==='cor'?'corrida':'isolada'} · ${bt}${J.cintaInt==='sim'?' · cinta intermediária':''}${J.pInf==='conc'?` · parede de concreto ${f(J.hcw)} m`:''}${J.canPI==='sim'?' · canaletas armadas':''}`}
+  const pre=J.chav==='sim'?`Chaveta ${f(+J.hk*100,0)} cm · apoio ${sgn(J.Nf)} · `:`Apoio ${sgn(J.Nf)} · `;return pre+(J.sys==='arm'?`Alvenaria armada · ${bt}${J.enr==='sim'?` · enrijecedores ${String(J.tenr)} cm a cada ${f(J.lenr)} m`:' · sem enrijecedores'} · fbk ${J.fbk} MPa`:
+   `Pilares a cada ${f(J.s)} m · sapata ${J.tipoSap==='cor'?'corrida':'isolada'} · ${bt}${J.cintaInt==='sim'?' · cinta intermediária':''}${J.pInf==='conc'?` · parede de concreto ${f(J.hcw)} m`:''}${J.canPI==='sim'?' · canaletas armadas':''}`)}
 function renderOtm(L){const w=L[0];const it=Object.entries(w.c.it).filter(([,v])=>v>0.5);
   $('otmRes').innerHTML=`<div class="verdict ok">Solução aplicada: ${otmDesc(w.I)} · B = ${f(w.I.B)} m, hs = ${f(w.I.hs)} m · C${w.I.fck} · argamassa ${({2:'1,5–3,4',5:'3,5–7,0',8:'> 7'})[w.I.fa]} MPa · <b>≈ R$ ${f(w.c.tot,0)} por metro de muro</b></div>
    <table class="tbl"><tr><th>Item</th><th>R$/m</th></tr>${it.map(([k,v])=>`<tr><td>${k}</td><td>${f(v,0)}</td></tr>`).join('')}</table>
