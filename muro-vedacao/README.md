@@ -1,6 +1,6 @@
-# Muro de vedação – v12
+# Muro de vedação – v13
 
-Aplicativo em uma única página HTML para dimensionar muro de vedação de divisa. Para usar: https://engrafaeljralves.github.io/DIMI--Concreto/muro-vedacao/ (GitHub Pages), ou abra `muro-vedacao-v12.html` no navegador.
+Aplicativo em uma única página HTML para dimensionar muro de vedação de divisa. Para usar: https://engrafaeljralves.github.io/DIMI--Concreto/muro-vedacao/ (GitHub Pages), ou abra `muro-vedacao-v13.html` no navegador.
 
 **Sistemas**
 - Pilares de concreto com alvenaria de vedação, baldrame, cinta superior e sapata isolada ou corrida, de divisa ou centrada.
@@ -49,3 +49,7 @@ Versões anteriores ficam na mesma pasta (por exemplo, `muro-vedacao-v6.html`).
 - Ações no 3D por componente: vento, empuxo ativo de cada lado (tardoz) e passivo resistente × fator, com opção "Todos os carregamentos", por caso de cálculo ou isoladas com setas e valor máximo, sobrecarga nos terrenos e seleção de elementos por clique com nome e dimensões.
 - Vistas rápidas (isométrica, lado interno, lado do vizinho, lateral, topo), camadas liga/desliga, alvenaria transparente e escolha de 1 a 4 vãos; o modelo acompanha os dados.
 - Detalhamento da alvenaria armada: desenhos F (planta baixa da 1ª fiada com furos grauteados, V1 e enrijecedores com E1/E2/E3) e G (vista pelo lado interno com canaletas H1, cotas entre eixos das canaletas, grampos E3 e furos V1), gerados a partir dos dados e incluídos no memorial (Figuras após o detalhamento).
+
+## v13
+- Botão **Dimensionar com menor custo** (aba Dados): mantém cotas, solo, vento e critérios; testa os dois sistemas (pilares + alvenaria/parede de concreto e alvenaria armada com ou sem enrijecedores), tipo de sapata, espaçamentos, bloco, cinta intermediária, canaletas, profundidade de apoio, largura e altura da sapata, fck, fbk e classe da argamassa; aplica a solução mais barata que passa em todas as verificações e no detalhamento, e lista as alternativas.
+- Custo por metro de muro (concreto, aço, fôrma, alvenaria, graute, escavação e reaterro) com preços unitários de referência editáveis.
