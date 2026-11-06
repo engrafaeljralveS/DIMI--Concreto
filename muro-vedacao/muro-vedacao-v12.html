@@ -264,6 +264,7 @@ td.txt{font-family:var(--body);text-align:left;color:var(--muted);font-size:12.5
     <div id="detVerdict"></div>
     <div class="panel"><header><h3>Armaduras adotadas</h3><small>Traspasse de 1,00 m; para Ø ≥ 16 mm é calculado pela NBR 6118 (*)</small></header><div class="scroll"><table id="tabDet" class="detTab"></table></div></div>
     <div class="panel" style="background:#ffffff"><header><h3 style="color:#16212c">Esboço do detalhamento</h3><small style="color:#5a6774">Vai para o memorial em Word</small></header><div class="scroll"><div id="detDraw" style="min-width:900px"></div></div></div>
+    <div class="panel" style="background:#ffffff" id="armDwgPanel" hidden><header><h3 style="color:#16212c">Planta e vista do muro armado</h3><small style="color:#5a6774">Grauteamento vertical e canaletas armadas · vai para o memorial em Word</small></header><div class="scroll"><div id="armPlan" style="min-width:900px"></div><div id="armVista" style="min-width:900px;margin-top:18px"></div></div></div>
     <div class="panel"><header><h3>Drenagem</h3><small>Dreno longitudinal com manta geotêxtil, brita, areia e tubo PEAD corrugado perfurado</small></header><div id="drenForm" class="formcol"></div></div>
     <div class="panel" style="background:#ffffff"><header><h3 style="color:#16212c">Seção transversal típica e drenagem</h3><small style="color:#5a6774">Cotas, níveis e detalhe do dreno · vai para o memorial em Word</small></header><div class="scroll"><div id="secDraw" style="min-width:900px"></div></div></div>
     <div class="nav"><button class="btn" type="button" data-go="3">← Verificações</button><button class="btn" type="button" data-go="5">Modelo 3D →</button><div class="memwrap"><span class="memStatus note" role="status"></span><button class="btn primary mem" type="button">Gerar memorial (Word)</button></div></div>
@@ -1689,6 +1690,83 @@ function detSvg(R,D){
   return {svg:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${Wd} ${Hd}">${dwgText(o.join(''))}</svg>`,w:Wd,h:Hd};
 }
 
+/* ---------- muro armado: planta da 1ª fiada (grauteamento vertical) e vista pelo lado interno (canaletas) ---------- */
+function armDrawCommon(R,D,mem){const md=R.mod/100,t=R.t/100,enr=!!R.enr,stepE=enr?Math.max(2,Math.round(R.lenr/md))*md:0,nE=enr?(mem||R.lenr>2.6?2:3):0,e0=md/2+2*md,
+  eixos=enr?Array.from({length:nE},(_,i)=>e0+i*stepE):[],len=enr?eixos[nE-1]+e0:Math.max(2.4,8*md*2),sV=Math.max(md,(D.V1.s||R.mod)/100),
+  isV1=c=>{const r=(c-e0)/sV;return Math.abs(r-Math.round(r))<1e-6};
+  return {md,t,enr,eixos,len,sV,isV1,tenr:enr?R.tenr/100:t,eenr:enr?R.eenr/100:t,
+   txt:(id)=>detText(id,D),dm:v=>f(v)}}
+function armSvgKit(F=1){const o=[];const e=v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const K={o,
+   T:(x,y,s,o2={})=>o.push(`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-family="Arial,Helvetica,sans-serif" font-size="${((o2.fs||10)*F).toFixed(1)}" text-anchor="${o2.a||'start'}" fill="#000000" font-weight="${o2.b?'bold':'normal'}"${o2.r?` transform="rotate(${o2.r} ${x.toFixed(1)} ${y.toFixed(1)})"`:''}>${e(s)}</text>`),
+   L:(x1,y1,x2,y2,c='#000000',w=0.8,d='')=>o.push(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${c}" stroke-width="${w}"${d?` stroke-dasharray="${d}"`:''}/>`),
+   R:(x,y,w,h,f,s='#555555',sw=0.6)=>o.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(0,w).toFixed(1)}" height="${Math.max(0,h).toFixed(1)}" fill="${f}" stroke="${s}" stroke-width="${sw}"/>`),
+   C:(x,y,r,f)=>o.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="${f}"/>`),
+   P:(d,c,w)=>o.push(`<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}"/>`)};
+  const tick=(x,y)=>K.L(x-3,y+3,x+3,y-3,'#000000',1);
+  K.TW=(x,y,str,o2={},maxCh=200)=>{const w=String(str).split(' '),ls=[];let cur='';w.forEach(t=>{if((cur+' '+t).trim().length>maxCh&&cur){ls.push(cur);cur=t}else cur=(cur+' '+t).trim()});if(cur)ls.push(cur);const lh=(o2.fs||10)*F*1.4;ls.forEach((s2,j)=>K.T(x,y+j*lh,s2,o2));return ls.length*lh};
+  K.legend=(x,y,items)=>{let cx=x;items.forEach(it=>{if(it.k==='rect')K.R(cx,y,16,10,it.c,it.s||'#555555');else if(it.k==='dot')K.C(cx+8,y+5,4,it.c);else K.L(cx,y+5,cx+20,y+5,it.c,it.w||1.4,it.d||'');K.T(cx+26,y+9,it.t,{fs:9});cx+=26+it.t.length*9*F*0.56+20})};
+  K.dimH=(x1,x2,y,s,up=true)=>{K.L(x1,y,x2,y);tick(x1,y);tick(x2,y);K.L(x1,y-5,x1,y+5,'#000000',.5);K.L(x2,y-5,x2,y+5,'#000000',.5);K.T((x1+x2)/2,y+(up?-4:12),s,{a:'middle',fs:9})};
+  K.dimV=(x,y1,y2,s,left=true)=>{K.L(x,y1,x,y2);tick(x,y1);tick(x,y2);K.L(x-5,y1,x+5,y1,'#000000',.5);K.L(x-5,y2,x+5,y2,'#000000',.5);K.T(x+(left?-5:11),(y1+y2)/2,s,{a:'middle',fs:9,r:-90})};
+  return K}
+const ARMC={blk:'#efe6d8',gr:'#bfc3c8',bar:'#c0392b',can:'#d6e4f2',st:'#1f5fa8'};
+function armPlanSvg(R,D,mem){const F=mem?1.4:1,G=armDrawCommon(R,D,mem),K=armSvgKit(F),{md,t,eixos,len}=G,k=Math.min(230,(mem?620:1050)/len),x0=70,y0=mem?160:130,X=m=>x0+m*k,Y=m=>y0+m*k;
+  K.T(20,24,'F – PLANTA BAIXA DO MURO ARMADO (1ª FIADA) – GRAUTEAMENTO VERTICAL',{b:1,fs:12});
+  const sub1=K.TW(20,40,`${R.Bl[1]}${G.enr?` · enrijecedores ${f(R.eenr,0)} × ${f(R.tenr,0)} cm a cada ${G.dm(R.lenr)} m`:''} · furos grauteados: V1 ${G.txt('V1')} no muro${G.enr?' e todos os furos do enrijecedor':''}`,{fs:10},mem?80:200);
+  K.T(x0,y0-58,`lado ${R.EaE&&R.EaI&&R.EaI.M>R.EaE.M?'do lote (empuxo interno)':'do aterro / vizinho (empuxo)'} ↑`,{fs:9});
+  K.L(x0-20,y0-2,X(len)+20,y0-2,'#b3261e',1,'6 3');K.T(x0-22,y0-6,'face externa do muro',{fs:9});
+  for(let m=0;m<len-1e-6;m+=2*md)K.R(X(m),Y(0),Math.min(2*md,len-m)*k-1,t*k,ARMC.blk,'#333333',0.8);
+  const cw=(md-0.05)*k,ch=(t-0.06)*k;
+  for(let c=md/2;c<len;c+=md){const g=G.isV1(c),onE=eixos.some(e=>Math.abs(e-c)<1e-6),cx=X(c),cy=Y(t/2);K.R(cx-cw/2,cy-ch/2,cw,ch,g||onE?ARMC.gr:'#ffffff','#333333',0.6);if(g&&!onE)K.C(cx,cy,4,ARMC.bar)}
+  if(G.enr){const nA=Math.max(1,Math.round((G.tenr-t)/md)),cy=j=>t+(j+0.5)*(G.tenr-t)/nA,r=4.5;
+    eixos.forEach((e,i)=>{K.R(X(e-G.eenr/2),Y(t),G.eenr*k,(G.tenr-t)*k,ARMC.blk,'#333333',0.8);
+      for(let j=0;j<nA;j++)K.R(X(e)-ch/2,Y(cy(j))-cw/2,ch,cw,ARMC.gr,'#333333',0.6);
+      const n1=Math.min(2,D.E1.n),n2=Math.min(2,D.E2.n),xs=n=>n===1?[0]:[-9,9];
+      xs(n1).forEach(d=>K.C(X(e)+d,Y(t/2),r,ARMC.bar));xs(n2).forEach(d=>K.C(X(e)+d,Y(cy(nA-1)),r,ARMC.bar));
+      if(D.E3)K.P(`M${(X(e)-14).toFixed(1)} ${(Y(t/2)-6).toFixed(1)} L${(X(e)-14).toFixed(1)} ${(Y(cy(nA-1))+9).toFixed(1)} L${(X(e)+14).toFixed(1)} ${(Y(cy(nA-1))+9).toFixed(1)} L${(X(e)+14).toFixed(1)} ${(Y(t/2)-6).toFixed(1)}`,ARMC.st,1.4);
+      K.L(X(e),Y(-0.08),X(e),Y(G.tenr+0.06),'#000000',0.5,'10 3 2 3');K.T(X(e)-4,Y(G.tenr+0.04),'eixo',{fs:8,a:'end'});
+      if(i===0){const lx=X(e)+60,ly=a=>Y(t)+20+a*18*F;
+        K.L(X(e)+5,Y(t/2)+3,lx,ly(0),'#000000',.5);K.T(lx+3,ly(0)+3,`E1 – ${G.txt('E1')} (no furo junto ao muro)`,{fs:9});
+        K.L(X(e)+13,Y(cy(nA-1)),lx,ly(1),'#000000',.5);K.T(lx+3,ly(1)+3,`E2 – ${G.txt('E2')} (no furo da ponta da alma)`,{fs:9});
+        if(D.E3){K.L(X(e)+14,Y(cy(nA-1))+9,lx,ly(2),'#000000',.5);K.T(lx+3,ly(2)+3,`E3 – grampo ${G.txt('E3')}${D.E3.s<=R.hcan*100+1e-6?' (em cada fiada)':''}`,{fs:9})}}});
+    for(let i=0;i<eixos.length-1;i++)K.dimH(X(eixos[i]),X(eixos[i+1]),Y(-0.17),`${G.dm(R.lenr)} m entre eixos de enrijecedores`);
+    const e2=eixos[eixos.length-1];K.dimV(X(e2)+40,Y(0),Y(G.tenr),`${f(R.tenr,0)} cm`,false);K.dimH(X(e2-G.eenr/2),X(e2+G.eenr/2),Y(G.tenr)+30,`${f(R.eenr,0)} cm`,false);}
+  {const a0=G.enr?eixos[0]:md/2,a1=G.enr?eixos[1]:Math.min(len-md/2,a0+4*G.sV);let a=a0;while(a<a1-1e-6){const b=Math.min(a1,a+G.sV);K.dimH(X(a),X(b),Y(-0.08),f((b-a)*100,0));a=b}}
+  K.dimV(X(len)+30,Y(0),Y(t),`${f(R.t,0)} cm`,false);
+  const yl=Y(G.tenr)+(G.enr?20:30);K.T(x0,yl,'lado interno ↓',{fs:9});
+  const ly=yl+60;K.legend(x0,ly,[{k:'rect',c:ARMC.gr,s:'#333333',t:'furo grauteado'},{k:'dot',c:ARMC.bar,t:'barra vertical'},{k:'rect',c:'#ffffff',s:'#333333',t:'furo vazio'},...(G.enr?[{k:'line',c:ARMC.st,t:'grampo do enrijecedor'}]:[])]);
+
+  let yN=ly+30*F;yN+=K.TW(x0,yN,`Grauteamento vertical: V1 ${G.txt('V1')}${G.enr?' a partir do eixo de cada enrijecedor':''}, em toda a altura${G.enr?'; enrijecedor com todos os furos grauteados':''}.`,{fs:9},mem?95:200);
+  yN+=K.TW(x0,yN,`V2 – ${G.txt('V2')} nas extremidades do muro, nos cantos e dos dois lados de cada junta de controle (não mostrado neste trecho).`,{fs:9},mem?95:200);
+  const W=Math.max(X(len)+130*F,mem?820:760),H=yN+10;return {svg:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W.toFixed(0)} ${H.toFixed(0)}"><rect width="${W.toFixed(0)}" height="${H.toFixed(0)}" fill="#ffffff"/>${K.o.join('')}</svg>`,w:Math.round(W),h:Math.round(H)}}
+function armVistaSvg(R,D,mem){const F=mem?1.4:1,G=armDrawCommon(R,D,mem),K=armSvgKit(F),{md,eixos,len}=G,fi=R.hcan,h=R.hA,hT=R.hT,k=Math.min(210,(mem?560:1000)/len,520/Math.max(h,0.5)),x0=90,yb=(mem?115:90)+h*k,X=m=>x0+m*k,Y=z=>yb-z*k;
+  const nf=Math.max(1,Math.round(h/fi)),canF=new Set(R.canH.map(z=>Math.round((z-fi/2)/fi))),cintaF=f2=>(f2+0.5)*fi>hT-1e-6;
+  K.T(20,24,`G – VISTA DO MURO PELO LADO INTERNO – CANALETAS ARMADAS${G.enr?' E ENRIJECEDORES':''}`,{b:1,fs:12});
+  K.TW(20,40,`canaletas H1 com ${G.txt('H1')}: 1ª fiada, a cada ${G.dm(R.ehI)} m no terço inferior e a cada ${G.dm(R.ehG)} m acima${G.enr&&D.E3?` · enrijecedor com grampos E3 ${G.txt('E3')}`:''}`,{fs:10},mem?80:200);
+  for(let f2=0;f2<nf;f2++){const off=f2%2?md:0,y=Y(Math.min(h,(f2+1)*fi)),hh=Math.min(fi,h-f2*fi)*k,can=canF.has(f2)||cintaF(f2);
+    for(let m=-off;m<len;m+=2*md){const a=Math.max(0,m),b=Math.min(len,m+2*md);if(b-a<0.01)continue;K.R(X(a),y,(b-a)*k-1,hh-1,can?ARMC.can:ARMC.blk,'#555555',0.5)}}
+  for(let c=md/2;c<len;c+=md){if(G.isV1(c)&&!eixos.some(e=>Math.abs(e-c)<1e-6))K.L(X(c),Y(0),X(c),Y(h),ARMC.bar,1.2,'5 3')}
+  eixos.forEach((e,i)=>{K.R(X(e-G.eenr/2),Y(h),G.eenr*k,h*k,ARMC.gr,'#333333',0.8);
+    if(D.E3){const s=Math.max(0.1,D.E3.s/100);for(let z=s/2;z<h;z+=s)K.L(X(e-G.eenr/2+0.015),Y(z),X(e+G.eenr/2-0.015),Y(z),ARMC.st,1.6)}
+    K.L(X(e)-4,Y(0)+30,X(e)-4,Y(h)+8,ARMC.bar,1.4);K.L(X(e)+4,Y(0)+30,X(e)+4,Y(h)+8,ARMC.bar,1.4);
+    if(i===0){const lx=X(e+G.eenr/2+0.25);
+      if(D.E3){K.R(lx,Y(h*0.55)-10*F,190*F,30*F,'#ffffff','none',0);K.L(X(e+G.eenr/2),Y(h*0.5),lx,Y(h*0.55),'#000000',.5);K.T(lx+2,Y(h*0.55)+3,`E3 – grampo ${G.txt('E3')}`,{fs:9});K.T(lx+2,Y(h*0.55)+15*F,'(na canaleta do enrijecedor)',{fs:9})}
+      K.R(lx,Y(h*0.08)-10*F,180*F,16*F,'#ffffff','none',0);K.L(X(e),Y(h*0.12),lx,Y(h*0.08),'#000000',.5);K.T(lx+2,Y(h*0.08)+3,`E1 ${G.txt('E1')} + E2 ${G.txt('E2')}`,{fs:9})}});
+  const axes=[...R.canH,h-Math.min(fi,h-hT)/2];
+  axes.forEach(z=>{const yy=Y(z);K.L(X(0.05),yy-3,X(len-0.05),yy-3,ARMC.bar,1.3);K.L(X(0.05),yy+3,X(len-0.05),yy+3,ARMC.bar,1.3)});
+  const xd=X(len)+30;K.T(xd-8,Y(h)-14,'eixo das canaletas',{fs:9});
+  for(let i=0;i<axes.length-1;i++)K.dimV(xd,Y(axes[i]),Y(axes[i+1]),`${f((axes[i+1]-axes[i])*100,0)} cm`,false);
+  axes.forEach((z,i)=>{K.L(X(len),Y(z),xd+5,Y(z),'#000000',.4,'2 2');K.T(X(len)+52,Y(z)+3,i===axes.length-1?`verga de topo – ${G.txt('N13')}`:`H1 – ${G.txt('H1')}${i===0?' (1ª fiada)':''}`,{fs:9})});
+  K.dimV(x0-40,Y(0),Y(hT/3),'terço inferior',true);K.dimV(x0-62,Y(0),Y(h),`${G.dm(h)} m`,true);
+  K.R(X(0),Y(0),len*k,30,'#e3e6ea','#555555',0.8);K.T(X(len/2),Y(0)+19,'parede de fundação / sapata (ver corte A)',{fs:9,a:'middle'});
+  for(let i=0;i<eixos.length-1;i++)K.dimH(X(eixos[i]),X(eixos[i+1]),Y(h)-12,`${G.dm(R.lenr)} m`);
+  const ly=Y(0)+58;K.legend(x0,ly,[{k:'rect',c:ARMC.can,t:'canaleta grauteada com H1'},...(G.enr?[{k:'rect',c:ARMC.gr,s:'#333333',t:'enrijecedor (todo grauteado)'}]:[]),{k:'line',c:ARMC.bar,w:1.2,d:'5 3',t:`furo grauteado V1 ${G.txt('V1')}`},...(G.enr&&D.E3?[{k:'line',c:ARMC.st,w:1.6,t:'grampo E3'}]:[])]);
+
+
+
+  const yN=ly+28*F+K.TW(x0,ly+28*F,`As barras H1 passam contínuas${G.enr?' pelos enrijecedores':''}; emendas por traspasse de 40Ø fora do meio do vão${G.enr?' e dobra de 90° dentro do enrijecedor nas extremidades':''}.`,{fs:9},mem?95:200);
+  const W=Math.max(xd+240*F,760),H=yN+6;return {svg:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W.toFixed(0)} ${H.toFixed(0)}"><rect width="${W.toFixed(0)}" height="${H.toFixed(0)}" fill="#ffffff"/>${K.o.join('')}</svg>`,w:Math.round(W),h:Math.round(H)}}
+
 function renderDet(R){
   const D=detGet(R),rows=detRows(R,D);R.det={D,rows};
   const selPhi=(id,fld,v)=>`<select data-det="${id}.${fld}" aria-label="Diâmetro ${id}">${BAR_D.map(d=>`<option value="${d}"${Math.abs(d-v)<1e-6?' selected':''}>${String(d).replace('.',',')}</option>`).join('')}</select>`;
@@ -1702,6 +1780,9 @@ function renderDet(R){
   const nf=rows.filter(r=>!r.ok).length;
   $('detVerdict').innerHTML=`<div class="verdict ${nf?'bad':'ok'}">${nf?`${nf} armadura(s) adotada(s) abaixo do necessário ou fora das regras de detalhamento.`:'Todas as armaduras adotadas atendem ao cálculo.'}</div>`;
   const sv=detSvg(R,D);$('detDraw').innerHTML=sv.svg.replace('<svg ',`<svg class="dwg" role="img" aria-label="Esboço do detalhamento das armaduras" style="width:${sv.w}px;max-width:none;height:auto;display:block" `);
+  $('armDwgPanel').hidden=!R.arm;if(R.arm){const ap=armPlanSvg(R,D),av=armVistaSvg(R,D),st=w=>`style="width:${w}px;max-width:none;height:auto;display:block" `;
+    $('armPlan').innerHTML=ap.svg.replace('<svg ',`<svg class="dwg" role="img" aria-label="Planta baixa do muro armado: grauteamento vertical" ${st(ap.w)}`);
+    $('armVista').innerHTML=av.svg.replace('<svg ',`<svg class="dwg" role="img" aria-label="Vista do muro pelo lado interno: canaletas armadas" ${st(av.w)}`)}
   const ss=secaoSvg(R);$('secDraw').innerHTML=ss.svg.replace('<svg ',`<svg class="dwg" role="img" aria-label="Seção transversal típica e detalhe do dreno" style="width:${ss.w}px;max-width:none;height:auto;display:block" `);
 }
 
@@ -2097,6 +2178,7 @@ function memorialXML(R,figs,state){
    b.push(TXT('Armaduras adotadas no detalhamento, conferidas contra as áreas exigidas pelo cálculo. Traspasse de 1,00 m para barras com Ø menor que 16 mm; para Ø ≥ 16 mm, l0t = 2,0·lb pela NBR 6118.'));
    FIGN('detalhamento_corte.png','Detalhamento: corte no eixo '+(R.arm?'do muro':'do pilar')+'.');
    FIGN('detalhamento_secoes.png','Detalhamento: seções e planta da sapata.');
+   if(R.arm){FIGN('muro_planta.png','Planta baixa do muro armado (1ª fiada): furos grauteados'+(R.enr?' e enrijecedores':'')+'.');FIGN('muro_vista.png','Vista do muro pelo lado interno: canaletas armadas'+(R.enr?' e grampos dos enrijecedores':'')+'.');}
    b.push(TBL([['Item','Elemento','Posição','Adotado','Necessário','Traspasse','Situação'],...rows.map(r=>[r.id,r.el,r.pos,r.mode==='lock'?detText('N1',D):detText(r.id,D),r.req,r.lap?`${f(r.lap.L,2)} m`:'–',ST(r.ok)])],[0.8,1.6,3,1.6,1.6,1,1.2],['l','l','l','l','r','r','r']));
    const nf=rows.filter(r=>!r.ok).length; if(nf)b.push(TXT(`${nf} armadura(s) adotada(s) não atende(m) ao cálculo ou às regras de detalhamento. Revisar antes da emissão.`));}
    {const Dr=drenoGeo(R);b.push(H2('9.1 Seção transversal típica e drenagem'));
@@ -2181,7 +2263,8 @@ async function gerarMemorial(){
     {const dv=detSvg(R,detGet(R));const crop=(vb)=>dv.svg.replace(/viewBox="[^"]*"/,`viewBox="${vb}"`);
      // a prancha é dividida em duas figuras para caber legível na folha em retrato
      figs.push(await mkFig(crop('0 80 870 1070'),870,1070,'detalhamento_corte.png','rIdImg4',13));
-     figs.push(await mkFig(crop('870 80 930 1070'),930,1070,'detalhamento_secoes.png','rIdImg5',16));}
+     figs.push(await mkFig(crop('870 80 930 1070'),930,1070,'detalhamento_secoes.png','rIdImg5',16));
+     if(R.arm){const D0=detGet(R),ap=armPlanSvg(R,D0,true),av=armVistaSvg(R,D0,true);figs.push(await mkFig(ap.svg,ap.w,ap.h,'muro_planta.png','rIdImg14',16.5));figs.push(await mkFig(av.svg,av.w,av.h,'muro_vista.png','rIdImg15',16.5));}}
     {const sv=secaoSvg(R),crop=vb=>sv.svg.replace(/viewBox="[^"]*"/,`viewBox="${vb}"`);
      if(sv.dr){const h1=Math.min(sv.h,sv.mainBot)-90,h2=Math.min(sv.h,sv.detBot)-90;
        figs.push(await mkFig(crop(`0 90 660 ${h1}`),660,h1,'secao_tipica.png','rIdImg6',12.5));
