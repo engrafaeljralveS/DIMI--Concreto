@@ -392,8 +392,9 @@ const DEF=[
   ['crit','Critério com vento','sel','total',[['total','Toda comprimida (e ≤ B/6)'],['23','2/3 comprimida (NBR 6122)']]],
   ['chav','Chaveta (dente) sob a sapata, contra o deslizamento','sel','nao',[['nao','Sem chaveta'],['sim','Com chaveta']]],
   ['hk','Chaveta – altura abaixo do fundo da sapata','m',0.40],
-  ['bk','Chaveta – largura','cm',25],
-  ['xk','Chaveta – posição','sel','muro',[['muro','Sob o muro (continua as esperas)'],['meio','No meio da sapata'],['ponta','Na ponta interna da sapata']]],
+  ['bk','Chaveta – espessura','cm',25],
+  ['xk','Chaveta – posição na sapata','sel','muro',[['muro','Sob o muro (continua as esperas)'],['meio','No meio da sapata'],['ponta','Na ponta interna (lado do lote)'],['dist','Distância informada a partir da face externa (divisa)']]],
+  ['dk','Chaveta – distância da face externa da sapata (divisa) à face da chaveta','m',0.00],
   ['fpk','Chaveta – fator do passivo na frente da chaveta (1 = total)','–',1.0]]],
  ['Solo','',[
   ['gam','Peso específico γ','kN/m³',18],
@@ -473,7 +474,7 @@ function applySys(){
   document.querySelectorAll('#form [data-sys]').forEach(el=>el.hidden=el.dataset.sys!==I.sys);
   document.querySelectorAll('#form [data-only]').forEach(el=>el.hidden=el.dataset.only!==I.sys);
   const hideIf=(id,cond)=>{const el=$(id),fl=el&&el.closest&&el.closest('.field');if(fl&&cond)fl.hidden=true};
-  hideIf('S2m',I.s2mode!=='man');['hk','bk','xk','fpk'].forEach(k=>hideIf(k,I.chav!=='sim'));{const ce=(I.bloco||'')[0]==='k';hideIf('fpkM',!ce);hideIf('fpkCM',!ce);}hideIf('L',I.tipoSap==='cor');['NA','bwi'].forEach(k=>{const fl=$(k).closest('.field');if(fl)fl.hidden=I.sys==='pil'&&I.tipoSap==='cor'});if(I.sys==='pil'){hideIf('bwi',I.tipoSap==='cor');hideIf('hci',I.tipoSap==='cor');hideIf('hPes',I.tipoSap!=='cor');hideIf('ehPI',I.canPI!=='sim');{const cw=I.tipoSap==='cor'&&I.pInf==='conc';hideIf('pInf',I.tipoSap!=='cor');['hcw','bcw','phW'].forEach(k=>hideIf(k,!cw))}hideIf('phPI',I.canPI!=='sim')}else hideIf('hPes',true);
+  hideIf('S2m',I.s2mode!=='man');['hk','bk','xk','dk','fpk'].forEach(k=>{const el=$(k),fl=el&&el.closest('.field');if(fl)fl.hidden=I.chav!=='sim'||(k==='dk'&&I.xk!=='dist')});{const ce=(I.bloco||'')[0]==='k';hideIf('fpkM',!ce);hideIf('fpkCM',!ce);}hideIf('L',I.tipoSap==='cor');['NA','bwi'].forEach(k=>{const fl=$(k).closest('.field');if(fl)fl.hidden=I.sys==='pil'&&I.tipoSap==='cor'});if(I.sys==='pil'){hideIf('bwi',I.tipoSap==='cor');hideIf('hci',I.tipoSap==='cor');hideIf('hPes',I.tipoSap!=='cor');hideIf('ehPI',I.canPI!=='sim');{const cw=I.tipoSap==='cor'&&I.pInf==='conc';hideIf('pInf',I.tipoSap!=='cor');['hcw','bcw','phW'].forEach(k=>hideIf(k,!cw))}hideIf('phPI',I.canPI!=='sim')}else hideIf('hPes',true);
   {const can=I.sys==='pil'&&I.canPI==='sim',ce=(I.bloco||'')[0]==='k';[['fbk',1],['fpkOut',1],['fpkM',ce],['fpkCM',ce]].forEach(([k,c])=>{const fl=$(k)&&$(k).closest('.field');if(fl&&can)fl.hidden=!c})}hideIf('zCi',I.cintaInt!=='sim');['drB','drPhi','drLas','drAr','drSel','drImp'].forEach(k=>{const el=$(k),fl=el&&el.closest&&el.closest('.field');if(fl)fl.hidden=I.drLado==='nao'});['lenr','tenr','eenrOut','phE'].forEach(k=>hideIf(k,I.enr!=='sim'));hideIf('p3d',I.tipoSap==='cor');
 }
 
@@ -605,7 +606,7 @@ function calc(){
    R.Pq=Wq;R.xq=Wq>0?Mq/Wq:0;}
   // chaveta (dente) sob a sapata: prisma de concreto abaixo do fundo, ao longo de toda a sapata
   R.chav=I.chav==='sim'&&+I.hk>0;R.K=null;
-  if(R.chav){const hk=+I.hk,bk=Math.max(0.15,(+I.bk||25)/100);let x0=I.xk==='ponta'?R.fx0+I.B-bk:I.xk==='meio'?R.fx0+(I.B-bk)/2:R.px0+bpe/200-bk/2;
+  if(R.chav){const hk=+I.hk,bk=Math.max(0.15,(+I.bk||25)/100);let x0=I.xk==='ponta'?R.fx0+I.B-bk:I.xk==='meio'?R.fx0+(I.B-bk)/2:I.xk==='dist'?R.fx0+(+I.dk||0):R.px0+bpe/200-bk/2;
     x0=Math.min(R.fx0+I.B-bk,Math.max(R.fx0,x0));R.K={hk,bk,x0,P:25*bk*hk*L,x:x0+bk/2-fc}}
   R.N=R.Nwall+R.Npes+R.Psap+R.Psolo+(R.K?R.K.P:0);
   R.xw=R.cw-fc; R.xpe=R.px0+bpe/200-fc;
@@ -2107,7 +2108,7 @@ function memorialXML(R,figs,state){
   b.push(EQ('Excentricidade e tensões:',`e = M/N; se |e| ≤ B/6: σ = N/(B·L) · (1 ± 6e/B); se não: σmáx = 2N / [3L(B/2 − |e|)]. B/6 = ${f(R.kern,3)} m.`));
   b.push(EQ('Tombamento:',`FS = Σ momentos estabilizantes em torno da borda de giro / momento horizontal ≥ ${f(+I.FStMin||1.5,1)}`));
   b.push(EQ('Deslizamento:',`FS = (N tan δ + ca·B·L + Ep${R.K?' + Ek':''}) / H ≥ ${f(+I.FSdMin||1.5,1)}, com δ = 2/3 φ = ${f(R.delta*180/Math.PI,1)}°`));
-  if(R.K){const K=R.K;b.push(EQ('Chaveta (dente):',`${f(K.bk*100,0)} × ${f(K.hk*100,0)} cm abaixo do fundo da sapata, ${I.xk==='ponta'?'na ponta interna':I.xk==='meio'?'no meio da sapata':'sob o muro'}, ao longo de toda a sapata. Na face da chaveta atua o empuxo passivo do solo abaixo do fundo, com a sobrecarga do solo acima dele: σp = Kp·(γ·z + γ·d) + 2c√Kp, de σp,topo = ${f(K.int.q1,1)} a ${f(K.int.q2,1)} kPa (deslizamento para o lote) e de ${f(K.ext.q1,1)} a ${f(K.ext.q2,1)} kPa (para a divisa), × fator ${f(+I.fpk,2)}. Ek = ${f(K.int.E,2)} kN e ${f(K.ext.E,2)} kN, somados à resistência ao deslizamento.`))}
+  if(R.K){const K=R.K;b.push(EQ('Chaveta (dente):',`${f(K.bk*100,0)} × ${f(K.hk*100,0)} cm abaixo do fundo da sapata, ${I.xk==='ponta'?'na ponta interna':I.xk==='meio'?'no meio da sapata':I.xk==='dist'?`a ${f(R.K.x0-R.fx0)} m da face externa da sapata`:'sob o muro'}, ao longo de toda a sapata. Na face da chaveta atua o empuxo passivo do solo abaixo do fundo, com a sobrecarga do solo acima dele: σp = Kp·(γ·z + γ·d) + 2c√Kp, de σp,topo = ${f(K.int.q1,1)} a ${f(K.int.q2,1)} kPa (deslizamento para o lote) e de ${f(K.ext.q1,1)} a ${f(K.ext.q2,1)} kPa (para a divisa), × fator ${f(+I.fpk,2)}. Ek = ${f(K.int.E,2)} kN e ${f(K.ext.E,2)} kN, somados à resistência ao deslizamento.`))}
   b.push(TBL([['Caso','M (kN·m)','e (m)','Comprimido','σmáx (kPa)','σmín (kPa)','FS tomb.','FS desl.','Situação'],
     ...[R.perm,...R.cW].map(c=>[c.lab,f(c.Mt,2),f(c.e,3),`${f(Math.min(1,c.lc/I.B)*100,0)}%`,f(c.smax,1),f(c.smin,1),c.d?f(c.FSt):'–',c.d?f(c.FSd):'–',ST(c.ok)])],[2.6,1.1,1,1.2,1.1,1.1,1,1,1.3]));
   FIGN('acoes_base.png','Ações na base da sapata: resultante N com excentricidade, força horizontal H e pressões no solo (kPa) nos três casos.');
